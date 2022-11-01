@@ -1,4 +1,4 @@
-package moe.nyamori.bgm
+package moe.nyamori.bgm.config
 
 import java.io.File
 
