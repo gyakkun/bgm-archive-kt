@@ -9,5 +9,6 @@ data class GroupPost(
     var contentBbcode: String?,
     var state: Short,
     var dateline: Long,
-    var isTopPost: Boolean?
+    var isTopPost: Boolean?,
+    var user: User?
 )
