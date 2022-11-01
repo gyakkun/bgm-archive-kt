@@ -2,7 +2,8 @@ package moe.nyamori.bgm.model
 
 data class GroupTopic(
     var id: Int,
-    var gid: Int,
+    var gid: Int?,
+    var gname: String,
     var uid: Int,
     var title: String,
     var dateline: Long,
