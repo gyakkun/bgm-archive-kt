@@ -61,31 +61,53 @@ class Launcher {
 
             // follow post div list:
             // System.err.println(followPostDivList[0])
-            followPostDivList.forEachIndexed { idx, jxnode ->
+            followPostDivList.forEachIndexed outer@{ outerIdx, floor ->
                 // Workaround for bug
-                if (idx != jxnode.asElement().elementSiblingIndex()) return@forEachIndexed
+                if (outerIdx != floor.asElement().elementSiblingIndex()) return@outer
                 // follow post id: post_{id}
-                System.err.println(jxnode.asElement().attr("id"))
+                System.err.println(floor.asElement().attr("id"))
                 // follow post floor: #{floor}
                 System.err.println(
-                    jxnode.selOne("div[@class=\"re_info\"]/small/a[@class=\"floor-anchor\"]").asElement().text()
+                    floor.selOne("div[@class=\"re_info\"]/small/a[@class=\"floor-anchor\"]").asElement().text()
                 )
                 // follow post date: ' - {yyyy-M-d HH:mm}'
-                System.err.println(jxnode.selOne("div[@class=\"re_info\"]/small/text()").asString())
+                System.err.println(floor.selOne("div[@class=\"re_info\"]/small/text()").asString())
                 // follow post user anchor - username: /user/{username}
-                System.err.println(jxnode.selOne("a").asElement().attr("href"))
+                System.err.println(floor.selOne("a").asElement().attr("href"))
                 // follow post user anchor span - uid (plan B): background...
                 // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
-                System.err.println(jxnode.selOne("a/span").asElement().attr("style"))
+                System.err.println(floor.selOne("a/span").asElement().attr("style"))
                 // follow post user nickname: {nickname}
-                System.err.println(jxnode.selOne("div[2]/span[@class=\"userInfo\"]/strong/a/text()").asString())
+                System.err.println(floor.selOne("div[2]/span[@class=\"userInfo\"]/strong/a/text()").asString())
                 // follow post user sign: ({sign})
-                System.err.println(jxnode.selOne("div[2]/span[@class=\"userInfo\"]/span/text()")?.asString() ?: null)
+                System.err.println(floor.selOne("div[2]/span[@class=\"userInfo\"]/span/text()")?.asString())
 
                 // follow post content div
-                System.err.println(jxnode.selOne("div/div/div[@class=\"message\"]").asElement().text())
+                System.err.println(floor.selOne("div/div/div[@class=\"message\"]").asElement().html())
 
                 // sub floor
+                val subFloorList: MutableList<JXNode> = floor.sel("div/div/div[@class=\"topic_sub_reply\"]/div")
+                subFloorList.forEachIndexed inner@{ innerIdx, subFloor ->
+                    if (innerIdx != subFloor.asElement().elementSiblingIndex()) return@inner
+                    // sub floor pid: post_{pid}
+                    System.err.println(subFloor.asElement().attr("id"))
+                    // sub floor floor number: #{floor}-#{subFloor}
+                    System.err.println(
+                        subFloor.selOne("div[@class=\"re_info\"]/small/a[@class=\"floor-anchor\"]").asElement().text()
+                    )
+                    // follow post date: ' - {yyyy-M-d HH:mm}'
+                    System.err.println(subFloor.selOne("div[@class=\"re_info\"]/small/text()").asString())
+                    // follow post user anchor - username: /user/{username}
+                    System.err.println(subFloor.selOne("a").asElement().attr("href"))
+                    // follow post user anchor span - uid (plan B): background...
+                    // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
+                    System.err.println(subFloor.selOne("a/span").asElement().attr("style"))
+                    // follow post user nickname: {nickname}
+                    System.err.println(subFloor.selOne("div[2]/strong[@class=\"userName\"]/a/text()").asString())
+
+                    // follow post content div
+                    System.err.println(subFloor.selOne("div[2]/div[@class=\"cmt_sub_content\"]").asElement().html())
+                }
 
             }
 
