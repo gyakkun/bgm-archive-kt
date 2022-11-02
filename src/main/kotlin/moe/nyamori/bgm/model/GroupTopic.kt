@@ -7,6 +7,6 @@ data class GroupTopic(
     var title: String?,
     var dateline: Long?,
     var display: Boolean?,
-    var topPostId: Int?,
-    var posts: List<GroupPost>?
+    var topPostPid: Int?,
+    var postList: List<GroupPost>?
 )
