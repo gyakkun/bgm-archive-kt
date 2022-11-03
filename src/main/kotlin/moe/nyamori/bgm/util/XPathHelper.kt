@@ -21,6 +21,7 @@ object XPathHelper {
 
     const val XP_FLOOR_ANCHOR = "div[@class=\"re_info\"]/small/a[@class=\"floor-anchor\"]"
     const val XP_FLOOR_DATE_SMALL_TEXT = "div[@class=\"re_info\"]/small/text()"
+    const val XP_FLOOR_DATE_ANCHOR = "div[@class=\"re_info\"]/small/a"
     const val XP_FLOOR_USER_NAME_ANCHOR = "a"
     const val XP_FLOOR_USER_STYLE_BG_SPAN = "a/span"
     const val XP_FLOOR_USER_NICKNAME_ANCHOR_TEXT = "div[2]/span[@class=\"userInfo\"]/strong/a/text()"
