@@ -29,6 +29,7 @@ import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_AN
 import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT
 import org.seimicrawler.xpath.JXDocument
 import org.seimicrawler.xpath.JXNode
+import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.text.SimpleDateFormat
@@ -36,22 +37,21 @@ import java.util.*
 import kotlin.collections.ArrayList
 
 object GroupTopicParser {
-    val LOGGER = LoggerFactory.getLogger(GroupTopicParser.javaClass)
-    val SDF_YYYY_M_D_HH_MM = SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA)
-    val SUB_FLOOR_FLOOR_NUM_REGEX = Regex("#\\d+-(\\d+)")
+    private val LOGGER: Logger = LoggerFactory.getLogger(GroupTopicParser.javaClass)
+    private val SDF_YYYY_M_D_HH_MM = SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA)
+    private val SUB_FLOOR_FLOOR_NUM_REGEX = Regex("#\\d+-(\\d+)")
 
     fun parseGroupTopic(htmlFile: File): Pair<GroupTopic?, Boolean> {
         try {
             val htmlContent: String =
                 FileUtil.getFileContent(htmlFile)!!
             val doc: JXDocument = JXDocument.create(htmlContent)
-            val topicId = run {
-                try {
-                    return@run htmlFile.nameWithoutExtension.toInt()
-                } catch (ex: Exception) {
-                    return@run -1
-                }
-            }
+            val topicId = kotlin.runCatching {
+                htmlFile.nameWithoutExtension.toInt()
+            }.onFailure {
+                return Pair(null, false)
+            }.getOrThrow()
+
             if (doc.selNOne(XP_404_MSG) != null) {
                 return Pair(
                     GroupTopic(
@@ -242,7 +242,8 @@ object GroupTopicParser {
             thisTopic.postList = postList
             return Pair(thisTopic, true)
         } catch (ex: Exception) {
-            LOGGER.error("Ex: ", ex)
+            //LOGGER.error("Ex: ", ex)
+            LOGGER.error("Ex: ${htmlFile.nameWithoutExtension}")
             return Pair(null, false)
         }
 
