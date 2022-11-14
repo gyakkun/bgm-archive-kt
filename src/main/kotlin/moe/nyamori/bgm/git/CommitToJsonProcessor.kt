@@ -19,10 +19,7 @@ import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 import org.eclipse.jgit.treewalk.CanonicalTreeParser
 import org.eclipse.jgit.treewalk.TreeWalk
 import org.slf4j.LoggerFactory
-import java.io.BufferedWriter
-import java.io.File
-import java.io.FileWriter
-import java.io.PrintWriter
+import java.io.*
 import java.nio.charset.StandardCharsets
 import java.util.*
 
@@ -173,18 +170,45 @@ object CommitToJsonProcessor {
         archiveCommit: RevCommit,
         changedFilePathList: List<String>
     ) {
-        Git(jsonRepo).use { git ->
-            changedFilePathList.forEach { path ->
+        if (Config.BGM_ARCHIVE_PREFER_JGIT) {
+            Git(jsonRepo).use { git ->
+                changedFilePathList.forEach { path ->
+                    git.add()
+                        .addFilepattern(path.replace("html", "json"))
+                        .call()
+                }
                 git.add()
-                    .addFilepattern(path.replace("html", "json"))
+                    .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+                    .call()
+                git.commit()
+                    .setMessage(archiveCommit.fullMessage)
                     .call()
             }
-            git.add()
-                .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
-                .call()
-            git.commit()
-                .setMessage(archiveCommit.fullMessage)
-                .call()
+        } else {
+            val commitMsg = archiveCommit.fullMessage
+            val jsonRepoDir = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
+            val commitMsgFile =
+                jsonRepoDir.resolve(".git").resolve("tmp" + UUID.randomUUID())
+            FileWriter(commitMsgFile).use {
+                it.write(commitMsg)
+                it.flush()
+            }
+            var gitProcess = Runtime.getRuntime()
+                .exec("git add *", null, jsonRepoDir)
+            printResults(gitProcess)
+            gitProcess = Runtime.getRuntime()
+                .exec("git commit -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
+            printResults(gitProcess)
+            commitMsgFile.delete()
+        }
+    }
+
+    fun printResults(process: Process) {
+        // Here actually block the process
+        val reader = BufferedReader(InputStreamReader(process.inputStream))
+        var line: String?
+        while (reader.readLine().also { line = it } != null) {
+            System.err.println(line)
         }
     }
 

@@ -18,4 +18,7 @@ object Config {
         "E_BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME",
         "last_processed_commit_rev_id"
     )
+
+    var BGM_ARCHIVE_PREFER_JGIT: Boolean =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_PREFER_JGIT", "false").toBoolean()
 }
