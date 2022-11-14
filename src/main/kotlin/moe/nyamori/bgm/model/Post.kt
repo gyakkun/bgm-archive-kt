@@ -4,6 +4,7 @@ import org.jetbrains.annotations.Nullable
 
 data class Post(
     var id: Int,
+    var user: User?,
     val floorNum: Int, // #{floor} Start from 1
     @Nullable
     val subFloorNum: Int?, // #{floor}-{subFloor} Start from 1
@@ -15,7 +16,6 @@ data class Post(
     var contentBbcode: String?,
     var state: Short,
     var dateline: Long,
-    var user: User?,
     var subFloorList: List<Post>?
 ) {
     val isTopPost: Boolean

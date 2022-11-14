@@ -52,7 +52,7 @@ object TopicParser {
             if (doc.selNOne(XP_404_MSG) != null) {
                 return Pair(
                     Topic(
-                        id = topicId, space = Space(type = spaceType)
+                        id = topicId, space = Space(type = spaceType), display = false
                     ), true
                 )
             }
@@ -66,7 +66,7 @@ object TopicParser {
             val SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH: String
             val SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH: String
             val SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH: String
-            val SPACE_TOPIC_FOLLOW_POST_DIV_LIST:String
+            val SPACE_TOPIC_FOLLOW_POST_DIV_LIST: String
 
             when (spaceType) {
                 SpaceType.GROUP -> {
@@ -309,8 +309,9 @@ object TopicParser {
         return userSignStr?.let {
             if (it.startsWith("(") && it.endsWith(")")) {
                 it.substring(1, it.length - 1)
+            } else {
+                null
             }
-            null
         }
     }
 

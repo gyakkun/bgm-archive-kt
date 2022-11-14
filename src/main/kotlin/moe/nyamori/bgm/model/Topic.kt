@@ -6,7 +6,7 @@ data class Topic(
     var uid: Int? = null,
     var title: String? = null,
     var dateline: Long? = null,
-    var display: Boolean? = null,
+    var display: Boolean = false,
     var topPostPid: Int? = null,
     var postList: List<Post>? = null
 )
