@@ -14,4 +14,8 @@ object Config {
         File(System.getProperty("user.home")).resolve("source/bgm-archive-json").absolutePath
     )
 
+    var BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME: String = System.getenv().getOrDefault(
+        "E_BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME",
+        "last_processed_commit_rev_id"
+    )
 }
