@@ -150,7 +150,7 @@ object GroupTopicParser {
                 // follow post floor: #{floor}
                 val floorNum = floor.selOne(XP_FLOOR_ANCHOR).asElement().text().substring(1).toInt()
                 // follow post date: ' - {yyyy-M-d HH:mm}'
-                val floorDateStr = floor.selOne(XP_FLOOR_DATE_SMALL_TEXT).asString().substring(3)
+                val floorDateStr = floor.selOne(XP_FLOOR_DATE_SMALL_TEXT).asString().substring(2)
                 val floorDate = SDF_YYYY_M_D_HH_MM.parse(floorDateStr).toInstant().epochSecond
                 // follow post user anchor - username: /user/{username}
                 val floorUserUsername = floor.selOne(XP_FLOOR_USER_NAME_ANCHOR).asElement().attr("href").substring(6)
@@ -199,7 +199,7 @@ object GroupTopicParser {
                         .findAll(subFloor.selOne(XP_FLOOR_ANCHOR).asElement().text()).iterator()
                         .next().groupValues[1].toInt()
                     // follow post date: ' - {yyyy-M-d HH:mm}'
-                    val subFloorDateStr = subFloor.selOne(XP_FLOOR_DATE_SMALL_TEXT).asString().substring(3)
+                    val subFloorDateStr = subFloor.selOne(XP_FLOOR_DATE_SMALL_TEXT).asString().substring(2)
                     val subFloorDate = SDF_YYYY_M_D_HH_MM.parse(subFloorDateStr).toInstant().epochSecond
                     // follow post user anchor - username: /user/{username}
                     val subFloorUserUsername =
@@ -242,8 +242,8 @@ object GroupTopicParser {
             thisTopic.postList = postList
             return Pair(thisTopic, true)
         } catch (ex: Exception) {
-            //LOGGER.error("Ex: ", ex)
-            LOGGER.error("Ex: ${htmlFile.nameWithoutExtension}")
+            LOGGER.error("Ex: ", ex)
+//            LOGGER.error("Ex: ${htmlFile.nameWithoutExtension}")
             return Pair(null, false)
         }
 
