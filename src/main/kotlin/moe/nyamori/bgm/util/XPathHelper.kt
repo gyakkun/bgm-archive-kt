@@ -3,34 +3,34 @@ package moe.nyamori.bgm.util
 object XPathHelper {
 
 
-    const val XP_404_MSG: String = "//div[1]/div[2]/div[1]/div/div/p[1]"
+    const val XP_404_MSG: String = "/div[1]/div[2]/div[1]/div/div/p[1]"
 
-    const val XP_GROUP_NAME_ANCHOR: String = "//div[2]/h1/span/a[1]"
-    const val XP_GROUP_TOPIC_TITLE_H1_TEXT: String = "//div[2]/h1/text()"
+    const val XP_GROUP_NAME_ANCHOR: String = "/div[2]/h1/span/a[1]"
+    const val XP_GROUP_TOPIC_TITLE_H1_TEXT: String = "/div[2]/h1/text()"
 
-    const val XP_GROUP_TOPIC_TOP_POST_DIV: String = "//div[3]/div[1]"
-    const val XP_GROUP_TOPIC_TOP_POST_DATE_SMALL_TEXT: String = "//div[3]/div[1]/div[1]/small/text()"
-    const val XP_GROUP_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR: String = "//div[3]/div[1]/a"
-    const val XP_GROUP_TOPIC_TOP_POST_UID_SPAN: String = "//div[3]/div[1]/a/span"
-    const val XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT: String = "//div[3]/div[1]/div[2]/strong/a/text()"
-    const val XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT: String = "//div[3]/div[1]/div[2]/span/text()"
-    const val XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV: String = "//div[3]/div[1]/div[2]/div"
+    const val XP_GROUP_TOPIC_TOP_POST_DIV: String = "/div[3]/div[1]"
+    const val XP_GROUP_TOPIC_TOP_POST_DATE_SMALL_TEXT: String = "/div[3]/div[1]/div[1]/small/text()"
+    const val XP_GROUP_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR: String = "/div[3]/div[1]/a"
+    const val XP_GROUP_TOPIC_TOP_POST_UID_SPAN: String = "/div[3]/div[1]/a/span"
+    const val XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT: String = "/div[3]/div[1]/div[2]/strong/a/text()"
+    const val XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT: String = "/div[3]/div[1]/div[2]/span/text()"
+    const val XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV: String = "/div[3]/div[1]/div[2]/div"
 
-    const val XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST: String = "//div[3]/div[3]/div"
+    const val XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST: String = "/div[3]/div[3]/div"
 
 
-    const val XP_SUBJECT_NAME_ANCHOR: String = "//div[2]/div[1]/h1/span/a[1]"
-    const val XP_SUBJECT_TOPIC_TITLE_H1_TEXT: String = "//div[2]/div[1]/h1/text()"
+    const val XP_SUBJECT_NAME_ANCHOR: String = "/div[2]/div[1]/h1/span/a[1]"
+    const val XP_SUBJECT_TOPIC_TITLE_H1_TEXT: String = "/div[2]/div[1]/h1/text()"
 
-    const val XP_SUBJECT_TOPIC_TOP_POST_DIV: String = "//div[2]/div[2]/div[1]"
-    const val XP_SUBJECT_TOPIC_TOP_POST_DATE_SMALL_TEXT: String = "//div[2]/div[2]/div[1]/div[1]/small/text()"
-    const val XP_SUBJECT_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR: String = "//div[2]/div[2]/div[1]/a"
-    const val XP_SUBJECT_TOPIC_TOP_POST_UID_SPAN: String = "//div[2]/div[2]/div[1]/a/span"
-    const val XP_SUBJECT_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT: String = "//div[2]/div[2]/div[1]/div[2]/strong/a/text()"
-    const val XP_SUBJECT_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT: String = "//div[2]/div[2]/div[1]/div[2]/span/text()"
-    const val XP_SUBJECT_TOPIC_TOP_POST_CONTENT_DIV: String = "//div[2]/div[2]/div[1]/div[2]/div"
+    const val XP_SUBJECT_TOPIC_TOP_POST_DIV: String = "/div[2]/div[2]/div[1]"
+    const val XP_SUBJECT_TOPIC_TOP_POST_DATE_SMALL_TEXT: String = "/div[2]/div[2]/div[1]/div[1]/small/text()"
+    const val XP_SUBJECT_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR: String = "/div[2]/div[2]/div[1]/a"
+    const val XP_SUBJECT_TOPIC_TOP_POST_UID_SPAN: String = "/div[2]/div[2]/div[1]/a/span"
+    const val XP_SUBJECT_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT: String = "/div[2]/div[2]/div[1]/div[2]/strong/a/text()"
+    const val XP_SUBJECT_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT: String = "/div[2]/div[2]/div[1]/div[2]/span/text()"
+    const val XP_SUBJECT_TOPIC_TOP_POST_CONTENT_DIV: String = "/div[2]/div[2]/div[1]/div[2]/div"
 
-    const val XP_SUBJECT_TOPIC_FOLLOW_POST_DIV_LIST: String = "//div[2]/div[2]/div[3]/div"
+    const val XP_SUBJECT_TOPIC_FOLLOW_POST_DIV_LIST: String = "/div[2]/div[2]/div[3]/div"
 
 
     const val XP_FLOOR_ANCHOR = "div[@class=\"re_info\"]/small/a[@class=\"floor-anchor\"]"

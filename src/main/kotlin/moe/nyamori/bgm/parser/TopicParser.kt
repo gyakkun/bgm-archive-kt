@@ -48,8 +48,10 @@ object TopicParser {
     fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         try {
             val doc: JXDocument = JXDocument.create(htmlFileString)
+            val bodyNode = doc.selNOne("body")
 
-            if (doc.selNOne(XP_404_MSG) != null) {
+
+            if (bodyNode.selOne(XP_404_MSG) != null) {
                 return Pair(
                     Topic(
                         id = topicId, space = Space(type = spaceType), display = false
@@ -99,26 +101,26 @@ object TopicParser {
             }
 
 
-            val groupNameAnchor: JXNode = doc.selNOne(SPACE_NAME_ANCHOR_XPATH)!!
+            val groupNameAnchor: JXNode = bodyNode.selOne(SPACE_NAME_ANCHOR_XPATH)!!
 
-            val topicTitle: JXNode = doc.selNOne(SPACE_TOPIC_TITLE_H1_TEXT_XPATH)!!
+            val topicTitle: JXNode = bodyNode.selOne(SPACE_TOPIC_TITLE_H1_TEXT_XPATH)!!
 
 
-            val topPostDiv = doc.selNOne(SPACE_TOPIC_TOP_POST_DIV_XPATH)
-            val topPostDivSmallText = doc.selNOne(SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH)
-            val topPostUsernameAnchor = doc.selNOne(SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH)
-            val topPostUidSpan = doc.selNOne(SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH)
+            val topPostDiv = bodyNode.selOne(SPACE_TOPIC_TOP_POST_DIV_XPATH)
+            val topPostDivSmallText = bodyNode.selOne(SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH)
+            val topPostUsernameAnchor = bodyNode.selOne(SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH)
+            val topPostUidSpan = bodyNode.selOne(SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH)
             val topPostUserNicknameAnchorText = when (spaceType) {
                 SpaceType.GROUP ->
-                    doc.selNOne(SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH)
+                    bodyNode.selOne(SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH)
 
                 SpaceType.SUBJECT ->
-                    doc.selNOne(XP_SUBJECT_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT)
+                    bodyNode.selOne(XP_SUBJECT_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT)
             }
-            val topPostUserSignSpanText = doc.selNOne(SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH)
-            val topPostContentDiv = doc.selNOne(SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH)
+            val topPostUserSignSpanText = bodyNode.selOne(SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH)
+            val topPostContentDiv = bodyNode.selOne(SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH)
 
-            val followPostDivList = doc.selN(SPACE_TOPIC_FOLLOW_POST_DIV_LIST)
+            val followPostDivList = bodyNode.sel(SPACE_TOPIC_FOLLOW_POST_DIV_LIST)
 
             // group name: /group/{groupName}
             val groupName = groupNameAnchor.asElement().attr("href").split("/").last()
