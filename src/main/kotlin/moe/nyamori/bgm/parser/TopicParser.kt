@@ -1,11 +1,7 @@
 package moe.nyamori.bgm.parser
 
-import com.vladsch.flexmark.util.misc.FileUtil
-import moe.nyamori.bgm.model.Group
-import moe.nyamori.bgm.model.GroupPost
-import moe.nyamori.bgm.model.GroupPost.Companion.STATE_NORMAL
-import moe.nyamori.bgm.model.GroupTopic
-import moe.nyamori.bgm.model.User
+import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.model.Post.Companion.STATE_NORMAL
 import moe.nyamori.bgm.util.XPathHelper.XP_404_MSG
 import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_ANCHOR
 import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_CONTENT
@@ -14,68 +10,118 @@ import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_USER_NAME_ANCHOR
 import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_USER_NICKNAME_ANCHOR_TEXT
 import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_USER_SIGN_SPAN_TEXT
 import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_USER_STYLE_BG_SPAN
-import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_CONTENT
-import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_DIV_LIST
-import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_USER_NICKNAME_ANCHOR_TEXT
 import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_NAME_ANCHOR
 import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST
 import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TITLE_H1_TEXT
+import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR
 import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV
+import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_DATE_SMALL_TEXT
 import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_DIV
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_SMALL_TEXT
 import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_UID_SPAN
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_USERNAME_ANCHOR
 import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT
 import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_NAME_ANCHOR
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_FOLLOW_POST_DIV_LIST
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_TITLE_H1_TEXT
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_TOP_POST_CONTENT_DIV
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_TOP_POST_DATE_SMALL_TEXT
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_TOP_POST_DIV
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_TOP_POST_UID_SPAN
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT
+import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT
+import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_CONTENT
+import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_DIV_LIST
+import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_USER_NICKNAME_ANCHOR_TEXT
 import org.seimicrawler.xpath.JXDocument
 import org.seimicrawler.xpath.JXNode
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
-import kotlin.collections.ArrayList
 
-object GroupTopicParser {
-    private val LOGGER: Logger = LoggerFactory.getLogger(GroupTopicParser.javaClass)
+object TopicParser {
+    private val LOGGER: Logger = LoggerFactory.getLogger(TopicParser.javaClass)
     private val SDF_YYYY_M_D_HH_MM = SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA)
     private val SUB_FLOOR_FLOOR_NUM_REGEX = Regex("#\\d+-(\\d+)")
 
-    fun parseGroupTopic(htmlFile: File): Pair<GroupTopic?, Boolean> {
+    fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         try {
-            val htmlContent: String =
-                FileUtil.getFileContent(htmlFile)!!
-            val doc: JXDocument = JXDocument.create(htmlContent)
-            val topicId = kotlin.runCatching {
-                htmlFile.nameWithoutExtension.toInt()
-            }.onFailure {
-                return Pair(null, false)
-            }.getOrThrow()
+            val doc: JXDocument = JXDocument.create(htmlFileString)
 
             if (doc.selNOne(XP_404_MSG) != null) {
                 return Pair(
-                    GroupTopic(
-                        topicId, null, null, null, null, false, null, null
+                    Topic(
+                        id = topicId, space = Space(type = spaceType)
                     ), true
                 )
             }
 
-            val groupNameAnchor: JXNode = doc.selNOne(XP_GROUP_NAME_ANCHOR)
-            val topicTitle: JXNode = doc.selNOne(XP_GROUP_TOPIC_TITLE_H1_TEXT)
+            val SPACE_NAME_ANCHOR_XPATH: String
+            val SPACE_TOPIC_TITLE_H1_TEXT_XPATH: String
+            val SPACE_TOPIC_TOP_POST_DIV_XPATH: String
+            val SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH: String
+            val SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH: String
+            val SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH: String
+            val SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH: String
+            val SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH: String
+            val SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH: String
+            val SPACE_TOPIC_FOLLOW_POST_DIV_LIST:String
 
-            val topPostDiv = doc.selNOne(XP_GROUP_TOPIC_TOP_POST_DIV)
-            val topPostDivSmallText = doc.selNOne(XP_GROUP_TOPIC_TOP_POST_SMALL_TEXT)
-            val topPostUsernameAnchor = doc.selNOne(XP_GROUP_TOPIC_TOP_POST_USERNAME_ANCHOR)
-            val topPostUidSpan = doc.selNOne(XP_GROUP_TOPIC_TOP_POST_UID_SPAN)
-            val topPostUserNicknameAnchorText =
-                doc.selNOne(XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT)
-            val topPostUserSignSpanText = doc.selNOne(XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT)
-            val topPostContentDiv = doc.selNOne(XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV)
+            when (spaceType) {
+                SpaceType.GROUP -> {
+                    SPACE_NAME_ANCHOR_XPATH = XP_GROUP_NAME_ANCHOR
+                    SPACE_TOPIC_TITLE_H1_TEXT_XPATH = XP_GROUP_TOPIC_TITLE_H1_TEXT
+                    SPACE_TOPIC_TOP_POST_DIV_XPATH = XP_GROUP_TOPIC_TOP_POST_DIV
+                    SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH = XP_GROUP_TOPIC_TOP_POST_DATE_SMALL_TEXT
+                    SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH = XP_GROUP_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR
+                    SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH = XP_GROUP_TOPIC_TOP_POST_UID_SPAN
+                    SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH =
+                        XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT
+                    SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH = XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT
+                    SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH = XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV
+                    SPACE_TOPIC_FOLLOW_POST_DIV_LIST = XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST
+                }
 
-            val followPostDivList = doc.selN(XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST)
+                SpaceType.SUBJECT -> {
+                    SPACE_NAME_ANCHOR_XPATH = XP_SUBJECT_NAME_ANCHOR
+                    SPACE_TOPIC_TITLE_H1_TEXT_XPATH = XP_SUBJECT_TOPIC_TITLE_H1_TEXT
+                    SPACE_TOPIC_TOP_POST_DIV_XPATH = XP_SUBJECT_TOPIC_TOP_POST_DIV
+                    SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH = XP_SUBJECT_TOPIC_TOP_POST_DATE_SMALL_TEXT
+                    SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH = XP_SUBJECT_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR
+                    SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH = XP_SUBJECT_TOPIC_TOP_POST_UID_SPAN
+                    SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH =
+                        XP_SUBJECT_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT
+                    SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH = XP_SUBJECT_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT
+                    SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH = XP_SUBJECT_TOPIC_TOP_POST_CONTENT_DIV
+                    SPACE_TOPIC_FOLLOW_POST_DIV_LIST = XP_SUBJECT_TOPIC_FOLLOW_POST_DIV_LIST
+                }
+            }
+
+
+            val groupNameAnchor: JXNode = doc.selNOne(SPACE_NAME_ANCHOR_XPATH)!!
+
+            val topicTitle: JXNode = doc.selNOne(SPACE_TOPIC_TITLE_H1_TEXT_XPATH)!!
+
+
+            val topPostDiv = doc.selNOne(SPACE_TOPIC_TOP_POST_DIV_XPATH)
+            val topPostDivSmallText = doc.selNOne(SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH)
+            val topPostUsernameAnchor = doc.selNOne(SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH)
+            val topPostUidSpan = doc.selNOne(SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH)
+            val topPostUserNicknameAnchorText = when (spaceType) {
+                SpaceType.GROUP ->
+                    doc.selNOne(SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH)
+
+                SpaceType.SUBJECT ->
+                    doc.selNOne(XP_SUBJECT_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT)
+            }
+            val topPostUserSignSpanText = doc.selNOne(SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH)
+            val topPostContentDiv = doc.selNOne(SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH)
+
+            val followPostDivList = doc.selN(SPACE_TOPIC_FOLLOW_POST_DIV_LIST)
 
             // group name: /group/{groupName}
-            val groupName = groupNameAnchor.asElement().attr("href").substring(7)
+            val groupName = groupNameAnchor.asElement().attr("href").split("/").last()
             // group display name: {groupDisplayName}
             val groupDisplayName = groupNameAnchor.asElement().text()
             // title
@@ -103,11 +149,12 @@ object GroupTopicParser {
             val topPostContentHtml = topPostContentDiv.asElement().html()
 
 
-            val thisTopic = GroupTopic(
+            val thisTopic = Topic(
                 id = topicId,
-                group = Group(
-                    groupName = groupName,
-                    groupDisplayName = groupDisplayName
+                space = Space(
+                    type = spaceType,
+                    name = groupName,
+                    displayName = groupDisplayName
                 ),
                 uid = topPostUserUid,
                 title = title,
@@ -117,9 +164,9 @@ object GroupTopicParser {
                 postList = null
             )
 
-            val postList = ArrayList<GroupPost>()
+            val postList = ArrayList<Post>()
 
-            val topPost = GroupPost(
+            val topPost = Post(
                 id = topPostPid,
                 floorNum = 1,
                 mid = topicId,
@@ -167,7 +214,7 @@ object GroupTopicParser {
                 // follow post content div
                 val floorContentHtml = floor.selOne(XP_FLOOR_CONTENT).asElement().html()
 
-                val thisFloor = GroupPost(
+                val thisFloor = Post(
                     id = floorPid,
                     floorNum = floorNum,
                     subFloorNum = null,
@@ -189,7 +236,7 @@ object GroupTopicParser {
 
                 // sub floor
                 val subFloorDivList: MutableList<JXNode> = floor.sel(XP_SUB_FLOOR_DIV_LIST)
-                val subFloorList = ArrayList<GroupPost>()
+                val subFloorList = ArrayList<Post>()
                 subFloorDivList.forEachIndexed inner@{ innerIdx, subFloor ->
                     if (innerIdx != subFloor.asElement().elementSiblingIndex()) return@inner
                     // sub floor pid: post_{pid}
@@ -214,7 +261,7 @@ object GroupTopicParser {
 
                     // follow post content div
                     val subFloorContentHtml = subFloor.selOne(XP_SUB_FLOOR_CONTENT).asElement().html()
-                    val thisSubFloor = GroupPost(
+                    val thisSubFloor = Post(
                         id = subFloorPid,
                         floorNum = floorNum,
                         subFloorNum = subFloorFloorNum,
