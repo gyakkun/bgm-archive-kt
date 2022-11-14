@@ -8,8 +8,7 @@ import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.TopicParser
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.diff.DiffEntry.DEV_NULL
-import org.eclipse.jgit.lib.Constants.DOT_GIT
-import org.eclipse.jgit.lib.Constants.HEAD
+import org.eclipse.jgit.lib.Constants.*
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.ObjectLoader
 import org.eclipse.jgit.lib.Repository
@@ -41,13 +40,23 @@ object CommitToJsonProcessor {
             Helper.getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder()
         val archiveRepo = Helper.getArchiveRepo()
         val jsonRepo = Helper.getJsonRepo()
-        var prevProcessedCommit = walk.next()
-        log.info("The previously processed commit: $prevProcessedCommit")
+        var prevCommit = walk.next()
+        val lastProcessedCommit = Helper.getPrevProcessedCommitRef()
+
+        // FIXME: Workaround the inclusive walk boundary
+        while (prevCommit != null) {
+            if (lastProcessedCommit == prevCommit) {
+                break
+            }
+            prevCommit = walk.next()
+        }
+
+        log.info("The previously processed commit: $prevCommit")
         run breakable@{
             walk.forEachIndexed { commitIdx, curCommit ->
                 try {
                     val noGoodIdTreeSet = TreeSet<Int>()
-                    if (curCommit == prevProcessedCommit) {
+                    if (curCommit == prevCommit) {
                         log.error("The first commit being iterated twice!")
                         return@breakable
                     }
@@ -65,7 +74,7 @@ object CommitToJsonProcessor {
                         throw IllegalStateException("Not a group or subject topic!")
                     }
 
-                    val changedFilePathList = findChangedFiles(archiveRepo, prevProcessedCommit, curCommit)
+                    val changedFilePathList = findChangedFiles(archiveRepo, prevCommit, curCommit)
 
                     for (pathIdx in changedFilePathList.indices) {
                         val path = changedFilePathList[pathIdx]
@@ -88,11 +97,16 @@ object CommitToJsonProcessor {
                             val fileContentInStr = getFileContentInACommit(archiveRepo, curCommit, path)
                             val topicId = path.split("/").last().replace(".html", "").toInt()
 
+                            var timing = System.currentTimeMillis()
                             val (resultTopicEntity, isSuccess) = TopicParser.parseTopic(
                                 fileContentInStr,
                                 topicId,
                                 htmlSpaceType
                             )
+                            timing = System.currentTimeMillis() - timing
+                            if (timing > 1000L) {
+                                log.error("$timing ms is costed to process $path in commit $curCommit!")
+                            }
 
                             if (isSuccess) {
                                 log.info("Parsing $topicId succeeded")
@@ -109,22 +123,25 @@ object CommitToJsonProcessor {
                             log.error("Exception occurs when handling $path", ex)
                         }
                     }
+                    writeJsonRepoLastCommitId(curCommit, jsonRepo)
                     commitJsonRepo(jsonRepo, commitSpaceType, curCommit, changedFilePathList)
-                    prevProcessedCommit = curCommit
+                    prevCommit = curCommit
                     writeNoGoodFile(noGoodIdTreeSet, commitSpaceType)
                     if (noGoodIdTreeSet.isNotEmpty()) {
                         log.error("NG LIST during $curCommit:\n $noGoodIdTreeSet")
                     }
-                    // if (commitIdx > 10) return@breakable
+                    if (commitIdx % 100 == 0) {
+                        Git(jsonRepo).gc()
+                    }
                 } catch (ex: Exception) {
-                    log.error("Ex occurs when processing commit: $curCommit")
+                    log.error("Ex occurs when processing commit: $curCommit", ex)
                 }
             }
         }
-        writeJsonRepoLastCommitId(prevProcessedCommit, jsonRepo)
     }
 
     private fun writeJsonRepoLastCommitId(prevProcessedCommit: RevCommit, jsonRepo: Repository) {
+        log.info("Writing last commit id: $prevProcessedCommit")
         val lastCommitIdFileLoc =
             Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR + "/" + BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
         val lastCommitIdFile = File(lastCommitIdFileLoc)
@@ -132,14 +149,6 @@ object CommitToJsonProcessor {
         FileWriter(lastCommitIdFile).use {
             it.write(lastCommitIdStr)
             it.flush()
-        }
-        Git(jsonRepo).use { git ->
-            git.add()
-                .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
-                .call()
-            git.commit()
-                .setMessage("META: Update last commit id to $lastCommitIdStr")
-                .call()
         }
     }
 
@@ -170,6 +179,9 @@ object CommitToJsonProcessor {
                     .addFilepattern(path.replace("html", "json"))
                     .call()
             }
+            git.add()
+                .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+                .call()
             git.commit()
                 .setMessage(archiveCommit.fullMessage)
                 .call()
