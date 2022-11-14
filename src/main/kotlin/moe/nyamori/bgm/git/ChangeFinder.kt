@@ -3,6 +3,8 @@ package moe.nyamori.bgm.git
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.parser.TopicParser
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants.*
 import org.eclipse.jgit.lib.ObjectId
@@ -17,8 +19,9 @@ import org.eclipse.jgit.treewalk.TreeWalk
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
+import java.lang.IllegalStateException
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.ConcurrentHashMap
+import java.util.TreeSet
 
 
 object ChangeFinder {
@@ -26,6 +29,7 @@ object ChangeFinder {
 
     @JvmStatic
     fun main(arg: Array<String>) {
+        val noGoodIdTreeSet = TreeSet<Int>()
         val walk =
             Helper.getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder()
         val archiveRepo = Helper.getArchiveRepo()
@@ -37,28 +41,72 @@ object ChangeFinder {
                     log.error("The first commit being iterated twice!")
                     return@breakable
                 }
-                if(curCommit.fullMessage.startsWith("META") || curCommit.fullMessage.startsWith("init")){
+
+                if (curCommit.fullMessage.startsWith("META") || curCommit.fullMessage.startsWith("init")) {
                     log.warn("Iterating meta or init commit: $curCommit")
                     return@forEachIndexed
                 }
+
+                val commitSpaceType = if (curCommit.fullMessage.startsWith("SUBJECT")) {
+                    SpaceType.SUBJECT
+                } else if (curCommit.fullMessage.startsWith("GROUP")) {
+                    SpaceType.GROUP
+                } else {
+                    throw IllegalStateException("Not a group or subject topic!")
+                }
+
                 val changedFilePathList = findChangeFiles(archiveRepo, prevProcessedCommit, curCommit)
-                for (path in changedFilePathList) {
-                    val fileContentInStr = getFileContentInACommit(archiveRepo, curCommit, path)
-                    log.warn(
-                        "Cur commit: $curCommit, path: $path, content: {}",
-                        fileContentInStr.substring(0, fileContentInStr.length.coerceAtMost(100))
-                    )
+                for (innerIdx in changedFilePathList.indices) {
+                    val path = changedFilePathList[innerIdx]
+                    try {
+                        if (!path.endsWith("html")) continue
+                        log.warn("Cur commit: $curCommit, path: $path")
+                        val htmlSpaceType: SpaceType =
+                            if (path.startsWith("group") && curCommit.fullMessage.startsWith("GROUP")) {
+                                SpaceType.GROUP
+                            } else if (path.startsWith("subject") && curCommit.fullMessage.startsWith("SUBJECT")) {
+                                SpaceType.SUBJECT
+                            } else {
+                                throw IllegalStateException("Not a subject or group topic!")
+                            }
+
+                        if (htmlSpaceType != commitSpaceType) {
+                            throw IllegalStateException("Html space type not consistent with commit space type!")
+                        }
+
+                        val fileContentInStr = getFileContentInACommit(archiveRepo, curCommit, path)
+                        val topicId = path.split("/").last().replace(".html", "").toInt()
+
+                        val (resultTopicEntity, isSuccess) = TopicParser.parseTopic(
+                            fileContentInStr,
+                            topicId,
+                            htmlSpaceType
+                        )
+
+                        if (isSuccess) {
+                            log.info("Parsing $topicId succeeded")
+                            if (resultTopicEntity?.display != null && resultTopicEntity.display == true) {
+                                log.info("topic id $topicId, title: ${resultTopicEntity.title}")
+                            }
+                        } else {
+                            log.error("Parsing $topicId failed")
+                            noGoodIdTreeSet.add(topicId)
+                        }
+                    } catch (ex: Exception) {
+                        log.error("Exception occurs when handling $path", ex)
+                    }
                 }
                 prevProcessedCommit = curCommit
                 if (idx > 10) return@breakable
             }
         }
+        log.error("NG LIST $noGoodIdTreeSet")
     }
 
-    fun findChangeFiles(repo: Repository, prevCommit: RevCommit, currentCommit: RevCommit): Iterable<String> {
+    fun findChangeFiles(repo: Repository, prevCommit: RevCommit, currentCommit: RevCommit): List<String> {
         val prevTree = prevCommit.tree
         val curTree = currentCommit.tree
-        val result = ConcurrentHashMap.newKeySet<String>()
+        val result = ArrayList<String>()
         repo.newObjectReader().use { reader ->
             val oldTreeIter = CanonicalTreeParser()
             oldTreeIter.reset(reader, prevTree)
@@ -69,7 +117,6 @@ object ChangeFinder {
                     .setNewTree(newTreeIter)
                     .setOldTree(oldTreeIter)
                     .call()
-                    .parallelStream()
                     .forEach {
                         result.add(it.newPath)
                     }
