@@ -19,7 +19,7 @@ data class Post(
     var subFloorList: List<Post>?
 ) {
     val isTopPost: Boolean
-        get() = id == 1
+        get() = floorNum == 1
 
     companion object {
         const val STATE_NORMAL: Short = 0
