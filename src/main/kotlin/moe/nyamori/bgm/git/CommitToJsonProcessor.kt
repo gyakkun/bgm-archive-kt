@@ -1,27 +1,16 @@
 package moe.nyamori.bgm.git
 
-import com.google.gson.GsonBuilder
-import com.vladsch.flexmark.util.misc.FileUtil
 import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.TopicParser
 import org.eclipse.jgit.api.Git
-import org.eclipse.jgit.diff.DiffEntry.DEV_NULL
-import org.eclipse.jgit.lib.Constants.*
 import org.eclipse.jgit.lib.ObjectId
-import org.eclipse.jgit.lib.ObjectLoader
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
-import org.eclipse.jgit.revwalk.RevSort
-import org.eclipse.jgit.revwalk.RevWalk
-import org.eclipse.jgit.storage.file.FileRepositoryBuilder
-import org.eclipse.jgit.treewalk.CanonicalTreeParser
-import org.eclipse.jgit.treewalk.TreeWalk
 import org.slf4j.LoggerFactory
 import java.io.*
-import java.nio.charset.StandardCharsets
 import java.util.*
 
 
@@ -35,11 +24,11 @@ object CommitToJsonProcessor {
 
     fun job() {
         val walk =
-            Helper.getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder()
-        val archiveRepo = Helper.getArchiveRepo()
-        val jsonRepo = Helper.getJsonRepo()
+            GitHelper.getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder()
+        val archiveRepo = GitHelper.getArchiveRepo()
+        val jsonRepo = GitHelper.getJsonRepo()
         var prevCommit = walk.next()
-        val lastProcessedCommit = Helper.getPrevProcessedCommitRef()
+        val lastProcessedCommit = GitHelper.getPrevProcessedCommitRef()
 
         // FIXME: Workaround the inclusive walk boundary
         while (prevCommit != null) {
@@ -72,7 +61,7 @@ object CommitToJsonProcessor {
                         throw IllegalStateException("Not a group or subject topic!")
                     }
 
-                    val changedFilePathList = findChangedFiles(archiveRepo, prevCommit, curCommit)
+                    val changedFilePathList = GitHelper.findChangedFilePaths(archiveRepo, prevCommit, curCommit)
 
                     for (pathIdx in changedFilePathList.indices) {
                         val path = changedFilePathList[pathIdx]
@@ -93,7 +82,7 @@ object CommitToJsonProcessor {
                                 log.error("Html space type not consistent with commit space type!")
                             }
 
-                            val fileContentInStr = getFileContentInACommit(archiveRepo, curCommit, path)
+                            val fileContentInStr = GitHelper.getFileContentInACommit(archiveRepo, curCommit, path)
                             val topicId = path.split("/").last().replace(".html", "").toInt()
 
                             var timing = System.currentTimeMillis()
@@ -112,8 +101,8 @@ object CommitToJsonProcessor {
                                 if (resultTopicEntity?.display == true) {
                                     log.info("topic id $topicId, title: ${resultTopicEntity.title}")
                                 }
-                                val json = Helper.GSON.toJson(resultTopicEntity)
-                                writeFile(path, json)
+                                val json = GitHelper.GSON.toJson(resultTopicEntity)
+                                writeJsonFile(path, json)
                             } else {
                                 log.error("Parsing $topicId failed")
                                 noGoodIdTreeSet.add(topicId)
@@ -213,7 +202,7 @@ object CommitToJsonProcessor {
         }
     }
 
-    private fun writeFile(path: String, json: String) {
+    private fun writeJsonFile(path: String, json: String) {
         val jsonPath = path.replace("html", "json")
         val jsonFileLoc = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(jsonPath)
         jsonFileLoc.parentFile.mkdirs()
@@ -225,94 +214,9 @@ object CommitToJsonProcessor {
         }
     }
 
-    fun findChangedFiles(repo: Repository, prevCommit: RevCommit, currentCommit: RevCommit): List<String> {
-        val prevTree = prevCommit.tree
-        val curTree = currentCommit.tree
-        val result = ArrayList<String>()
-        repo.newObjectReader().use { reader ->
-            val oldTreeIter = CanonicalTreeParser()
-            oldTreeIter.reset(reader, prevTree)
-            val newTreeIter = CanonicalTreeParser()
-            newTreeIter.reset(reader, curTree)
-            Git(repo).use { git ->
-                git.diff()
-                    .setNewTree(newTreeIter)
-                    .setOldTree(oldTreeIter)
-                    .call()
-                    .forEach {
-                        if (it.newPath == DEV_NULL) return@forEach
-                        result.add(it.newPath)
-                    }
-            }
-        }
-        return result
-    }
 
-    private fun getFileContentInACommit(repo: Repository, commit: RevCommit, path: String): String {
-        TreeWalk.forPath(repo, path, commit.tree).use { treeWalk ->
-            val blobId: ObjectId = treeWalk.getObjectId(0)
-            repo.newObjectReader().use { objectReader ->
-                val objectLoader: ObjectLoader = objectReader.open(blobId)
-                val bytes = objectLoader.bytes
-                return String(bytes, StandardCharsets.UTF_8)
-            }
-        }
-    }
 
-    object Helper {
 
-        val GSON = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
-        fun getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder(): RevWalk {
-            val prevProcessedCommit = getPrevProcessedCommitRef()
-            val latestCommit = getLatestCommitRef()
-            getArchiveRepo().use { archiveRepo ->
-                val revWalk = RevWalk(archiveRepo)
-                revWalk.markStart(latestCommit)
-                revWalk.markUninteresting(prevProcessedCommit)
-                revWalk.sort(RevSort.REVERSE, true)
-                return revWalk
-            }
-        }
 
-        fun getPrevProcessedCommitRef(): RevCommit {
-            getArchiveRepo().use { archiveRepo ->
-                val revWalk = RevWalk(archiveRepo)
-                val prevProcessedCommitRevId = archiveRepo.resolve(getPrevProcessedCommitRevId())
-                val prevProcessedCommit = revWalk.parseCommit(prevProcessedCommitRevId)
-                return prevProcessedCommit
-            }
-        }
 
-        fun getLatestCommitRef(): RevCommit {
-            getArchiveRepo().use { archiveRepo ->
-                val revWalk = RevWalk(archiveRepo)
-                val latestHeadCommitRevId = archiveRepo.resolve(HEAD)
-                val latestHeadCommit = revWalk.parseCommit(latestHeadCommitRevId)
-                return latestHeadCommit
-            }
-        }
-
-        fun getPrevProcessedCommitRevId(): String {
-            val prevProcessedCommitRevIdFile =
-                File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
-            val rawFileStr = FileUtil.getFileContent(prevProcessedCommitRevIdFile)!!
-            return rawFileStr.trim()
-        }
-
-        fun getArchiveRepo(): Repository {
-            return FileRepositoryBuilder()
-                .setGitDir(File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve(DOT_GIT))
-                .readEnvironment() // scan environment GIT_* variables
-                .findGitDir() // scan up the file system tree
-                .build()
-        }
-
-        fun getJsonRepo(): Repository {
-            return FileRepositoryBuilder()
-                .setGitDir(File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(DOT_GIT))
-                .readEnvironment() // scan environment GIT_* variables
-                .findGitDir() // scan up the file system tree
-                .build()
-        }
-    }
 }
