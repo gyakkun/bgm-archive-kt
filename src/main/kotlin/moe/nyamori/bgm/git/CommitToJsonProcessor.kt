@@ -85,11 +85,12 @@ object CommitToJsonProcessor {
                                 } else if (path.startsWith("subject") && curCommit.fullMessage.startsWith("SUBJECT")) {
                                     SpaceType.SUBJECT
                                 } else {
-                                    throw IllegalStateException("Not a subject or group topic! Path: $path, commit full msg: ${curCommit.fullMessage}")
+                                    log.error("Not a subject or group topic! Path: $path, commit full msg: ${curCommit.fullMessage}")
+                                    SpaceType.valueOf(path.split("/").first().uppercase())
                                 }
 
                             if (htmlSpaceType != commitSpaceType) {
-                                throw IllegalStateException("Html space type not consistent with commit space type!")
+                                log.error("Html space type not consistent with commit space type!")
                             }
 
                             val fileContentInStr = getFileContentInACommit(archiveRepo, curCommit, path)
