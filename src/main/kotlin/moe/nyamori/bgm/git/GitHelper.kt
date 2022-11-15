@@ -74,16 +74,24 @@ object GitHelper {
     }
 
     fun getArchiveRepo(): Repository {
+        var repo = File(Config.BGM_ARCHIVE_GIT_REPO_DIR)
+        if (repo.resolve(DOT_GIT).let { it.exists() && it.isDirectory }) {
+            repo = repo.resolve(DOT_GIT)
+        }
         return FileRepositoryBuilder()
-            .setGitDir(File(Config.BGM_ARCHIVE_GIT_REPO_DIR))
+            .setGitDir(repo)
             .readEnvironment() // scan environment GIT_* variables
             .findGitDir() // scan up the file system tree
             .build()
     }
 
     fun getJsonRepo(): Repository {
+        var repo = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
+        if (repo.resolve(DOT_GIT).let { it.exists() && it.isDirectory }) {
+            repo = repo.resolve(DOT_GIT)
+        }
         return FileRepositoryBuilder()
-            .setGitDir(File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR))
+            .setGitDir(repo)
             .readEnvironment() // scan environment GIT_* variables
             .findGitDir() // scan up the file system tree
             .build()
