@@ -2,6 +2,7 @@ package moe.nyamori.bgm.git
 
 import com.google.gson.GsonBuilder
 import com.vladsch.flexmark.util.misc.FileUtil
+import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
 import moe.nyamori.bgm.model.SpaceType
@@ -154,12 +155,11 @@ object CommitToJsonProcessor {
         val noGoodFile = File(noGoodFilePath)
         FileWriter(noGoodFile, true).use { fw ->
             BufferedWriter(fw).use { bfw ->
-                PrintWriter(bfw).use { pw ->
-                    for (i in noGoodIdTreeSet) {
-                        pw.println(i)
-                    }
-                    pw.flush()
+                for (i in noGoodIdTreeSet) {
+                    bfw.write(i)
+                    bfw.write(NEW_LINE)
                 }
+                bfw.flush()
             }
         }
     }
