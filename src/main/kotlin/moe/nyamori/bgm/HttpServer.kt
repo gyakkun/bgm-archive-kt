@@ -4,6 +4,7 @@ import io.javalin.Javalin
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.Header.CACHE_CONTROL
+import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.git.GitHelper
@@ -33,7 +34,7 @@ class HttpServer {
                 .get("/history/group/{topicId}/{timestamp}", FileOnCommit(SpaceType.GROUP))
                 .get("/history/subject/{topicId}", FileHistory(SpaceType.SUBJECT))
                 .get("/history/subject/{topicId}/{timestamp}", FileOnCommit(SpaceType.SUBJECT))
-                .start(5926)
+                .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
             Runtime.getRuntime().addShutdownHook(Thread {
                 app.stop()
             })
@@ -41,6 +42,10 @@ class HttpServer {
 
         class CommitHook : Handler {
             override fun handle(ctx: Context) {
+                if (Config.BGM_ARCHIVE_DISABLE_HOOK) {
+                    ctx.status(400)
+                    return
+                }
                 Thread {
                     try {
                         if (lock.tryLock(10, TimeUnit.SECONDS)) {

@@ -21,4 +21,13 @@ object Config {
 
     var BGM_ARCHIVE_PREFER_JGIT: Boolean =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_PREFER_JGIT", "false").toBoolean()
+
+    var BGM_ARCHIVE_DISABLE_HOOK: Boolean =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_DISABLE_HOOK", "false").toBoolean()
+
+    var BGM_ARCHIVE_ADDRESS: String =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_ADDRESS", "localhost")
+
+    var BGM_ARCHIVE_PORT: Int =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_PORT", "5926").toInt()
 }
