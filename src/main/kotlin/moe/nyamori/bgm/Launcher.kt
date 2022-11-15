@@ -1,3 +1,5 @@
+package moe.nyamori.bgm
+
 import com.google.gson.GsonBuilder
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
@@ -27,9 +29,9 @@ class Launcher {
 //            val sampleFile2 = File("E:\\SOURCE_ROOT\\bgm-archive-sh\\sample_html\\group_topic_sample_2.html")
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive\\group\\36\\27\\362716.html")
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive-historical\\group\\00\\22\\2226.html")
-            val sampleFile2 = File("C:\\Users\\Steve\\source\\group\\374427.html")
+            val sampleFile2 = File("E:\\[ToBak]\\Desktop_Win10\\23629.html")
             val str = FileUtil.getFileContent(sampleFile2)!!
-            val (parseGroupTopic, result) = TopicParser.parseTopic(str, 374427,SpaceType.GROUP)
+            val (parseGroupTopic, result) = TopicParser.parseTopic(str, 23629,SpaceType.SUBJECT)
             if (result) {
                 val toJson = gson.toJson(parseGroupTopic)
                 val jsonFile = File(

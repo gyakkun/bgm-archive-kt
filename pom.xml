@@ -96,6 +96,11 @@
             <version>5.1.4</version>
         </dependency>
 
+        <dependency>
+            <groupId>com.nixxcode.jvmbrotli</groupId>
+            <artifactId>jvmbrotli</artifactId>
+            <version>0.2.0</version>
+        </dependency>
     </dependencies>
 
     <repositories>
@@ -145,7 +150,7 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>1.6.0</version>
                 <configuration>
-                    <mainClass>Launcher</mainClass>
+                    <mainClass>moe.nyamori.bgm.Launcher</mainClass>
                 </configuration>
             </plugin>
             <plugin>
