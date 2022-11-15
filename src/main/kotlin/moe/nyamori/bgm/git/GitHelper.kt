@@ -75,7 +75,7 @@ object GitHelper {
 
     fun getArchiveRepo(): Repository {
         return FileRepositoryBuilder()
-            .setGitDir(File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve(DOT_GIT))
+            .setGitDir(File(Config.BGM_ARCHIVE_GIT_REPO_DIR))
             .readEnvironment() // scan environment GIT_* variables
             .findGitDir() // scan up the file system tree
             .build()
@@ -83,7 +83,7 @@ object GitHelper {
 
     fun getJsonRepo(): Repository {
         return FileRepositoryBuilder()
-            .setGitDir(File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(DOT_GIT))
+            .setGitDir(File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR))
             .readEnvironment() // scan environment GIT_* variables
             .findGitDir() // scan up the file system tree
             .build()
