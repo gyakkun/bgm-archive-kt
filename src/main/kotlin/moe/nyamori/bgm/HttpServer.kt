@@ -3,14 +3,14 @@ package moe.nyamori.bgm
 import io.javalin.Javalin
 import io.javalin.http.Context
 import io.javalin.http.Handler
+import io.javalin.http.Header.CACHE_CONTROL
 import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.FilePathHelper
 import org.slf4j.LoggerFactory
-import java.lang.Exception
-import java.util.TreeSet
+import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
@@ -64,6 +64,7 @@ class HttpServer {
                 val timestampList = FileHistoryLookup.getJsonTimestampList(
                     spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".json"
                 )
+                ctx.header(CACHE_CONTROL, "max-age=86400")
                 ctx.json(timestampList)
             }
         }
@@ -88,6 +89,7 @@ class HttpServer {
                     return
                 }
 
+                ctx.header(CACHE_CONTROL, "max-age=86400")
                 ctx.json(
                     GitHelper.getFileContentInACommit(
                         GitHelper.getJsonRepo(),
