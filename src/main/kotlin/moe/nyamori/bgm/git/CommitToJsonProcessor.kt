@@ -157,7 +157,7 @@ object CommitToJsonProcessor {
         FileWriter(noGoodFile, true).use { fw ->
             BufferedWriter(fw).use { bfw ->
                 for (i in noGoodIdTreeSet) {
-                    bfw.write(i)
+                    bfw.write(i.toString())
                     bfw.write(NEW_LINE)
                 }
                 bfw.flush()
