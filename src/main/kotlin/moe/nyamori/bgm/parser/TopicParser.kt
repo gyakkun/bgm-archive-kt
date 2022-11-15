@@ -299,11 +299,12 @@ object TopicParser {
     }
 
     private fun guessUidFromUsername(username: String?): Int? {
-        return username?.let {
-            if (username.all { Character.isDigit(it) }) {
-                username.toInt()
+        return username?.let { name ->
+            if (name.all { ch -> Character.isDigit(ch) }) {
+                name.toInt()
+            } else {
+                null
             }
-            null
         }
     }
 
