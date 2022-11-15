@@ -160,36 +160,80 @@ object CommitToJsonProcessor {
         archiveCommit: RevCommit,
         changedFilePathList: List<String>
     ) {
+        var timing = System.currentTimeMillis()
         if (Config.BGM_ARCHIVE_PREFER_JGIT) {
-            Git(jsonRepo).use { git ->
-                changedFilePathList.forEach { path ->
-                    git.add()
-                        .addFilepattern(path.replace("html", "json"))
-                        .call()
-                }
-                git.add()
-                    .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
-                    .call()
-                git.commit()
-                    .setMessage(archiveCommit.fullMessage)
-                    .call()
-            }
+            jgitCommitJsonRepo(jsonRepo, changedFilePathList, archiveCommit)
         } else {
-            val commitMsg = archiveCommit.fullMessage
-            val jsonRepoDir = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
-            val commitMsgFile =
-                jsonRepoDir.resolve(".git").resolve("tmp" + UUID.randomUUID())
-            FileWriter(commitMsgFile).use {
-                it.write(commitMsg)
-                it.flush()
+            commandLineCommitJsonRepoAddFileInBatch(archiveCommit)
+            // commandLineCommitJsonRepoAddFileSeparately(archiveCommit, changedFilePathList)
+        }
+        timing = System.currentTimeMillis() - timing
+        log.info("Timing: $timing for git add/commit ${archiveCommit.fullMessage}")
+    }
+
+    private fun commandLineCommitJsonRepoAddFileSeparately(
+        archiveCommit: RevCommit,
+        changedFilePathList: List<String>
+    ) {
+        val commitMsg = archiveCommit.fullMessage
+        val jsonRepoDir = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
+        val commitMsgFile =
+            jsonRepoDir.resolve(".git").resolve("tmp-" + UUID.randomUUID())
+        FileWriter(commitMsgFile).use {
+            it.write(commitMsg)
+            it.flush()
+        }
+        for (path in changedFilePathList) {
+            val addPathProcess = Runtime.getRuntime()
+                .exec("git add ${path.replace("html", "json")}", null, jsonRepoDir)
+            printResults(addPathProcess)
+        }
+        val addLastCommitIdProcess = Runtime.getRuntime().exec(
+            "git add $BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME",
+            null, jsonRepoDir
+        )
+        printResults(addLastCommitIdProcess)
+        val gitProcess = Runtime.getRuntime()
+            .exec("git commit -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
+        printResults(gitProcess)
+        commitMsgFile.delete()
+    }
+
+    private fun commandLineCommitJsonRepoAddFileInBatch(archiveCommit: RevCommit) {
+        val commitMsg = archiveCommit.fullMessage
+        val jsonRepoDir = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
+        val commitMsgFile =
+            jsonRepoDir.resolve(".git").resolve("tmp-" + UUID.randomUUID())
+        FileWriter(commitMsgFile).use {
+            it.write(commitMsg)
+            it.flush()
+        }
+        var gitProcess = Runtime.getRuntime()
+            .exec("git add *", null, jsonRepoDir)
+        printResults(gitProcess)
+        gitProcess = Runtime.getRuntime()
+            .exec("git commit -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
+        printResults(gitProcess)
+        commitMsgFile.delete()
+    }
+
+    private fun jgitCommitJsonRepo(
+        jsonRepo: Repository,
+        changedFilePathList: List<String>,
+        archiveCommit: RevCommit
+    ) {
+        Git(jsonRepo).use { git ->
+            changedFilePathList.forEach { path ->
+                git.add()
+                    .addFilepattern(path.replace("html", "json"))
+                    .call()
             }
-            var gitProcess = Runtime.getRuntime()
-                .exec("git add *", null, jsonRepoDir)
-            printResults(gitProcess)
-            gitProcess = Runtime.getRuntime()
-                .exec("git commit -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
-            printResults(gitProcess)
-            commitMsgFile.delete()
+            git.add()
+                .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+                .call()
+            git.commit()
+                .setMessage(archiveCommit.fullMessage)
+                .call()
         }
     }
 
@@ -213,10 +257,6 @@ object CommitToJsonProcessor {
             }
         }
     }
-
-
-
-
 
 
 }
