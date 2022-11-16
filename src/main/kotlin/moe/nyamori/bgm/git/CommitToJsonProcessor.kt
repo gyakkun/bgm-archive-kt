@@ -11,6 +11,7 @@ import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
 import org.slf4j.LoggerFactory
 import java.io.*
+import java.nio.charset.StandardCharsets.UTF_8
 import java.util.*
 
 
@@ -250,13 +251,14 @@ object CommitToJsonProcessor {
         val jsonPath = path.replace("html", "json")
         val jsonFileLoc = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(jsonPath)
         jsonFileLoc.parentFile.mkdirs()
-        FileWriter(jsonFileLoc).use { fw ->
-            BufferedWriter(fw).use { bfw ->
-                bfw.write(json)
-                bfw.flush()
+        FileOutputStream(jsonFileLoc).use { fos ->
+            OutputStreamWriter(fos, UTF_8).use { osw ->
+                BufferedWriter(osw).use { bw ->
+                    bw.write(json)
+                    bw.flush()
+                }
             }
         }
     }
-
 
 }
