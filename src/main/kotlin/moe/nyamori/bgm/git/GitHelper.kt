@@ -3,6 +3,7 @@ package moe.nyamori.bgm.git
 import ch.qos.logback.core.CoreConstants.EMPTY_STRING
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import com.ibm.icu.text.CharsetDetector
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
@@ -19,11 +20,12 @@ import org.eclipse.jgit.revwalk.RevWalk
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 import org.eclipse.jgit.treewalk.CanonicalTreeParser
 import org.eclipse.jgit.treewalk.TreeWalk
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.charset.StandardCharsets
 
 object GitHelper {
-
+    private val log = LoggerFactory.getLogger(GitHelper.javaClass)
     val GSON: Gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
 
     fun getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder(): RevWalk {
@@ -103,7 +105,18 @@ object GitHelper {
             repo.newObjectReader().use { objectReader ->
                 val objectLoader: ObjectLoader = objectReader.open(blobId)
                 val bytes = objectLoader.bytes
-                return String(bytes, StandardCharsets.UTF_8)
+                val cd = CharsetDetector()
+                cd.setText(bytes)
+                cd.enableInputFilter(true)
+                val cm = cd.detect()
+                val charsetName:String = if(cm==null){
+                    StandardCharsets.UTF_8.name()
+                } else {
+                    cm.name
+                }
+                log.info("Select charset $charsetName for $path at commit ${commit.fullMessage}")
+                val selectedCharset = charset(charsetName)
+                return String(bytes, selectedCharset)
             }
         }
     }
