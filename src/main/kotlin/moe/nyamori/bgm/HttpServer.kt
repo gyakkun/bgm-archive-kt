@@ -71,7 +71,7 @@ class HttpServer {
                 val timestampList = FileHistoryLookup.getJsonTimestampList(
                     spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".json"
                 )
-                ctx.header(CACHE_CONTROL, "max-age=86400")
+                ctx.header(CACHE_CONTROL, "max-age=3600")
                 ctx.json(timestampList)
             }
         }
@@ -103,7 +103,7 @@ class HttpServer {
                     return
                 }
 
-                // ctx.header(CACHE_CONTROL, "max-age=86400")
+                ctx.header(CACHE_CONTROL, "max-age=86400")
                 if (isRaw) {
                     var html = GitHelper.getFileContentInACommit(
                         GitHelper.archiveRepoSingleton,
