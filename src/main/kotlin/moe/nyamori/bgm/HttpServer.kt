@@ -31,8 +31,10 @@ class HttpServer {
             }
                 .get("/after-commit-hook", CommitHook())
                 .get("/history/group/{topicId}", FileHistory(SpaceType.GROUP))
+                .get("/history/group/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.GROUP, isRaw = true))
                 .get("/history/group/{topicId}/{timestamp}", FileOnCommit(SpaceType.GROUP))
                 .get("/history/subject/{topicId}", FileHistory(SpaceType.SUBJECT))
+                .get("/history/subject/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.SUBJECT, isRaw = true))
                 .get("/history/subject/{topicId}/{timestamp}", FileOnCommit(SpaceType.SUBJECT))
                 .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
             Runtime.getRuntime().addShutdownHook(Thread {
@@ -74,14 +76,21 @@ class HttpServer {
             }
         }
 
-        class FileOnCommit(private val spaceType: SpaceType) : Handler {
+        class FileOnCommit(private val spaceType: SpaceType, private val isRaw: Boolean = false) : Handler {
             override fun handle(ctx: Context) {
                 val topicId = ctx.pathParam("topicId").toInt()
-                val timestamp = ctx.pathParam("timestamp").toLong()
-                val relativePath = spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".json"
-                val timestampList = FileHistoryLookup.getJsonTimestampList(
-                    relativePath
-                )
+                val timestampPathParam = ctx.pathParam("timestamp")
+                val timestamp =
+                    if (timestampPathParam == "latest") Long.MAX_VALUE
+                    else if (timestampPathParam.toLongOrNull() != null) timestampPathParam.toLong()
+                    else -1L
+                val relativePath =
+                    spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + if (isRaw) ".html" else ".json"
+                val timestampList = if (isRaw) {
+                    FileHistoryLookup.getArchiveTimestampList(relativePath)
+                } else {
+                    FileHistoryLookup.getJsonTimestampList(relativePath)
+                }
                 val ts = TreeSet<Long>().apply {
                     addAll(timestampList)
                 }
@@ -90,18 +99,31 @@ class HttpServer {
                     if (ceilingTimestamp == null) {
                         ceilingTimestamp = ts.first()
                     }
-                    ctx.redirect(ctx.path().replace(timestamp.toString(), ceilingTimestamp.toString()))
+                    ctx.redirect(ctx.path().replace(timestampPathParam, ceilingTimestamp.toString()))
                     return
                 }
 
-                ctx.header(CACHE_CONTROL, "max-age=86400")
-                ctx.json(
-                    GitHelper.getFileContentInACommit(
-                        GitHelper.getJsonRepo(),
-                        FileHistoryLookup.getJsonCommitAtTimestamp(relativePath, timestamp),
+                // ctx.header(CACHE_CONTROL, "max-age=86400")
+                if (isRaw) {
+                    var html = GitHelper.getFileContentInACommit(
+                        GitHelper.archiveRepoSingleton,
+                        FileHistoryLookup.getArchiveCommitAtTimestamp(relativePath, timestamp),
                         relativePath
                     )
-                )
+                    html = html.replace("chii.in", "bgm.tv")
+                    html = html.replace("bangumi.tv", "bgm.tv")
+                    html = html.replace("src=\"/", "src=\"https://bgm.tv/")
+                    html = html.replace("href=\"/", "href=\"https://bgm.tv/")
+                    ctx.html(html)
+                } else {
+                    ctx.json(
+                        GitHelper.getFileContentInACommit(
+                            GitHelper.jsonRepoSingleton,
+                            FileHistoryLookup.getJsonCommitAtTimestamp(relativePath, timestamp),
+                            relativePath
+                        )
+                    )
+                }
             }
 
         }

@@ -17,24 +17,26 @@ object FileHistoryLookup {
 
     }
 
-    private val jsonRepoPathToRevCommitCache: LoadingCache<String, Map<Long, RevCommit>> = Caffeine.newBuilder()
-        .maximumSize(1000)
-        .expireAfterWrite(Duration.ofHours(3))
-        .refreshAfterWrite(Duration.ofHours(3))
-        .build { relativePath ->
-            getTimestampCommitMapFromRevCommitList(getRevCommitList(relativePath, GitHelper.getJsonRepo()))
-        }
+    private val repoPathToRevCommitCache: LoadingCache<Pair<Repository, String>, Map<Long, RevCommit>> =
+        Caffeine.newBuilder()
+            .maximumSize(1000)
+            .expireAfterWrite(Duration.ofHours(3))
+            .refreshAfterWrite(Duration.ofHours(1))
+            .build { key ->
+                getTimestampCommitMapFromRevCommitList(getRevCommitList(key.second, key.first))
+            }
 
-    private val archiveRepoPathToRevCommitCache: LoadingCache<String, Map<Long, RevCommit>> = Caffeine.newBuilder()
-        .maximumSize(1000)
-        .expireAfterWrite(Duration.ofHours(3))
-        .refreshAfterWrite(Duration.ofHours(3))
-        .build { relativePath ->
-            getTimestampCommitMapFromRevCommitList(getRevCommitList(relativePath, GitHelper.getArchiveRepo()))
-        }
 
     fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> {
-        return jsonRepoPathToRevCommitCache.get(relativePathToRepoFolder).keys.toList()
+        return repoPathToRevCommitCache.get(Pair(GitHelper.jsonRepoSingleton, relativePathToRepoFolder)).keys.toList()
+    }
+
+    fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> {
+        return repoPathToRevCommitCache.get(
+            Pair(
+                GitHelper.archiveRepoSingleton, relativePathToRepoFolder
+            )
+        ).keys.toList()
     }
 
 
@@ -55,11 +57,23 @@ object FileHistoryLookup {
             if (it.fullMessage.startsWith("META") || it.fullMessage.startsWith("init")) return@forEach
             result[it.fullMessage.split("|").last().trim().toLong()] = it
         }
+        // Workaround for historical files added in META commit
+        if (result.isEmpty() && revCommitList.isNotEmpty()) {
+            result[revCommitList.first().commitTime.toLong() * 1000] = revCommitList.first()
+        }
         return result
     }
 
     fun getJsonCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit {
-        val m: Map<Long, RevCommit> = jsonRepoPathToRevCommitCache.get(relativePathToRepoFolder)
+        return getCommitAtTimestamp(GitHelper.jsonRepoSingleton, relativePathToRepoFolder, timestamp)
+    }
+
+    fun getArchiveCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit {
+        return getCommitAtTimestamp(GitHelper.archiveRepoSingleton, relativePathToRepoFolder, timestamp)
+    }
+
+    fun getCommitAtTimestamp(repo: Repository, relativePathToRepoFolder: String, timestamp: Long): RevCommit {
+        val m: Map<Long, RevCommit> = repoPathToRevCommitCache.get(Pair(repo, relativePathToRepoFolder))
         if (!m.containsKey(timestamp)) throw IllegalArgumentException("Timestamp $timestamp not in commit history")
         return m[timestamp]!!
     }
