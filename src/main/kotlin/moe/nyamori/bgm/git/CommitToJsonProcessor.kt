@@ -26,8 +26,8 @@ object CommitToJsonProcessor {
     fun job() {
         val walk =
             GitHelper.getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder()
-        val archiveRepo = GitHelper.getArchiveRepo()
-        val jsonRepo = GitHelper.getJsonRepo()
+        val archiveRepo = GitHelper.archiveRepoSingleton
+        val jsonRepo = GitHelper.jsonRepoSingleton
         var prevCommit = walk.next()
         val lastProcessedCommit = GitHelper.getPrevProcessedCommitRef()
 

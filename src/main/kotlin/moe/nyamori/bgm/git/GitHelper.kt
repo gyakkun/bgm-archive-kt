@@ -87,6 +87,15 @@ object GitHelper {
             .build()
     }
 
+
+    val jsonRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        getJsonRepo()
+    }
+
+    val archiveRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        getArchiveRepo()
+    }
+
     fun getJsonRepo(): Repository {
         var repo = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
         if (repo.resolve(DOT_GIT).let { it.exists() && it.isDirectory }) {
@@ -109,7 +118,7 @@ object GitHelper {
                 cd.setText(bytes)
                 cd.enableInputFilter(true)
                 val cm = cd.detect()
-                val charsetName:String = if(cm==null){
+                val charsetName: String = if (cm == null) {
                     StandardCharsets.UTF_8.name()
                 } else {
                     cm.name
