@@ -99,7 +99,13 @@ class HttpServer {
                     if (ceilingTimestamp == null) {
                         ceilingTimestamp = ts.first()
                     }
-                    ctx.redirect(ctx.path().replace(timestampPathParam, ceilingTimestamp.toString()))
+                    ctx.redirect(
+                        if (isRaw) {
+                            ctx.path().replace(Regex("/${timestampPathParam}/html"), "/${ceilingTimestamp}/html")
+                        } else {
+                            ctx.path().replace(Regex("/${timestampPathParam}/*\$"), "/${ceilingTimestamp}")
+                        }
+                    )
                     return
                 }
 
