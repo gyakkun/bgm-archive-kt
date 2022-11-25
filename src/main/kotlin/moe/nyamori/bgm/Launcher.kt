@@ -29,13 +29,13 @@ class Launcher {
 //            val sampleFile2 = File("E:\\SOURCE_ROOT\\bgm-archive-sh\\sample_html\\group_topic_sample_2.html")
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive\\group\\36\\27\\362716.html")
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive-historical\\group\\00\\22\\2226.html")
-            val sampleFile2 = File("E:\\[ToBak]\\Desktop_Win10\\23629.html")
-            val str = FileUtil.getFileContent(sampleFile2)!!
-            val (parseGroupTopic, result) = TopicParser.parseTopic(str, 23629,SpaceType.SUBJECT)
+            val dropDown = File("E:\\[ToBak]\\Desktop_Win10\\group_close_sample.html")
+            val str = FileUtil.getFileContent(dropDown)!!
+            val (parseGroupTopic, result) = TopicParser.parseTopic(str, 375099, SpaceType.GROUP)
             if (result) {
                 val toJson = gson.toJson(parseGroupTopic)
                 val jsonFile = File(
-                    sampleFile2.absolutePath.replace("bgm-archive", "bgm-archive-json")
+                    dropDown.absolutePath.replace("bgm-archive", "bgm-archive-json")
                         .replace(".html", ".json")
                 )
                 jsonFile.parentFile.mkdirs()
@@ -64,7 +64,7 @@ class Launcher {
                 val fileName = htmlFile.nameWithoutExtension
                 val fileStr = FileUtil.getFileContent(htmlFile)!!
                 val topicId = fileName.toInt()
-                val (topic, result) = TopicParser.parseTopic(fileStr, topicId,SpaceType.GROUP)
+                val (topic, result) = TopicParser.parseTopic(fileStr, topicId, SpaceType.GROUP)
                 if (!result) {
                     ng.add(htmlFile)
                     ngCounter.incrementAndGet()
