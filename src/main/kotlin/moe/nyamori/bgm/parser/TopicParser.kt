@@ -1,7 +1,13 @@
 package moe.nyamori.bgm.parser
 
 import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.model.Post.Companion.STATE_CLOSED
 import moe.nyamori.bgm.model.Post.Companion.STATE_NORMAL
+import moe.nyamori.bgm.model.Post.Companion.STATE_SILENT
+import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_CLOSED_SPAN
+import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_DISABLED_FLOOR_DATE_SPAN
+import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_DISABLED_FLOOR_AUTHOR_ANCHOR
+import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_SILENT_SPAN
 import moe.nyamori.bgm.util.XPathHelper.XP_404_MSG
 import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_ANCHOR
 import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_CONTENT
@@ -196,25 +202,51 @@ object TopicParser {
                 if (outerIdx != floor.asElement().elementSiblingIndex()) return@outer
                 // follow post id: post_{id}
                 val floorPid = floor.asElement().attr("id").substring(5).toInt()
-                // follow post floor: #{floor}
-                val floorNum = floor.selOne(XP_FLOOR_ANCHOR).asElement().text().substring(1).toInt()
-                // follow post date: ' - {yyyy-M-d HH:mm}'
-                val floorDateStr = floor.selOne(XP_FLOOR_DATE_SMALL_TEXT).asString().substring(2)
-                val floorDate = SDF_YYYY_M_D_HH_MM.parse(floorDateStr).toInstant().epochSecond
+
+                // floor is slient or close
+                val isSilent = floor.selOne(XP_TOPIC_SILENT_SPAN) != null
+                val isClosed = floor.selOne(XP_TOPIC_CLOSED_SPAN) != null
+                val isTopicDisabled = isSilent || isClosed
+
+                val floorNum: Int
+                val floorDateStr: String
+                val floorDate: Long
+
+                if (isTopicDisabled) {
+                    thisTopic.display = false
+                    val dateSpan = floor.selOne(XP_TOPIC_DISABLED_FLOOR_DATE_SPAN)
+                    floorNum = postList.size + 1
+                    floorDateStr = dateSpan.asElement().html()
+                    floorDate = SDF_YYYY_M_D_HH_MM.parse(floorDateStr).toInstant().epochSecond
+                } else {
+                    // follow post floor: #{floor}
+                    floorNum = floor.selOne(XP_FLOOR_ANCHOR).asElement().text().substring(1).toInt()
+                    // follow post date: ' - {yyyy-M-d HH:mm}'
+                    floorDateStr = floor.selOne(XP_FLOOR_DATE_SMALL_TEXT).asString().substring(2)
+                    floorDate = SDF_YYYY_M_D_HH_MM.parse(floorDateStr).toInstant().epochSecond
+                }
                 // follow post user anchor - username: /user/{username}
                 val floorUserUsername = floor.selOne(XP_FLOOR_USER_NAME_ANCHOR).asElement().attr("href").substring(6)
                 // follow post user anchor span - uid (plan B): background...
                 // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
                 val floorUserBgStyle = floor.selOne(XP_FLOOR_USER_STYLE_BG_SPAN).asElement().attr("style")
                 val floorUserUid = getUidFromBgStyle(floorUserBgStyle) ?: guessUidFromUsername(floorUserUsername)
-                // follow post user nickname: {nickname}
-                val floorUserNickname = floor.selOne(XP_FLOOR_USER_NICKNAME_ANCHOR_TEXT).asString()
-                // follow post user sign: ({sign})
-                val floorUserSignStr = floor.selOne(XP_FLOOR_USER_SIGN_SPAN_TEXT)?.asString()
-                val floorUserSign = getUserSign(floorUserSignStr)
+                val floorUserNickname: String
+                val floorUserSignStr: String?
+                var floorUserSign: String? = null
+                if (!isTopicDisabled) {
+                    // follow post user nickname: {nickname}
+                    floorUserNickname = floor.selOne(XP_FLOOR_USER_NICKNAME_ANCHOR_TEXT).asString()
+                    // follow post user sign: ({sign})
+                    floorUserSignStr = floor.selOne(XP_FLOOR_USER_SIGN_SPAN_TEXT)?.asString()
+                    floorUserSign = getUserSign(floorUserSignStr)
+                } else {
+                    floorUserNickname = floor.selOne(XP_TOPIC_DISABLED_FLOOR_AUTHOR_ANCHOR).asElement().html()
+                }
 
                 // follow post content div
-                val floorContentHtml = floor.selOne(XP_FLOOR_CONTENT).asElement().html()
+                val floorContentHtml = if (!isTopicDisabled) floor.selOne(XP_FLOOR_CONTENT).asElement()
+                    .html() else floor.selOne("//div[@class=\"inner\"]").asElement().html()
 
                 val thisFloor = Post(
                     id = floorPid,
@@ -224,7 +256,7 @@ object TopicParser {
                     related = null,
                     contentHtml = floorContentHtml,
                     contentBbcode = null,
-                    state = STATE_NORMAL,
+                    state = if (isSilent) STATE_SILENT else if (isClosed) STATE_CLOSED else STATE_NORMAL,
                     dateline = floorDate,
                     user = User(
                         id = floorUserUid,
