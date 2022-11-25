@@ -26,7 +26,8 @@ object XPathHelper {
     const val XP_SUBJECT_TOPIC_TOP_POST_DATE_SMALL_TEXT: String = "/div[2]/div[2]/div[1]/div[1]/small/text()"
     const val XP_SUBJECT_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR: String = "/div[2]/div[2]/div[1]/a"
     const val XP_SUBJECT_TOPIC_TOP_POST_UID_SPAN: String = "/div[2]/div[2]/div[1]/a/span"
-    const val XP_SUBJECT_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT: String = "/div[2]/div[2]/div[1]/div[2]/strong/a/text()"
+    const val XP_SUBJECT_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT: String =
+        "/div[2]/div[2]/div[1]/div[2]/strong/a/text()"
     const val XP_SUBJECT_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT: String = "/div[2]/div[2]/div[1]/div[2]/span/text()"
     const val XP_SUBJECT_TOPIC_TOP_POST_CONTENT_DIV: String = "/div[2]/div[2]/div[1]/div[2]/div"
 
@@ -43,4 +44,9 @@ object XPathHelper {
     const val XP_SUB_FLOOR_DIV_LIST = "div/div/div[@class=\"topic_sub_reply\"]/div"
     const val XP_SUB_FLOOR_USER_NICKNAME_ANCHOR_TEXT = "div[2]/strong[@class=\"userName\"]/a/text()"
     const val XP_SUB_FLOOR_CONTENT = "div[2]/div[@class=\"cmt_sub_content\"]"
+
+    const val XP_TOPIC_SILENT_SPAN = "span[contains(@class, \"badgeStateSilent\")]"
+    const val XP_TOPIC_CLOSED_SPAN = "span[contains(@class, \"badgeStateClosed\")]"
+    const val XP_TOPIC_DISABLED_FLOOR_DATE_SPAN = "//span[@class=\"tip_j\"]"
+    const val XP_TOPIC_DISABLED_FLOOR_AUTHOR_ANCHOR = "//a[contains(@class, \"post_author_\")]"
 }
