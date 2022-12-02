@@ -23,6 +23,7 @@ data class Post(
 
     companion object {
         const val STATE_NORMAL: Short = 0
+        const val STATE_REOPEN: Short = 11
         const val STATE_CLOSED: Short = 1
         const val STATE_SILENT: Short = 5
     }

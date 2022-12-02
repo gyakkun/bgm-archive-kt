@@ -3,6 +3,7 @@ package moe.nyamori.bgm.parser
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.model.Post.Companion.STATE_CLOSED
 import moe.nyamori.bgm.model.Post.Companion.STATE_NORMAL
+import moe.nyamori.bgm.model.Post.Companion.STATE_REOPEN
 import moe.nyamori.bgm.model.Post.Companion.STATE_SILENT
 import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_CLOSED_SPAN
 import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_DISABLED_FLOOR_DATE_SPAN
@@ -39,6 +40,7 @@ import moe.nyamori.bgm.util.XPathHelper.XP_SUBJECT_TOPIC_TOP_POST_USER_SIGN_SPAN
 import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_CONTENT
 import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_DIV_LIST
 import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_USER_NICKNAME_ANCHOR_TEXT
+import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_REOPEN_SPAN
 import org.seimicrawler.xpath.JXDocument
 import org.seimicrawler.xpath.JXNode
 import org.slf4j.Logger
@@ -206,13 +208,16 @@ object TopicParser {
                 // floor is slient or close
                 val isSilent = floor.selOne(XP_TOPIC_SILENT_SPAN) != null
                 val isClosed = floor.selOne(XP_TOPIC_CLOSED_SPAN) != null
+                val isReopen = floor.selOne(XP_TOPIC_REOPEN_SPAN) != null
                 val isTopicDisabled = isSilent || isClosed
+                val isSpecialBadge = isSilent || isClosed || isReopen
+
 
                 val floorNum: Int
                 val floorDateStr: String
                 val floorDate: Long
 
-                if (isTopicDisabled) {
+                if (isSpecialBadge) {
                     thisTopic.display = false
                     val dateSpan = floor.selOne(XP_TOPIC_DISABLED_FLOOR_DATE_SPAN)
                     floorNum = postList.size + 1
@@ -234,7 +239,7 @@ object TopicParser {
                 val floorUserNickname: String
                 val floorUserSignStr: String?
                 var floorUserSign: String? = null
-                if (!isTopicDisabled) {
+                if (!isSpecialBadge) {
                     // follow post user nickname: {nickname}
                     floorUserNickname = floor.selOne(XP_FLOOR_USER_NICKNAME_ANCHOR_TEXT).asString()
                     // follow post user sign: ({sign})
@@ -245,7 +250,7 @@ object TopicParser {
                 }
 
                 // follow post content div
-                val floorContentHtml = if (!isTopicDisabled) floor.selOne(XP_FLOOR_CONTENT).asElement()
+                val floorContentHtml = if (!isSpecialBadge) floor.selOne(XP_FLOOR_CONTENT).asElement()
                     .html() else floor.selOne("//div[@class=\"inner\"]").asElement().html()
 
                 val thisFloor = Post(
@@ -256,7 +261,8 @@ object TopicParser {
                     related = null,
                     contentHtml = floorContentHtml,
                     contentBbcode = null,
-                    state = if (isSilent) STATE_SILENT else if (isClosed) STATE_CLOSED else STATE_NORMAL,
+                    // state = if (isSilent) STATE_SILENT else if (isClosed) STATE_CLOSED else STATE_NORMAL,
+                    state = if (isSilent) STATE_SILENT else if (isClosed) STATE_CLOSED else if (isReopen) STATE_REOPEN else STATE_NORMAL,
                     dateline = floorDate,
                     user = User(
                         id = floorUserUid,

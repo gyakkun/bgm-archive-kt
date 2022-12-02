@@ -47,6 +47,7 @@ object XPathHelper {
 
     const val XP_TOPIC_SILENT_SPAN = "span[contains(@class, \"badgeStateSilent\")]"
     const val XP_TOPIC_CLOSED_SPAN = "span[contains(@class, \"badgeStateClosed\")]"
+    const val XP_TOPIC_REOPEN_SPAN = "span[contains(@class, \"badgeStateReopen\")]"
     const val XP_TOPIC_DISABLED_FLOOR_DATE_SPAN = "//span[@class=\"tip_j\"]"
     const val XP_TOPIC_DISABLED_FLOOR_AUTHOR_ANCHOR = "//a[contains(@class, \"post_author_\")]"
 }
