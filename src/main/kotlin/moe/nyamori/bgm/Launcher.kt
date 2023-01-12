@@ -4,6 +4,7 @@ import com.google.gson.GsonBuilder
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.parser.GlobalVotingParser
 import moe.nyamori.bgm.parser.TopicParser
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -29,8 +30,15 @@ class Launcher {
 //            val sampleFile2 = File("E:\\SOURCE_ROOT\\bgm-archive-sh\\sample_html\\group_topic_sample_2.html")
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive\\group\\36\\27\\362716.html")
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive-historical\\group\\00\\22\\2226.html")
-            val dropDown = File("E:\\[ToBak]\\Desktop_Win10\\group_close_sample.html")
+            val dropDown = File("E:\\[ToBak]\\Desktop_Win10\\sample\\subject\\1010.html")
+
+
             val str = FileUtil.getFileContent(dropDown)!!
+            val voting = GlobalVotingParser.parseSubject(str,1010)
+            LOGGER.info("voting, {} , {} , {} ", voting.titleChn,voting.titleOrig,voting.voting)
+            if (true) return
+
+
             val (parseGroupTopic, result) = TopicParser.parseTopic(str, 375099, SpaceType.GROUP)
             if (result) {
                 val toJson = gson.toJson(parseGroupTopic)
@@ -49,7 +57,6 @@ class Launcher {
                 System.err.println(parseGroupTopic)
             }
 //
-            if (true) return
 
             val ts = ConcurrentSkipListSet<Pair<Long, File>>(Comparator.comparingLong { -it.first })
             val ng = ConcurrentHashMap.newKeySet<File>()
