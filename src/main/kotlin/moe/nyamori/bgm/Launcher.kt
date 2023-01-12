@@ -3,24 +3,1022 @@ package moe.nyamori.bgm
 import com.google.gson.GsonBuilder
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.GlobalVotingParser
-import moe.nyamori.bgm.parser.TopicParser
 import moe.nyamori.bgm.parser.VibVotingParser
+import moe.nyamori.bgm.util.VotingCalculator
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.io.FileWriter
 import java.io.IOException
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentSkipListSet
-import java.util.concurrent.atomic.AtomicLong
-import kotlin.streams.asStream
+import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 class Launcher {
     companion object {
         val LOGGER = LoggerFactory.getLogger(Launcher.javaClass)
         val gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
+        val top1000 = intArrayOf(
+            253,
+            326,
+            324,
+            876,
+            25961,
+            6049,
+            237,
+            1728,
+            265,
+            211567,
+            2907,
+            1428,
+            110467,
+            238,
+            11834,
+            321,
+            340,
+            1608,
+            839,
+            247,
+            10380,
+            3375,
+            840,
+            263750,
+            311,
+            1270,
+            770,
+            146457,
+            3302,
+            1962,
+            1015,
+            216371,
+            106207,
+            37460,
+            254,
+            4019,
+            93739,
+            9717,
+            141530,
+            325285,
+            9622,
+            93377,
+            92705,
+            173849,
+            39923,
+            841,
+            848,
+            298,
+            10291,
+            847,
+            29883,
+            315574,
+            1453,
+            9912,
+            1773,
+            44693,
+            4583,
+            1333,
+            317613,
+            310,
+            335036,
+            246001,
+            328609,
+            23304,
+            320,
+            67753,
+            975,
+            51,
+            124341,
+            72266,
+            294135,
+            1704,
+            176615,
+            120236,
+            152091,
+            793,
+            262897,
+            295,
+            822,
+            325585,
+            1671,
+            3553,
+            1959,
+            18692,
+            4163,
+            248154,
+            298477,
+            147068,
+            1269,
+            3128,
+            605,
+            842,
+            47576,
+            100501,
+            113292,
+            2741,
+            115908,
+            240386,
+            132373,
+            1856,
+            33352,
+            860,
+            493,
+            27364,
+            37785,
+            8,
+            2734,
+            203526,
+            1891,
+            88473,
+            315,
+            1104,
+            2496,
+            6048,
+            965,
+            40003,
+            302,
+            41568,
+            120700,
+            207195,
+            276,
+            10356,
+            309311,
+            282684,
+            769,
+            485,
+            750,
+            12426,
+            772,
+            3996,
+            12536,
+            218708,
+            84171,
+            531,
+            9565,
+            794,
+            119394,
+            8986,
+            338,
+            995,
+            285901,
+            48745,
+            278569,
+            768,
+            4124,
+            844,
+            110148,
+            116370,
+            3774,
+            4077,
+            217300,
+            175596,
+            148037,
+            1267,
+            246238,
+            3627,
+            8621,
+            240760,
+            282433,
+            10639,
+            120791,
+            11577,
+            216372,
+            28533,
+            202240,
+            45089,
+            3324,
+            22588,
+            1984,
+            353605,
+            288,
+            1940,
+            68812,
+            909,
+            1029,
+            56847,
+            9005,
+            13552,
+            1266,
+            127563,
+            294880,
+            1948,
+            48746,
+            1424,
+            43558,
+            843,
+            218707,
+            85631,
+            3172,
+            3423,
+            289,
+            21032,
+            496,
+            12885,
+            10379,
+            486,
+            18294,
+            211089,
+            1625,
+            891,
+            290980,
+            8402,
+            347887,
+            72941,
+            37063,
+            62680,
+            234,
+            44692,
+            55770,
+            22985,
+            10843,
+            307,
+            259,
+            927,
+            28440,
+            28205,
+            112419,
+            18624,
+            1443,
+            23495,
+            160209,
+            100444,
+            4042,
+            696,
+            101442,
+            235128,
+            1606,
+            440,
+            80864,
+            52787,
+            2664,
+            302286,
+            77480,
+            980,
+            78405,
+            215618,
+            29870,
+            11658,
+            329948,
+            3428,
+            4608,
+            10404,
+            443,
+            193378,
+            14878,
+            1607,
+            3892,
+            233,
+            767,
+            292,
+            799,
+            54552,
+            187276,
+            1976,
+            343607,
+            66244,
+            515,
+            1937,
+            230914,
+            2461,
+            1373,
+            2463,
+            13603,
+            211311,
+            2979,
+            129807,
+            59664,
+            118335,
+            82233,
+            2582,
+            148036,
+            232067,
+            24790,
+            37183,
+            60901,
+            8726,
+            2481,
+            29421,
+            968,
+            5694,
+            14879,
+            4014,
+            242,
+            4038,
+            214265,
+            2045,
+            233926,
+            3995,
+            150490,
+            4607,
+            35858,
+            175600,
+            2896,
+            88433,
+            1905,
+            5118,
+            3478,
+            64172,
+            361095,
+            25833,
+            10395,
+            5753,
+            3166,
+            26449,
+            37685,
+            68035,
+            262277,
+            314,
+            2611,
+            91205,
+            322967,
+            45241,
+            207573,
+            516,
+            4216,
+            67217,
+            331887,
+            2921,
+            50,
+            130230,
+            3130,
+            500,
+            4010,
+            1878,
+            221726,
+            8484,
+            252655,
+            33491,
+            13557,
+            221227,
+            293049,
+            2096,
+            3153,
+            41189,
+            209925,
+            6390,
+            9853,
+            14220,
+            697,
+            1942,
+            45336,
+            3168,
+            294836,
+            337,
+            7707,
+            979,
+            2046,
+            1038,
+            2127,
+            2981,
+            240799,
+            243429,
+            35679,
+            812,
+            312,
+            105255,
+            4475,
+            90880,
+            12283,
+            89536,
+            296739,
+            282,
+            47665,
+            4884,
+            284,
+            115661,
+            10392,
+            2166,
+            1609,
+            158316,
+            313852,
+            12317,
+            144087,
+            2459,
+            186881,
+            175599,
+            100449,
+            28065,
+            3626,
+            3304,
+            2460,
+            191302,
+            333664,
+            248175,
+            300,
+            24823,
+            43581,
+            57995,
+            1981,
+            2842,
+            3291,
+            1219,
+            10385,
+            23161,
+            1958,
+            316007,
+            10357,
+            513,
+            921,
+            76319,
+            16621,
+            77476,
+            1760,
+            1321,
+            176478,
+            10436,
+            2972,
+            2439,
+            14106,
+            54234,
+            23307,
+            4859,
+            49315,
+            1512,
+            193042,
+            355109,
+            243981,
+            6880,
+            2094,
+            109869,
+            3293,
+            9979,
+            284524,
+            10358,
+            4301,
+            4215,
+            37819,
+            928,
+            80199,
+            214824,
+            208825,
+            3292,
+            304087,
+            8803,
+            299,
+            1742,
+            211269,
+            1263,
+            1805,
+            6985,
+            766,
+            274,
+            977,
+            277554,
+            8474,
+            112397,
+            10419,
+            10197,
+            751,
+            214799,
+            10553,
+            228046,
+            3019,
+            255191,
+            285482,
+            23213,
+            287488,
+            2603,
+            219654,
+            103906,
+            2108,
+            83868,
+            118262,
+            305,
+            124649,
+            38256,
+            129224,
+            4214,
+            3275,
+            343176,
+            36359,
+            159725,
+            11598,
+            4035,
+            13012,
+            7883,
+            9588,
+            39087,
+            14877,
+            1966,
+            23119,
+            2059,
+            693,
+            119279,
+            274613,
+            5870,
+            216310,
+            138829,
+            3134,
+            339326,
+            271151,
+            407,
+            7777,
+            1836,
+            12579,
+            10440,
+            5998,
+            918,
+            282759,
+            338353,
+            79678,
+            61275,
+            36004,
+            1894,
+            13014,
+            45240,
+            3482,
+            133860,
+            8290,
+            330,
+            3471,
+            3916,
+            47685,
+            22346,
+            18254,
+            9757,
+            11602,
+            10375,
+            56117,
+            13677,
+            806,
+            296875,
+            251547,
+            181354,
+            38437,
+            97305,
+            137722,
+            285666,
+            61534,
+            254470,
+            334,
+            231497,
+            106656,
+            52129,
+            3641,
+            3805,
+            3622,
+            28900,
+            294713,
+            37873,
+            14508,
+            749,
+            28066,
+            5487,
+            13871,
+            31836,
+            503,
+            593,
+            99748,
+            3113,
+            4328,
+            260770,
+            1956,
+            185792,
+            266301,
+            2693,
+            51945,
+            283,
+            331480,
+            185943,
+            194300,
+            885,
+            4849,
+            389474,
+            10309,
+            274234,
+            295421,
+            10391,
+            217285,
+            109375,
+            5997,
+            4075,
+            39531,
+            85316,
+            893,
+            104521,
+            1890,
+            10941,
+            8987,
+            8748,
+            6756,
+            2790,
+            3133,
+            240798,
+            332649,
+            204623,
+            1752,
+            4028,
+            84756,
+            86895,
+            152092,
+            2097,
+            317680,
+            165738,
+            106655,
+            2784,
+            299277,
+            899,
+            13498,
+            2898,
+            21942,
+            92412,
+            361385,
+            50323,
+            2712,
+            36338,
+            8386,
+            208826,
+            2662,
+            18882,
+            2909,
+            4406,
+            36355,
+            381842,
+            3960,
+            69484,
+            9619,
+            216311,
+            1171,
+            326895,
+            358660,
+            40310,
+            297396,
+            9639,
+            109604,
+            14876,
+            2710,
+            4237,
+            296195,
+            296659,
+            220631,
+            110239,
+            332261,
+            96167,
+            508,
+            297261,
+            91987,
+            236020,
+            100437,
+            2897,
+            129844,
+            54675,
+            3732,
+            1877,
+            378862,
+            9618,
+            126173,
+            1617,
+            3819,
+            10840,
+            243916,
+            3893,
+            7408,
+            106653,
+            40187,
+            188819,
+            1957,
+            170415,
+            25442,
+            382,
+            36186,
+            14588,
+            305515,
+            20547,
+            124646,
+            1030,
+            286,
+            2531,
+            36126,
+            285074,
+            45904,
+            75568,
+            361384,
+            4193,
+            1969,
+            213816,
+            1487,
+            262940,
+            3485,
+            62285,
+            4046,
+            345980,
+            119356,
+            10742,
+            8081,
+            78479,
+            36271,
+            152691,
+            175137,
+            174584,
+            6651,
+            35632,
+            10402,
+            114161,
+            3830,
+            2789,
+            195249,
+            2894,
+            85204,
+            19130,
+            47731,
+            86670,
+            13045,
+            88411,
+            1451,
+            2049,
+            77171,
+            174142,
+            335579,
+            265708,
+            79662,
+            3697,
+            512,
+            3169,
+            3642,
+            1639,
+            78798,
+            84501,
+            381841,
+            311809,
+            29307,
+            52392,
+            60606,
+            225801,
+            289829,
+            9270,
+            2785,
+            22241,
+            56846,
+            37874,
+            174638,
+            17160,
+            79227,
+            2882,
+            174043,
+            64086,
+            1955,
+            240583,
+            307995,
+            331752,
+            203387,
+            204027,
+            24274,
+            75533,
+            9617,
+            73083,
+            49892,
+            3022,
+            7206,
+            1741,
+            141799,
+            53984,
+            976,
+            1444,
+            8991,
+            2464,
+            60493,
+            2103,
+            8181,
+            14542,
+            2074,
+            57105,
+            2215,
+            309,
+            60604,
+            12,
+            135275,
+            50017,
+            95445,
+            66941,
+            56403,
+            119035,
+            286125,
+            131891,
+            6819,
+            226224,
+            3021,
+            1220,
+            111894,
+            75855,
+            4255,
+            9713,
+            60607,
+            22505,
+            4400,
+            267412,
+            20813,
+            22759,
+            199392,
+            269918,
+            3421,
+            46458,
+            148726,
+            60608,
+            442,
+            123568,
+            4283,
+            334399,
+            244761,
+            3773,
+            62571,
+            3755,
+            54433,
+            38436,
+            127573,
+            896,
+            2936,
+            106654,
+            286132,
+            919,
+            1851,
+            4274,
+            8696,
+            4043,
+            5378,
+            10599,
+            104591,
+            33695,
+            242216,
+            9571,
+            4212,
+            128239,
+            348335,
+            70323,
+            227240,
+            4293,
+            2585,
+            120186,
+            3175,
+            29426,
+            11784,
+            1961,
+            7667,
+            103718,
+            312723,
+            51928,
+            67755,
+            55654,
+            39118,
+            18779,
+            353266,
+            11603,
+            358934,
+            234250,
+            139022,
+            49666,
+            159826,
+            151345,
+            29889,
+            475,
+            1511,
+            5649,
+            239270,
+            273843,
+            325587,
+            53925,
+            880,
+            178884,
+            37395,
+            168204,
+            37745,
+            193298,
+            101437,
+            253046,
+            1372,
+            2733,
+            2971,
+            110648,
+            227718,
+            95225,
+            4843,
+            261806,
+            373247,
+            234349,
+            141852,
+            316247,
+            4264,
+            44690,
+            381839,
+            315026,
+            220188,
+            41013,
+            19208,
+            14514,
+            58949,
+            70322,
+            3026,
+            47889,
+            23537,
+            89875,
+            33922,
+            235130,
+            1941,
+            25469,
+            212008,
+            5864,
+            1972,
+            293658,
+            34281,
+            208908,
+            9568,
+            8296,
+            7159,
+            237423,
+            72767,
+            10071,
+            90502,
+            60601,
+            60605,
+            65883,
+            116225,
+            218971,
+            8582,
+            536,
+            467,
+            47730,
+            74625,
+            3425,
+            2782,
+            347888,
+            1934,
+            83737,
+            160271,
+            7348,
+            11145,
+            285776,
+            58864,
+            79656,
+            64140,
+            3754,
+            56239,
+            9564,
+            9642,
+            12544,
+            285759,
+            2829,
+            104569,
+            3734,
+            3020,
+            4025,
+            1983,
+            2889,
+            331936,
+            32318,
+            1010,
+            348240,
+            25716,
+            238815,
+            50658,
+            192680,
+            9001,
+            60368,
+            210458,
+            226218,
+            10966,
+            336522,
+            4450,
+            211934,
+            2689,
+            255980,
+            14766,
+            4045,
+            292359,
+            273877,
+            11629,
+            10409,
+            71802,
+            10388,
+            192247,
+            75055,
+            37897,
+            6811,
+            3816,
+            2643,
+            2225,
+            316037,
+            1515,
+            2772,
+            866,
+            1848,
+            294288,
+            13549,
+            2083,
+            1147,
+            110600,
+            8199,
+            388170,
+            296367,
+            115932,
+            292219,
+            917,
+            96643,
+            325178,
+            102134,
+            220403,
+            289138,
+            37154,
+            150775,
+            94985,
+            97045,
+        )
 
         @Throws(IOException::class)
         @JvmStatic
@@ -32,194 +1030,152 @@ class Launcher {
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive\\group\\36\\27\\362716.html")
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive-historical\\group\\00\\22\\2226.html")
             // val dropDown =   File("E:\\[ToBak]\\Desktop_Win10\\sample\\subject\\1010.html")
-            val dropDown =   File("E:\\[ToBak]\\Desktop_Win10\\sample\\stats\\1010.html")
+            val origSubjectIdRankMap = HashMap<Int, Int>()
+            val vibSubjectIdRankMap = HashMap<Int, Int>()
+
+            val origRankSubjectIdMap = HashMap<Int, Int>()
+            val vibRankSubjectIdMap = HashMap<Int, Int>()
+
+            val origSubjectIdRatingMap = HashMap<Int, Double>()
+            val vibSubjectIdRatingMap = HashMap<Int, Double>()
+
+            val origSubjectIdRMSMap = HashMap<Int, Double>()
+            val vibSubjectIdRMSMap = HashMap<Int, Double>()
+
+            val origSubjectIdVoteCountMap = HashMap<Int, Int>()
+            val vibSubjectIdVoteCountMap = HashMap<Int, Int>()
+
+            val resultSubjectRowMap = HashMap<Int, VibRankingRow>()
+
+            val subjectIdOrigTitleMap = HashMap<Int, String>()
+            val subjectIdChnTitleMap = HashMap<Int, String>()
 
 
-            val str = FileUtil.getFileContent(dropDown)!!
-            val voting = VibVotingParser.parseSubject(str,1010)
-            LOGGER.info("voting, {} , {} , {} ", voting.titleChn,voting.titleOrig,voting.voting)
-            if (true) return
+            val vibRanking = ArrayList<Int>()
+            repeat(1001) { vibRanking.add(-1) }
 
-
-            val (parseGroupTopic, result) = TopicParser.parseTopic(str, 375099, SpaceType.GROUP)
-            if (result) {
-                val toJson = gson.toJson(parseGroupTopic)
-                val jsonFile = File(
-                    dropDown.absolutePath.replace("bgm-archive", "bgm-archive-json")
-                        .replace(".html", ".json")
-                )
-                jsonFile.parentFile.mkdirs()
-                val fileWriter =
-                    FileWriter(
-                        jsonFile
-                    )
-                fileWriter.write(toJson)
-                fileWriter.flush()
-                fileWriter.close()
-                System.err.println(parseGroupTopic)
-            }
-//
-
-            val ts = ConcurrentSkipListSet<Pair<Long, File>>(Comparator.comparingLong { -it.first })
-            val ng = ConcurrentHashMap.newKeySet<File>()
-            val ngCounter = AtomicLong()
-            val totalCounter = AtomicLong()
-            val _404Counter = AtomicLong()
-            archiveFolder.walk().asStream().parallel().forEach allMatch@{ htmlFile ->
-                if (htmlFile.isDirectory) return@allMatch
-                if (htmlFile.extension != "html") return@allMatch
-                totalCounter.incrementAndGet()
-                var timing = System.currentTimeMillis()
-                val fileName = htmlFile.nameWithoutExtension
-                val fileStr = FileUtil.getFileContent(htmlFile)!!
-                val topicId = fileName.toInt()
-                val (topic, result) = TopicParser.parseTopic(fileStr, topicId, SpaceType.GROUP)
-                if (!result) {
-                    ng.add(htmlFile)
-                    ngCounter.incrementAndGet()
-//                    LOGGER.error("NG: ${htmlFile.absolutePath}")
-                    return@allMatch
-                } else {
-                    if (topic == null) {
-                        _404Counter.incrementAndGet()
-                        return@allMatch
-                    }
-                    timing = System.currentTimeMillis() - timing
-                    // LOGGER.info("$timing ms : ${htmlFile.absolutePath}")
-                    ts.add(Pair(timing, htmlFile))
-                    if (!topic!!.display!!) return@allMatch
-//                    val toJson = gson.toJson(topic)
-//                    val jsonFile = File(
-//                        htmlFile.absolutePath.replace("bgm-archive", "bgm-archive-json")
-//                            .replace(".html", ".json")
-//                    )
-//                    jsonFile.parentFile.mkdirs()
-//                    val fileWriter =
-//                        FileWriter(
-//                            jsonFile
-//                        )
-//                    fileWriter.write(toJson)
-//                    fileWriter.flush()
-//                    fileWriter.close()
-                    return@allMatch
-                }
+            for (i in top1000.indices) {
+                origSubjectIdRankMap.put(top1000[i], i + 1)
+                origRankSubjectIdMap.put(i + 1, top1000[i])
             }
 
-            LOGGER.info("NG COUNT: ${ngCounter.get()}")
-            LOGGER.info("404 COUNT: ${_404Counter.get()}")
-            LOGGER.info("TOT COUNT: ${totalCounter.get()}")
-            LOGGER.info("Top 10 time consumed: ${ts.toList().subList(0, 10)}")
-            LOGGER.info("NG: ${ng.map { i -> i.nameWithoutExtension }.sorted().toList()}")
-            /*
-            val htmlContent: String =
-                FileUtil.getFileContent(sampleFile2)!!
-            val doc: JXDocument = JXDocument.create(htmlContent)
-
-            val groupNameAnchor: JXNode = doc.selNOne(XPathHelper.XP_GROUP_NAME_ANCHOR)
-            val topicTitle: JXNode = doc.selNOne(XPathHelper.XP_GROUP_TOPIC_TITLE_H1_TEXT)
-
-            val topPostDiv = doc.selNOne(XPathHelper.XP_GROUP_TOPIC_TOP_POST_DIV)
-            val topPostDivSmallText = doc.selNOne(XPathHelper.XP_GROUP_TOPIC_TOP_POST_SMALL_TEXT)
-            val topPostUsernameAnchor = doc.selNOne(XPathHelper.XP_GROUP_TOPIC_TOP_POST_USERNAME_ANCHOR)
-            val topPostUidSpan = doc.selNOne(XPathHelper.XP_GROUP_TOPIC_TOP_POST_UID_SPAN)
-            val topPostUserNicknameAnchorText =
-                doc.selNOne(XPathHelper.XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT)
-            val topPostUserSignSpanText = doc.selNOne(XPathHelper.XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT)
-            val topPostContentDiv = doc.selNOne(XPathHelper.XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV)
-
-            val followPostDivList = doc.selN(XPathHelper.XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST)
+            for (i in top1000) {
+                val statFile = File("C:\\Users\\Steve\\source\\vib-sth\\stats\\${i}.html")
+                val subjectFile = File("C:\\Users\\Steve\\source\\vib-sth\\subject\\${i}.html")
 
 
-            // group name: /group/{groupName}
-            System.err.println(groupNameAnchor.asElement().attr("href"))
-            // group display name: {groupDisplayName}
-            System.err.println(groupNameAnchor.asElement().text())
-            // title
-            System.err.println(topicTitle.asString())
-            // top post div small : #1 - {yyyy-M-d HH:mm}
-            System.err.println(topPostDivSmallText.asString())
-            // username: /user/{username}
-            System.err.println(topPostUsernameAnchor.asElement().attr("href"))
-            // user nickname: {nickname}
-            System.err.println(topPostUserNicknameAnchorText.asString())
-            // uid: background-image:url\\('//lain.bgm.tv/pic/user/l/\\d+/\\d+/\\d+/(\\d+)\\.jpg\\?r=\\d+'\\)
-            // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
-            System.err.println(topPostUidSpan.asElement().attr("style"))
-            // user sign: ({sign})
-            System.err.println(topPostUserSignSpanText.asString())
-            // top post id: post_{id}
-            System.err.println(topPostDiv.asElement().attr("id"))
-            // top post inner html: {}
-            System.err.println(topPostContentDiv.asElement().html())
+                val statStr = FileUtil.getFileContent(statFile)!!
+                val subjectStr = FileUtil.getFileContent(subjectFile)!!
 
-            // subReply('group'|'subject'|..., mid,floorPid,subFloorPid,floorUid,subFloorUid,isReplySubFloor(sub-1, floor-0)
+                val globalRanking = GlobalVotingParser.parseRank(subjectStr)
+                val globalVoting = GlobalVotingParser.parseSubject(subjectStr, i)
+                val vibVoting = VibVotingParser.parseSubject(statStr, i)
 
-            System.err.println("###############################################################")
+                LOGGER.info("Extract: {}, {}, {}", globalRanking, globalVoting, vibVoting)
 
-            // follow post div list:
-            // System.err.println(followPostDivList[0])
-            followPostDivList.forEachIndexed outer@{ outerIdx, floor ->
-                // Workaround for bug
-                if (outerIdx != floor.asElement().elementSiblingIndex()) return@outer
-                // follow post id: post_{id}
-                System.err.println(floor.asElement().attr("id"))
-                // follow post floor: #{floor}
-                System.err.println(
-                    floor.selOne("div[@class=\"re_info\"]/small/a[@class=\"floor-anchor\"]").asElement().text()
-                )
-                // follow post date: ' - {yyyy-M-d HH:mm}'
-                System.err.println(floor.selOne("div[@class=\"re_info\"]/small/text()").asString())
-                // follow post user anchor - username: /user/{username}
-                System.err.println(floor.selOne("a").asElement().attr("href"))
-                // follow post user anchor span - uid (plan B): background...
-                // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
-                System.err.println(floor.selOne("a/span").asElement().attr("style"))
-                // follow post user nickname: {nickname}
-                System.err.println(floor.selOne("div[2]/span[@class=\"userInfo\"]/strong/a/text()").asString())
-                // follow post user sign: ({sign})
-                System.err.println(floor.selOne("div[2]/span[@class=\"userInfo\"]/span/text()")?.asString())
 
-                // follow post content div
-                System.err.println(floor.selOne("div/div/div[@class=\"message\"]").asElement().html())
+                val globalRating = VotingCalculator.avg(globalVoting.voting)
+                val globalRms = VotingCalculator.RMS(globalVoting.voting)
+                val globalVoteCount = VotingCalculator.totalPeople(globalVoting.voting)
 
-                // sub floor
-                val subFloorList: MutableList<JXNode> = floor.sel("div/div/div[@class=\"topic_sub_reply\"]/div")
-                subFloorList.forEachIndexed inner@{ innerIdx, subFloor ->
-                    if (innerIdx != subFloor.asElement().elementSiblingIndex()) return@inner
-                    // sub floor pid: post_{pid}
-                    System.err.println(subFloor.asElement().attr("id"))
-                    // sub floor floor number: #{floor}-#{subFloor}
-                    System.err.println(
-                        subFloor.selOne("div[@class=\"re_info\"]/small/a[@class=\"floor-anchor\"]").asElement().text()
+                subjectIdOrigTitleMap.put(i, globalVoting.titleOrig)
+                subjectIdChnTitleMap.put(i, globalVoting.titleChn)
+
+                origSubjectIdRatingMap.put(i, globalRating)
+                origSubjectIdRMSMap.put(i, globalRms)
+                origSubjectIdVoteCountMap.put(i, globalVoteCount)
+
+                if (vibVoting.subjectId == -1) {
+                    resultSubjectRowMap.put(
+                        i, VibRankingRow(
+                            subjectId = i,
+                            origTitle = globalVoting.titleOrig,
+                            chnTitle = globalVoting.titleChn,
+                            origRating = globalRating,
+                            vibRating = globalRating,
+                            ratingDelta = 0.0,
+                            origRanking = globalRanking,
+                            vibRanking = globalRanking,
+                            rankingDelta = 0,
+                            origRms = globalRms,
+                            vibRms = globalRms,
+                            rmsDelta = 0.0,
+                            origVoteCount = globalVoteCount,
+                            vibVoteCount = 0,
+                            voteCountDelta = globalVoteCount
+                        )
                     )
-                    // follow post date: ' - {yyyy-M-d HH:mm}'
-                    System.err.println(subFloor.selOne("div[@class=\"re_info\"]/small/text()").asString())
-                    // follow post user anchor - username: /user/{username}
-                    System.err.println(subFloor.selOne("a").asElement().attr("href"))
-                    // follow post user anchor span - uid (plan B): background...
-                    // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
-                    System.err.println(subFloor.selOne("a/span").asElement().attr("style"))
-                    // follow post user nickname: {nickname}
-                    System.err.println(subFloor.selOne("div[2]/strong[@class=\"userName\"]/a/text()").asString())
-
-                    // follow post content div
-                    System.err.println(subFloor.selOne("div[2]/div[@class=\"cmt_sub_content\"]").asElement().html())
+                    vibRanking[globalRanking] = i
+                    continue
                 }
 
+                val vibRating = VotingCalculator.avg(vibVoting.voting)
+                val vibRms = VotingCalculator.RMS(vibVoting.voting)
+                val vibVoteCount = VotingCalculator.totalPeople(vibVoting.voting)
+
+                vibSubjectIdRatingMap.put(i, vibRating)
+                vibSubjectIdRMSMap.put(i, vibRms)
+                vibSubjectIdVoteCountMap.put(i, vibVoteCount)
             }
 
-
-//            val outputFile = File("E:\\SOURCE_ROOT\\bgm-archive-sh\\sample_html\\group_topic_sample.md")
-//            outputFile.createNewFile()
-//            val fw = FileWriter(outputFile)
-//            val bfw = BufferedWriter(fw)
-//            val converted: String = converter.convert(htmlContent)
-//            bfw.write(converted)
-//            bfw.flush()
-//            bfw.close()
-//            fw.close()
-             */
-
+            val idsToRank = ArrayList<Int>(top1000.toList())
+            val preIt = idsToRank.iterator()
+            while (preIt.hasNext()) {
+                val next = preIt.next()
+                if (resultSubjectRowMap.containsKey(next)) preIt.remove()
+            }
+            val working = ArrayList(idsToRank)
+            idsToRank.sortBy { -vibSubjectIdRatingMap[it]!! }
+            var pivot = 1
+            val it = working.iterator()
+            while (it.hasNext()) {
+                val next = it.next()
+                while (pivot <= 1000 && vibRanking[pivot] != -1) {
+                    pivot++
+                }
+                if (pivot > 1000) break
+                vibRanking[pivot] = next
+                resultSubjectRowMap.put(
+                    next, VibRankingRow(
+                        subjectId = next,
+                        origTitle = subjectIdOrigTitleMap[next]!!,
+                        chnTitle = subjectIdChnTitleMap[next]!!,
+                        origRating = origSubjectIdRatingMap[next]!!,
+                        vibRating = vibSubjectIdRatingMap[next]!!,
+                        ratingDelta = vibSubjectIdRatingMap[next]!! - origSubjectIdRatingMap[next]!!,
+                        origRanking = origSubjectIdRankMap[next]!!,
+                        vibRanking = pivot,
+                        rankingDelta = pivot - origSubjectIdRankMap[next]!!,
+                        origRms = origSubjectIdRMSMap[next]!!,
+                        vibRms = vibSubjectIdRMSMap[next]!!,
+                        rmsDelta = vibSubjectIdRMSMap[next]!! - origSubjectIdRMSMap[next]!!,
+                        origVoteCount = origSubjectIdVoteCountMap[next]!!,
+                        vibVoteCount = vibSubjectIdVoteCountMap[next]!!,
+                        voteCountDelta = vibSubjectIdVoteCountMap[next]!! - origSubjectIdVoteCountMap[next]!!
+                    )
+                )
+                pivot++
+            }
+            System.err.println("abc")
         }
     }
+
 }
+
+data class VibRankingRow(
+    val subjectId: Int,
+    val origTitle: String,
+    val chnTitle: String,
+    val origRating: Double,
+    val vibRating: Double,
+    val ratingDelta: Double,
+    val origRanking: Int,
+    val vibRanking: Int,
+    val rankingDelta: Int,
+    val origRms: Double,
+    val vibRms: Double,
+    val rmsDelta: Double,
+    val origVoteCount: Int,
+    val vibVoteCount: Int,
+    val voteCountDelta: Int
+)

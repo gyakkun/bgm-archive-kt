@@ -8,6 +8,20 @@ object GlobalVotingParser {
     private val LOGGER: Logger = LoggerFactory.getLogger(GlobalVotingParser.javaClass)
     const val HORIZONTAL_CHART_XPATH = "//div[@id=\"ChartWarpper\"]/ul[@class=\"horizontalChart\"]"
     const val TITLE_XPATH = "//div[@id=\"headerSubject\"]/h1/a"
+    const val RANK_XPATH = "//small[@class=\"alarm\"]"
+    fun parseRank(htmlFileString: String): Int {
+        try {
+            val doc: JXDocument = JXDocument.create(htmlFileString)
+            val bodyNode = doc.selNOne("body")
+            val rankNode = bodyNode.selOne(RANK_XPATH)
+            val rankStr = rankNode.asElement().html()
+            return Integer.parseInt(rankStr.substring(1))
+        } catch (ex: Exception) {
+            LOGGER.error("Ex: ", ex)
+        }
+        return -1
+    }
+
     fun parseSubject(htmlFileString: String, subjectId: Int): VotingResult {
         try {
             val doc: JXDocument = JXDocument.create(htmlFileString)
@@ -17,7 +31,7 @@ object GlobalVotingParser {
 
             val titleOrig = titleNode.asElement().text()
             val titleChn = titleNode.asElement().attr("title")
-            LOGGER.info("Orig title: {}, chn title: {}", titleOrig, titleChn)
+            LOGGER.info("Subject id: {}, Orig title: {}, chn title: {}", subjectId, titleOrig, titleChn)
 
             val liList = horizontalChartUl.sel("/li")
             val result = IntArray(11)
