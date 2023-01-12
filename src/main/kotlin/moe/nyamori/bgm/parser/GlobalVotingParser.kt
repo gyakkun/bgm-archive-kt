@@ -6,8 +6,8 @@ import org.slf4j.LoggerFactory
 
 object GlobalVotingParser {
     private val LOGGER: Logger = LoggerFactory.getLogger(GlobalVotingParser.javaClass)
-    private const val HORIZONTAL_CHART_XPATH = "//div[@id=\"ChartWarpper\"]/ul[@class=\"horizontalChart\"]"
-    private const val TITLE_XPATH = "//div[@id=\"headerSubject\"]/h1/a"
+    const val HORIZONTAL_CHART_XPATH = "//div[@id=\"ChartWarpper\"]/ul[@class=\"horizontalChart\"]"
+    const val TITLE_XPATH = "//div[@id=\"headerSubject\"]/h1/a"
     fun parseSubject(htmlFileString: String, subjectId: Int): VotingResult {
         try {
             val doc: JXDocument = JXDocument.create(htmlFileString)

@@ -6,6 +6,7 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.GlobalVotingParser
 import moe.nyamori.bgm.parser.TopicParser
+import moe.nyamori.bgm.parser.VibVotingParser
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
@@ -30,11 +31,12 @@ class Launcher {
 //            val sampleFile2 = File("E:\\SOURCE_ROOT\\bgm-archive-sh\\sample_html\\group_topic_sample_2.html")
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive\\group\\36\\27\\362716.html")
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive-historical\\group\\00\\22\\2226.html")
-            val dropDown = File("E:\\[ToBak]\\Desktop_Win10\\sample\\subject\\1010.html")
+            // val dropDown =   File("E:\\[ToBak]\\Desktop_Win10\\sample\\subject\\1010.html")
+            val dropDown =   File("E:\\[ToBak]\\Desktop_Win10\\sample\\stats\\1010.html")
 
 
             val str = FileUtil.getFileContent(dropDown)!!
-            val voting = GlobalVotingParser.parseSubject(str,1010)
+            val voting = VibVotingParser.parseSubject(str,1010)
             LOGGER.info("voting, {} , {} , {} ", voting.titleChn,voting.titleOrig,voting.voting)
             if (true) return
 
