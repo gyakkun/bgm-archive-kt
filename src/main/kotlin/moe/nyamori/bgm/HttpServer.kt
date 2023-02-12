@@ -118,6 +118,7 @@ class HttpServer {
                     )
                     html = html.replace("chii.in", "bgm.tv")
                     html = html.replace("bangumi.tv", "bgm.tv")
+                    html = html.replace("//lain.bgm.tv", "https://lain.bgm.tv")
                     html = html.replace("src=\"/", "src=\"https://bgm.tv/")
                     html = html.replace("href=\"/", "href=\"https://bgm.tv/")
                     ctx.html(html)
