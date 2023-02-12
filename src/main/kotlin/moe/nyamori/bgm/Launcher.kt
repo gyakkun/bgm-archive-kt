@@ -8,6 +8,7 @@ import moe.nyamori.bgm.parser.VibVotingParser
 import moe.nyamori.bgm.util.VotingCalculator
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.FileWriter
 import java.io.IOException
 import java.util.*
 import kotlin.collections.ArrayList
@@ -1125,7 +1126,7 @@ class Launcher {
                 if (resultSubjectRowMap.containsKey(next)) preIt.remove()
             }
             val working = ArrayList(idsToRank)
-            idsToRank.sortBy { -vibSubjectIdRatingMap[it]!! }
+            working.sortBy { -vibSubjectIdRatingMap[it]!! }
             var pivot = 1
             val it = working.iterator()
             while (it.hasNext()) {
@@ -1156,7 +1157,24 @@ class Launcher {
                 )
                 pivot++
             }
-            System.err.println("abc")
+
+            val outputFile = File(
+                "C:\\Users\\Steve\\source\\vib-sth\\output\\vib_ranking.csv"
+            )
+            outputFile.parentFile.mkdirs()
+            val fileWriter =
+                FileWriter(
+                    outputFile
+                )
+
+            for (i in vibRanking) {
+                if (i == -1) continue
+                val r = resultSubjectRowMap[i]!!
+                fileWriter.write("${r.subjectId}\t${r.origTitle}\t${r.chnTitle}\t${r.origRanking}\t${r.vibRanking}\t${r.rankingDelta}\t${r.origRating}\t${r.vibRating}\t${r.ratingDelta}\t${r.origRms}\t${r.vibRms}\t${r.rmsDelta}\t${r.origVoteCount}\t${r.vibVoteCount}\t${r.voteCountDelta}")
+                fileWriter.write("\r\n")
+            }
+            fileWriter.flush()
+            fileWriter.close()
         }
     }
 
