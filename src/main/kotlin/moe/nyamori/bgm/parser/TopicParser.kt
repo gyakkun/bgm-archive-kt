@@ -50,7 +50,8 @@ import java.util.*
 
 object TopicParser {
     private val LOGGER: Logger = LoggerFactory.getLogger(TopicParser.javaClass)
-    private val SDF_YYYY_M_D_HH_MM = SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA)
+    private val SDF_YYYY_M_D_HH_MM =
+        SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA).apply { timeZone = TimeZone.getTimeZone("GMT+08:00") }
     private val SUB_FLOOR_FLOOR_NUM_REGEX = Regex("#\\d+-(\\d+)")
 
     fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
