@@ -73,6 +73,7 @@ class HttpServer {
                 if (!lock.tryLock(30, TimeUnit.SECONDS)) {
                     ctx.status(HttpStatus.REQUEST_TIMEOUT)
                     ctx.html("The server is busy. Please wait and refresh later.")
+                    return
                 }
                 val topicId = ctx.pathParam("topicId").toInt()
                 val timestampList = FileHistoryLookup.getJsonTimestampList(
@@ -89,6 +90,7 @@ class HttpServer {
                 if (!lock.tryLock(30, TimeUnit.SECONDS)) {
                     ctx.status(HttpStatus.REQUEST_TIMEOUT)
                     ctx.html("The server is busy. Please wait and refresh later.")
+                    return
                 }
                 val topicId = ctx.pathParam("topicId").toInt()
                 val timestampPathParam = ctx.pathParam("timestamp")
