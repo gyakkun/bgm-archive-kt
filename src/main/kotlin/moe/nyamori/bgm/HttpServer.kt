@@ -4,6 +4,7 @@ import io.javalin.Javalin
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.Header.CACHE_CONTROL
+import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.git.FileHistoryLookup
@@ -69,17 +70,26 @@ class HttpServer {
 
         class FileHistory(private val spaceType: SpaceType) : Handler {
             override fun handle(ctx: Context) {
+                if (!lock.tryLock(30, TimeUnit.SECONDS)) {
+                    ctx.status(HttpStatus.REQUEST_TIMEOUT)
+                    ctx.html("The server is busy. Please wait and refresh later.")
+                }
                 val topicId = ctx.pathParam("topicId").toInt()
                 val timestampList = FileHistoryLookup.getJsonTimestampList(
                     spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".json"
                 )
                 ctx.header(CACHE_CONTROL, "max-age=3600")
                 ctx.json(timestampList)
+                if (lock.isHeldByCurrentThread) lock.unlock()
             }
         }
 
         class FileOnCommit(private val spaceType: SpaceType, private val isRaw: Boolean = false) : Handler {
             override fun handle(ctx: Context) {
+                if (!lock.tryLock(30, TimeUnit.SECONDS)) {
+                    ctx.status(HttpStatus.REQUEST_TIMEOUT)
+                    ctx.html("The server is busy. Please wait and refresh later.")
+                }
                 val topicId = ctx.pathParam("topicId").toInt()
                 val timestampPathParam = ctx.pathParam("timestamp")
                 val timestamp =
@@ -133,11 +143,12 @@ class HttpServer {
                         )
                     )
                 }
+                if (lock.isHeldByCurrentThread) lock.unlock()
             }
 
         }
 
-        object LinkHandler:Handler {
+        object LinkHandler : Handler {
 
             override fun handle(ctx: Context) {
                 ctx.html(html)
