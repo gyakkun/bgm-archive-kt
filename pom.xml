@@ -15,7 +15,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <kotlin.code.style>official</kotlin.code.style>
         <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
-        <kt.major.version>1.8.0</kt.major.version>
+        <kt.major.version>1.8.10</kt.major.version>
     </properties>
 
     <dependencies>
@@ -28,7 +28,7 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.9.0</version>
+            <version>5.9.2</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -46,13 +46,13 @@
         <dependency>
             <groupId>cn.wanghaomiao</groupId>
             <artifactId>JsoupXpath</artifactId>
-            <version>2.5.1</version>
+            <version>2.5.3</version>
         </dependency>
 
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
-            <version>6.3.0.202209071007-r</version>
+            <version>6.5.0.202303070854-r</version>
         </dependency>
 
         <dependency>
