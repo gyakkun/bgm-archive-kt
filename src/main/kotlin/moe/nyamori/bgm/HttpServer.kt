@@ -152,11 +152,11 @@ class HttpServer {
 <script type="text/javascript">
     const onErr = () => {
         let content = document.getElementById("content")
-        content.setHTML("Error")
+        content.innerHTML = "Error"
     }
     const onNoContent = () => {
         let content = document.getElementById("content")
-        content.setHTML("No content")
+        content.innerHTML = "No content"
     }
     const getTimeline = async () => {
         let path = document.location.pathname
@@ -177,12 +177,12 @@ class HttpServer {
         }
         let cele = document.getElementById("content")
         let liele = document.createElement("ul")
-        cele.setHTML("")
+        cele.innerHTML = ""
         cele.appendChild(liele)
         timelineJsonArr.forEach(element => {
             let ul = document.createElement("ul")
             let a = document.createElement("a")
-            a.setHTML(new Date(element).toLocaleString())
+            a.innerHTML = new Date(element).toLocaleString()
             a.setAttribute("href", document.location.pathname.replace("/link", "/") + element + "/html")
             ul.appendChild(a)
             liele.appendChild(ul)
