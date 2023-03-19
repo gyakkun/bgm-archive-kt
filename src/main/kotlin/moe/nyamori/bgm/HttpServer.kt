@@ -31,9 +31,11 @@ class HttpServer {
             }
                 .get("/after-commit-hook", CommitHook())
                 .get("/history/group/{topicId}", FileHistory(SpaceType.GROUP))
+                .get("/history/group/{topicId}/link", LinkHandler)
                 .get("/history/group/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.GROUP, isRaw = true))
                 .get("/history/group/{topicId}/{timestamp}", FileOnCommit(SpaceType.GROUP))
                 .get("/history/subject/{topicId}", FileHistory(SpaceType.SUBJECT))
+                .get("/history/subject/{topicId}/link", LinkHandler)
                 .get("/history/subject/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.SUBJECT, isRaw = true))
                 .get("/history/subject/{topicId}/{timestamp}", FileOnCommit(SpaceType.SUBJECT))
                 .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
@@ -132,6 +134,89 @@ class HttpServer {
                     )
                 }
             }
+
+        }
+
+        object LinkHandler:Handler {
+
+            override fun handle(ctx: Context) {
+                ctx.html(html)
+            }
+
+            const val html = """
+<html>
+
+<body>
+    <div id="content">Loading...</div>
+</body>
+<script async type="text/javascript">
+    const onErr = () => {
+        let content = document.getElementById("content")
+        content.setHTML("Error")
+    }
+    const onNoContent = () => {
+        let content = document.getElementById("content")
+        content.setHTML("No content")
+    }
+    const getTimeline = async () => {
+        let path = document.location.pathname
+        let timelineList = []
+        let jsonListPath = path.replace("/link", "")
+        timelineList = await fetch(jsonListPath)
+            .then(d => { return d.text() })
+            .then(t => { return JSON.parse(t) })
+            .catch(e => { onErr(); console.error("Ex: ", e) })
+        return timelineList
+    }
+
+    const go = async () => {
+        let timelineJsonArr = await getTimeline()
+        if (timelineJsonArr.length == 0) {
+            onNoContent()
+            return
+        }
+        let cele = document.getElementById("content")
+        let liele = document.createElement("ul")
+        cele.setHTML("")
+        cele.appendChild(liele)
+        timelineJsonArr.forEach(element => {
+            let ul = document.createElement("ul")
+            let a = document.createElement("a")
+            a.setHTML(new Date(element).toLocaleString())
+            a.setAttribute("href", document.location.pathname.replace("/link", "/") + element + "/html")
+            ul.appendChild(a)
+            liele.appendChild(ul)
+        });
+
+    }
+    go()
+</script>
+<style type="text/css">
+    body {
+        color: #222;
+        background: #fff;
+        font: 100% system-ui;
+    }
+
+    a {
+        color: #0033cc;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        body {
+            color: #eee;
+            background: #121212;
+        }
+
+        body a {
+            color: #afc3ff;
+        }
+    }
+</style>
+
+</html>
+            """
+
 
         }
     }
