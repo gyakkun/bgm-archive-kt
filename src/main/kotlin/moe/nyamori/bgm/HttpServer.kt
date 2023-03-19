@@ -176,16 +176,16 @@ class HttpServer {
             return
         }
         let cele = document.getElementById("content")
-        let liele = document.createElement("ul")
+        let ulele = document.createElement("ul")
         cele.innerHTML = ""
-        cele.appendChild(liele)
+        cele.appendChild(ulele)
         timelineJsonArr.forEach(element => {
-            let ul = document.createElement("ul")
+            let li = document.createElement("li")
             let a = document.createElement("a")
             a.innerHTML = new Date(element).toLocaleString()
             a.setAttribute("href", document.location.pathname.replace("/link", "/") + element + "/html")
-            ul.appendChild(a)
-            liele.appendChild(ul)
+            li.appendChild(a)
+            ulele.appendChild(li)
         });
 
     }
