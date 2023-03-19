@@ -149,7 +149,7 @@ class HttpServer {
 <body>
     <div id="content">Loading...</div>
 </body>
-<script async type="text/javascript">
+<script type="text/javascript">
     const onErr = () => {
         let content = document.getElementById("content")
         content.setHTML("Error")
