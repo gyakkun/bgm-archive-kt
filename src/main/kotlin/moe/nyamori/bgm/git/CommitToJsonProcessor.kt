@@ -4,7 +4,7 @@ import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.parser.TopicParser
+import moe.nyamori.bgm.parser.TopicParserR398
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Repository
@@ -74,6 +74,8 @@ object CommitToJsonProcessor {
                                     SpaceType.GROUP
                                 } else if (path.startsWith("subject") && curCommit.fullMessage.startsWith("SUBJECT")) {
                                     SpaceType.SUBJECT
+                                } else if(path.startsWith("blog") && curCommit.fullMessage.startsWith("BLOG")){
+                                    SpaceType.BLOG
                                 } else {
                                     log.error("Not a subject or group topic! Path: $path, commit full msg: ${curCommit.fullMessage}")
                                     SpaceType.valueOf(path.split("/").first().uppercase())
@@ -87,7 +89,7 @@ object CommitToJsonProcessor {
                             val topicId = path.split("/").last().replace(".html", "").toInt()
 
                             var timing = System.currentTimeMillis()
-                            val (resultTopicEntity, isSuccess) = TopicParser.parseTopic(
+                            val (resultTopicEntity, isSuccess) = TopicParserR398.parseTopic(
                                 fileContentInStr,
                                 topicId,
                                 htmlSpaceType
