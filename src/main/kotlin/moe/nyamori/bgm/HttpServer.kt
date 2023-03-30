@@ -31,14 +31,14 @@ class HttpServer {
                 }*/
             }
                 .get("/after-commit-hook", CommitHook())
-                .get("/history/group/{topicId}", FileHistory(SpaceType.GROUP))
+                .get("/history/group/{topicId}", FileHistory(SpaceType.GROUP, isRaw = true))
                 .get("/history/group/{topicId}/link", LinkHandler)
                 .get("/history/group/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.GROUP, isRaw = true))
-                .get("/history/group/{topicId}/{timestamp}", FileOnCommit(SpaceType.GROUP))
-                .get("/history/subject/{topicId}", FileHistory(SpaceType.SUBJECT))
+//                .get("/history/group/{topicId}/{timestamp}", FileOnCommit(SpaceType.GROUP))
+                .get("/history/subject/{topicId}", FileHistory(SpaceType.SUBJECT, isRaw = true))
                 .get("/history/subject/{topicId}/link", LinkHandler)
                 .get("/history/subject/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.SUBJECT, isRaw = true))
-                .get("/history/subject/{topicId}/{timestamp}", FileOnCommit(SpaceType.SUBJECT))
+//                .get("/history/subject/{topicId}/{timestamp}", FileOnCommit(SpaceType.SUBJECT))
                 .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
             Runtime.getRuntime().addShutdownHook(Thread {
                 app.stop()
@@ -68,7 +68,7 @@ class HttpServer {
             }
         }
 
-        class FileHistory(private val spaceType: SpaceType) : Handler {
+        class FileHistory(private val spaceType: SpaceType, private val isRaw: Boolean = false) : Handler {
             override fun handle(ctx: Context) {
                 try {
                     if (!lock.tryLock(30, TimeUnit.SECONDS)) {
@@ -77,9 +77,15 @@ class HttpServer {
                         return
                     }
                     val topicId = ctx.pathParam("topicId").toInt()
-                    val timestampList = FileHistoryLookup.getJsonTimestampList(
-                        spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".json"
-                    )
+                    val timestampList = if (isRaw) {
+                        FileHistoryLookup.getArchiveTimestampList(
+                            spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".json"
+                        )
+                    } else {
+                        FileHistoryLookup.getJsonTimestampList(
+                            spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".json"
+                        )
+                    }
                     ctx.header(CACHE_CONTROL, "max-age=3600")
                     ctx.json(timestampList)
                 } catch (ex: Exception) {
@@ -153,7 +159,7 @@ class HttpServer {
                         )
                     }
                 } catch (ex: Exception) {
-                    log.error("Ex: ",ex)
+                    log.error("Ex: ", ex)
                     throw ex
                 } finally {
                     if (lock.isHeldByCurrentThread) lock.unlock()
