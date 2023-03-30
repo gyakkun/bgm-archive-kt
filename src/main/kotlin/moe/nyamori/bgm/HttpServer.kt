@@ -79,7 +79,7 @@ class HttpServer {
                     val topicId = ctx.pathParam("topicId").toInt()
                     val timestampList = if (isRaw) {
                         FileHistoryLookup.getArchiveTimestampList(
-                            spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".json"
+                            spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".html"
                         )
                     } else {
                         FileHistoryLookup.getJsonTimestampList(
