@@ -39,6 +39,9 @@ class HttpServer {
                 .get("/history/subject/{topicId}/link", LinkHandler)
                 .get("/history/subject/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.SUBJECT, isRaw = true))
 //                .get("/history/subject/{topicId}/{timestamp}", FileOnCommit(SpaceType.SUBJECT))
+                .get("/history/blog/{topicId}", FileHistory(SpaceType.BLOG, isRaw = true))
+                .get("/history/blog/{topicId}/link", LinkHandler)
+                .get("/history/blog/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.BLOG, isRaw = true))
                 .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
             Runtime.getRuntime().addShutdownHook(Thread {
                 app.stop()
