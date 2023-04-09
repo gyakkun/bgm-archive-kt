@@ -2,6 +2,10 @@ package moe.nyamori.bgm.parser
 
 import moe.nyamori.bgm.model.Group
 import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.parser.group.GroupTopicParserR398
+import moe.nyamori.bgm.parser.group.GroupTopicParserR400
+import moe.nyamori.bgm.parser.group.GroupTopicParserR402
+import moe.nyamori.bgm.parser.group.GroupTopicParserR403
 import moe.nyamori.bgm.util.ParserHelper
 import org.junit.jupiter.api.Test
 

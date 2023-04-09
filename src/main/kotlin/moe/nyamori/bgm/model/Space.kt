@@ -26,8 +26,8 @@ class Group(
 class Blog(
     type: SpaceType = SpaceType.BLOG,
     meta: Map<String, Any>? = null,
-    var tags: List<String>,
-    var relatedSubjectIds: List<Long>
+    var tags: List<String>? = null,
+    var relatedSubjectIds: List<Int>? = null
 ) : Space(type, meta)
 
 class Reserved(

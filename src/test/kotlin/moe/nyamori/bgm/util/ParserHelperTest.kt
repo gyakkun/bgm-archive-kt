@@ -22,7 +22,7 @@ class ParserHelperTest {
 
      @Test
     fun writeSampleHtml() {
-        val filePath = "blog/" + FilePathHelper.numberToPath(317322) + ".html"
+        val filePath = "blog/" + FilePathHelper.numberToPath(313741) + ".html"
         val commitList = FileHistoryLookup.getRevCommitList(filePath, GitHelper.getArchiveRepo())
         for (i in commitList) {
             val htmlString = GitHelper.getFileContentInACommit(GitHelper.getArchiveRepo(), i, filePath)

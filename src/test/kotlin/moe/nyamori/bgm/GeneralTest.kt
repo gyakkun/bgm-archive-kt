@@ -4,7 +4,7 @@ import com.google.gson.GsonBuilder
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.parser.TopicParserR398
+import moe.nyamori.bgm.parser.TopicParserEntranceR398
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
@@ -31,7 +31,7 @@ class GeneralTest {
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive-historical\\group\\00\\22\\2226.html")
             val dropDown = File("E:\\[ToBak]\\Desktop_Win10\\group_close_sample.html")
             val str = FileUtil.getFileContent(dropDown)!!
-            val (parseGroupTopic, result) = TopicParserR398.parseTopic(str, 375099, SpaceType.GROUP)
+            val (parseGroupTopic, result) = TopicParserEntranceR398.parseTopic(str, 375099, SpaceType.GROUP)
             if (result) {
                 val toJson = gson.toJson(parseGroupTopic)
                 val jsonFile = File(
@@ -64,7 +64,7 @@ class GeneralTest {
                 val fileName = htmlFile.nameWithoutExtension
                 val fileStr = FileUtil.getFileContent(htmlFile)!!
                 val topicId = fileName.toInt()
-                val (topic, result) = TopicParserR398.parseTopic(fileStr, topicId, SpaceType.GROUP)
+                val (topic, result) = TopicParserEntranceR398.parseTopic(fileStr, topicId, SpaceType.GROUP)
                 if (!result) {
                     ng.add(htmlFile)
                     ngCounter.incrementAndGet()

@@ -1,5 +1,8 @@
 package moe.nyamori.bgm.util
 
+import java.text.SimpleDateFormat
+import java.util.*
+
 object ParserHelper {
     fun guessUidFromUsername(username: String?): Int? {
         return username?.let { name ->
@@ -37,5 +40,12 @@ object ParserHelper {
         val it = matchResult.iterator()
         if (!it.hasNext()) return DEFAULT_REV
         return it.next().groupValues[1].toInt()
+    }
+
+    private val SDF_YYYY_M_D_HH_MM =
+        SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA).apply { timeZone = TimeZone.getTimeZone("GMT+08:00") }
+
+    fun parsePostDate(dateStr: String): Date {
+        return SDF_YYYY_M_D_HH_MM.parse(dateStr)
     }
 }

@@ -4,7 +4,7 @@ import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.parser.TopicParserR398
+import moe.nyamori.bgm.parser.TopicParserEntranceR398
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Repository
@@ -89,7 +89,7 @@ object CommitToJsonProcessor {
                             val topicId = path.split("/").last().replace(".html", "").toInt()
 
                             var timing = System.currentTimeMillis()
-                            val (resultTopicEntity, isSuccess) = TopicParserR398.parseTopic(
+                            val (resultTopicEntity, isSuccess) = TopicParserEntranceR398.parseTopic(
                                 fileContentInStr,
                                 topicId,
                                 htmlSpaceType
