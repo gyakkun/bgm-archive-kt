@@ -15,9 +15,9 @@ import java.util.concurrent.ConcurrentSkipListSet
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.streams.asStream
 
-class Launcher {
+class GeneralTest {
     companion object {
-        val LOGGER = LoggerFactory.getLogger(Launcher.javaClass)
+        val LOGGER = LoggerFactory.getLogger(GeneralTest.javaClass)
         val gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
 
         @Throws(IOException::class)

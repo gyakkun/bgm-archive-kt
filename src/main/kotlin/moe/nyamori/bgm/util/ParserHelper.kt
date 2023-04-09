@@ -28,4 +28,14 @@ object ParserHelper {
         tmp = tmp.substring(0, tmp.indexOf(".jpg"))
         tmp.toInt()
     }
+
+    private val CSS_REV_REGEX = Regex("css\\?r(\\d+)+")
+    private const val DEFAULT_REV = 398
+    fun getStyleRevNumberFromHtmlString(htmlString: String): Int {
+        val limitedHtml = htmlString.substring(0, htmlString.length.coerceAtMost(5000))
+        val matchResult = CSS_REV_REGEX.findAll(limitedHtml)
+        val it = matchResult.iterator()
+        if (!it.hasNext()) return DEFAULT_REV
+        return it.next().groupValues[1].toInt()
+    }
 }
