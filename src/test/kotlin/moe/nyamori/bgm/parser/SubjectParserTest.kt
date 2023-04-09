@@ -1,33 +1,46 @@
 package moe.nyamori.bgm.parser
 
-import moe.nyamori.bgm.model.Group
 import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Subject
 import moe.nyamori.bgm.util.ParserHelper
 import org.junit.jupiter.api.Test
 
 class SubjectParserTest {
 
     @Test
-    fun testR403toR412() {
-        for (i in 403..412) {
-            val ins = ParserHelper.javaClass.getResourceAsStream("/html_samples/group/$i.html") ?: continue
+    fun testR412() {
+        for (i in 412..412) {
+            val ins = ParserHelper.javaClass.getResourceAsStream("/html_samples/subject/$i.html") ?: continue
             ins.use {
                 System.err.println("Parsing $i")
                 val htmlString = String(it.readAllBytes(), Charsets.UTF_8)
-                val (topic, success) = GroupTopicParserR403.parseTopic(htmlString, 888, SpaceType.GROUP)
+                val (topic, success) = SubjectTopicParserR412.parseTopic(htmlString, 888, SpaceType.SUBJECT)
                 assert(success)
-                assert((topic!!.space as Group).meta!!.containsKey("data_likes_list"))
+                assert((topic!!.space as Subject).meta!!.containsKey("data_likes_list"))
+            }
+        }
+    }
+
+    @Test
+    fun testR403toR411() {
+        for (i in 403..411) {
+            val ins = ParserHelper.javaClass.getResourceAsStream("/html_samples/subject/$i.html") ?: continue
+            ins.use {
+                System.err.println("Parsing $i")
+                val htmlString = String(it.readAllBytes(), Charsets.UTF_8)
+                val (topic, success) = SubjectTopicParserR412.parseTopic(htmlString, 888, SpaceType.SUBJECT)
+                assert(success)
             }
         }
     }
 
     @Test
     fun testR402() {
-        val ins = ParserHelper.javaClass.getResourceAsStream("/html_samples/group/402.html")
+        val ins = ParserHelper.javaClass.getResourceAsStream("/html_samples/subject/402.html")
         if (ins == null) return
         ins.use {
             val htmlString = String(it.readAllBytes(), Charsets.UTF_8)
-            val (_, success) = GroupTopicParserR402.parseTopic(htmlString, 888, SpaceType.GROUP)
+            val (_, success) = SubjectTopicParserR402.parseTopic(htmlString, 888, SpaceType.SUBJECT)
             assert(success)
         }
     }
