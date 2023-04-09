@@ -39,7 +39,7 @@ object FileHistoryLookup {
     }
 
 
-    private fun getRevCommitList(relativePathToRepoFolder: String, repo: Repository): List<RevCommit> {
+    fun getRevCommitList(relativePathToRepoFolder: String, repo: Repository): List<RevCommit> {
         val result = ArrayList<RevCommit>()
         Git(repo).use { git ->
             val commitList = git.log()
