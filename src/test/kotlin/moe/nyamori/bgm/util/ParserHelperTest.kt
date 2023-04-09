@@ -20,14 +20,15 @@ class ParserHelperTest {
         }
     }
 
-    private fun writeSampleHtml() {
-        val filePath = "group/" + FilePathHelper.numberToPath(378905) + ".html"
+    // @Test
+    fun writeSampleHtml() {
+        val filePath = "subject/" + FilePathHelper.numberToPath(25131) + ".html"
         val commitList = FileHistoryLookup.getRevCommitList(filePath, GitHelper.getArchiveRepo())
         for (i in commitList) {
             val htmlString = GitHelper.getFileContentInACommit(GitHelper.getArchiveRepo(), i, filePath)
             val revId = ParserHelper.getStyleRevNumberFromHtmlString(htmlString)
             val htmlFile =
-                File("E:\\SOURCE_ROOT\\bgm-archive-kt\\src\\test\\resources\\html_samples\\group\\$revId.html")
+                File("E:\\SOURCE_ROOT\\bgm-archive-kt\\src\\test\\resources\\html_samples\\subject\\$revId.html")
             FileWriter(htmlFile).use {
                 it.write(htmlString)
                 it.flush()
