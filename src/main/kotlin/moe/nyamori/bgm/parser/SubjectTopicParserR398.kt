@@ -52,7 +52,7 @@ import java.lang.IllegalArgumentException
 import java.text.SimpleDateFormat
 import java.util.*
 
-object SubjectTopicParserR398 {
+object SubjectTopicParserR398 : Parser {
     private val LOGGER: Logger = LoggerFactory.getLogger(SubjectTopicParserR398.javaClass)
     private val SDF_YYYY_M_D_HH_MM =
         SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA).apply { timeZone = TimeZone.getTimeZone("GMT+08:00") }
@@ -69,7 +69,7 @@ object SubjectTopicParserR398 {
     val SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH = XP_SUBJECT_TOPIC_TOP_POST_CONTENT_DIV
     val SPACE_TOPIC_FOLLOW_POST_DIV_LIST = XP_SUBJECT_TOPIC_FOLLOW_POST_DIV_LIST
 
-    fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
+    override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         if (spaceType != SpaceType.SUBJECT) throw IllegalStateException("Should parse a subject topic but got $spaceType")
         try {
             val doc: JXDocument = JXDocument.create(htmlFileString)

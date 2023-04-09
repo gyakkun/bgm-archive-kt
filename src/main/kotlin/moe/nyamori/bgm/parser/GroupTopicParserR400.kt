@@ -41,22 +41,26 @@ import org.slf4j.LoggerFactory
 import java.text.SimpleDateFormat
 import java.util.*
 
-object GroupTopicParserR398 : Parser {
-    private val LOGGER: Logger = LoggerFactory.getLogger(GroupTopicParserR398.javaClass)
+object GroupTopicParserR400 :Parser {
+
+    private val LOGGER: Logger = LoggerFactory.getLogger(GroupTopicParserR400.javaClass)
     private val SDF_YYYY_M_D_HH_MM =
         SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA).apply { timeZone = TimeZone.getTimeZone("GMT+08:00") }
     private val SUB_FLOOR_FLOOR_NUM_REGEX = Regex("#\\d+-(\\d+)")
 
-    val SPACE_NAME_ANCHOR_XPATH = XP_GROUP_NAME_ANCHOR
-    val SPACE_TOPIC_TITLE_H1_TEXT_XPATH = XP_GROUP_TOPIC_TITLE_H1_TEXT
-    val SPACE_TOPIC_TOP_POST_DIV_XPATH = XP_GROUP_TOPIC_TOP_POST_DIV
-    val SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH = XP_GROUP_TOPIC_TOP_POST_DATE_SMALL_TEXT
-    val SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH = XP_GROUP_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR
-    val SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH = XP_GROUP_TOPIC_TOP_POST_UID_SPAN
-    val SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH = XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT
-    val SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH = XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT
-    val SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH = XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV
-    val SPACE_TOPIC_FOLLOW_POST_DIV_LIST = XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST
+    const val SPACE_NAME_ANCHOR_XPATH = XP_GROUP_NAME_ANCHOR
+    const val SPACE_TOPIC_TITLE_H1_TEXT_XPATH = XP_GROUP_TOPIC_TITLE_H1_TEXT
+    const val SPACE_TOPIC_TOP_POST_DIV_XPATH = XP_GROUP_TOPIC_TOP_POST_DIV
+    const val SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH = "/div[3]/div[1]/div[1]/div[1]/small/text()"
+    const val SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH = XP_GROUP_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR
+    const val SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH = XP_GROUP_TOPIC_TOP_POST_UID_SPAN
+    const val SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH = XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT
+    const val SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH = XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT
+    const val SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH = XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV
+    const val SPACE_TOPIC_FOLLOW_POST_DIV_LIST = XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST
+
+    const val XP_FLOOR_ANCHOR_R400 = "div[@class=\"post_actions\"]/div[@class=\"action\"]/small/a[@class=\"floor-anchor\"]"
+    const val XP_FLOOR_DATE_SMALL_TEXT_R400 = "div[@class=\"post_actions\"]/div[@class=\"action\"]/small/text()"
 
     override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         if (spaceType != SpaceType.GROUP) throw IllegalStateException("Should parse a group topic but got $spaceType")
@@ -183,9 +187,9 @@ object GroupTopicParserR398 : Parser {
                     floorDate = SDF_YYYY_M_D_HH_MM.parse(floorDateStr).toInstant().epochSecond
                 } else {
                     // follow post floor: #{floor}
-                    floorNum = floor.selOne(XP_FLOOR_ANCHOR).asElement().text().substring(1).toInt()
+                    floorNum = floor.selOne(XP_FLOOR_ANCHOR_R400).asElement().text().substring(1).toInt()
                     // follow post date: ' - {yyyy-M-d HH:mm}'
-                    floorDateStr = floor.selOne(XP_FLOOR_DATE_SMALL_TEXT).asString().substring(2)
+                    floorDateStr = floor.selOne(XP_FLOOR_DATE_SMALL_TEXT_R400).asString().substring(2)
                     floorDate = SDF_YYYY_M_D_HH_MM.parse(floorDateStr).toInstant().epochSecond
                 }
                 // follow post user anchor - username: /user/{username}
@@ -241,10 +245,10 @@ object GroupTopicParserR398 : Parser {
                     val subFloorPid = subFloor.asElement().attr("id").substring(5).toInt()
                     // sub floor floor number: #{floor}-#{subFloor}
                     val subFloorFloorNum = SUB_FLOOR_FLOOR_NUM_REGEX
-                        .findAll(subFloor.selOne(XP_FLOOR_ANCHOR).asElement().text()).iterator()
+                        .findAll(subFloor.selOne(XP_FLOOR_ANCHOR_R400).asElement().text()).iterator()
                         .next().groupValues[1].toInt()
                     // follow post date: ' - {yyyy-M-d HH:mm}'
-                    val subFloorDateStr = subFloor.selOne(XP_FLOOR_DATE_SMALL_TEXT).asString().substring(2)
+                    val subFloorDateStr = subFloor.selOne(XP_FLOOR_DATE_SMALL_TEXT_R400).asString().substring(2)
                     val subFloorDate = SDF_YYYY_M_D_HH_MM.parse(subFloorDateStr).toInstant().epochSecond
                     // follow post user anchor - username: /user/{username}
                     val subFloorUserUsername =
