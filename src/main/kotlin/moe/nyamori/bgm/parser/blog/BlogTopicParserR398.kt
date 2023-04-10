@@ -35,7 +35,8 @@ object BlogTopicParserR398 : Parser {
             // main content
             val blogEntryDiv: JXNode =
                 bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[3]/div[1][@id=\"entry_content\"]")
-            val blogTagDiv = bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[3]/div[2][contains(@class,\"tags\")]") // nullable
+            val blogTagDiv =
+                bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[3]/div[2][contains(@class,\"tags\")]") // nullable
             val blogRelatedSubjectUl = bodyNode.selOne("/div[1]/div[2]/div[1]/div[2]/div/ul[1]") // nullable
 
             // comment list
@@ -145,7 +146,7 @@ object BlogTopicParserR398 : Parser {
 
             val innerAnchor = li.selOne("/a")
             val subjectHref = innerAnchor.asElement().attr("href")
-            val subjectId = subjectHref.substring(subjectHref.lastIndexOf("/") + 1).toInt()
+            val subjectId = subjectHref.substring(subjectHref.lastIndexOf("/") + 1).toIntOrNull()
 
             return@mapIndexed subjectId
         }

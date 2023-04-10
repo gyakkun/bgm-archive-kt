@@ -142,7 +142,7 @@ object BlogTopicParserR400 : Parser {
 
             val innerAnchor = li.selOne("/a")
             val subjectHref = innerAnchor.asElement().attr("href")
-            val subjectId = subjectHref.substring(subjectHref.lastIndexOf("/") + 1).toInt()
+            val subjectId = subjectHref.substring(subjectHref.lastIndexOf("/") + 1).toIntOrNull()
 
             return@mapIndexed subjectId
         }
