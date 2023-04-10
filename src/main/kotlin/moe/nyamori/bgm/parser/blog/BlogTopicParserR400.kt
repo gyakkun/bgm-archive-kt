@@ -12,8 +12,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 import kotlin.collections.ArrayList
 
-object BlogTopicParserR398 : Parser {
-    private val LOGGER: Logger = LoggerFactory.getLogger(BlogTopicParserR398.javaClass)
+object BlogTopicParserR400 : Parser {
+    private val LOGGER: Logger = LoggerFactory.getLogger(BlogTopicParserR400.javaClass)
     private val SDF_YYYY_M_D_HH_MM =
         SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA).apply { timeZone = TimeZone.getTimeZone("GMT+08:00") }
 
@@ -199,7 +199,8 @@ object BlogTopicParserR398 : Parser {
         val postId = postDiv.asElement().attr("id").substring("post_".length).toInt()
 
         if (possibleSubReplyListDiv != null) {
-            possibleSubReplyPostList = ArrayList<Post>()
+            if(isSubReply) throw IllegalStateException("Sub reply should not have its sub replies!")
+            possibleSubReplyPostList = ArrayList()
             val subReplyDivList = possibleSubReplyListDiv.sel("/div")
             subReplyDivList.forEachIndexed { idx, innerDiv ->
                 if (idx != innerDiv.asElement().elementSiblingIndex()) return@forEachIndexed
@@ -214,8 +215,8 @@ object BlogTopicParserR398 : Parser {
             }
         }
 
-        val reInfoDiv = postDiv.selOne("/div[1][@class=\"re_info\"]")
-        val reInfoSmall = reInfoDiv.selOne("/small")
+        val reInfoDiv = postDiv.selOne("/div[1][contains(@class,\"re_info\")]")
+        val reInfoSmall = reInfoDiv.selOne("/div[@class=\"action\"]/small")
         val reInfoAnchor = reInfoSmall.selOne("/a")
         val avatarAnchor = postDiv.selOne("/a")
         val avatarAnchorBgSpan = avatarAnchor.selOne("/span")
