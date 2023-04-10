@@ -118,14 +118,7 @@ object BlogTopicParserR398 : Parser {
         val userAvatarImgSrc = avatarAnchor.selOne("/img").asElement().attr("src")
         val usernameFromHref = userHref.substring(userHref.lastIndexOf("/") + 1)
         val uidFromAvatar =
-            userAvatarImgSrc.substring(userAvatarImgSrc.lastIndexOf("/") + 1, userAvatarImgSrc.lastIndexOf("?"))
-                .toCharArray()
-                .filter { it.isDigit() }.joinToString().let {
-                    if (it.isBlank()) {
-                        return@let -1
-                    }
-                    it.toInt()
-                }
+            getUidFromAvatarBgOrSrc(userAvatarImgSrc)
         val uidGuessing = ParserHelper.guessUidFromUsername(usernameFromHref)
         return User(
             id = if (uidFromAvatar > 0) {
@@ -134,6 +127,17 @@ object BlogTopicParserR398 : Parser {
             nickname = userNickname,
             username = usernameFromHref
         )
+    }
+
+    private fun getUidFromAvatarBgOrSrc(userAvatarImgSrc: String): Int {
+        return userAvatarImgSrc.substring(userAvatarImgSrc.lastIndexOf("/") + 1, userAvatarImgSrc.lastIndexOf("jpg"))
+            .toCharArray()
+            .filter { it.isDigit() }.joinToString(separator = "").let {
+                if (it.isBlank()) {
+                    return@let -1
+                }
+                it.toInt()
+            }
     }
 
     private fun extractRelatedSubjectIdList(relatedSubjectLiList: List<JXNode>): List<Int> {
@@ -168,24 +172,131 @@ object BlogTopicParserR398 : Parser {
     ): MutableList<Post> {
         val result = ArrayList<Post>()
         val blogPost: Post = extractBlogEntry(blogId, blogPostUser, blogDateline, blogEntryDiv)
-        val commentList: List<Post> = extractCommentList(blogCommentListDiv)
+        val commentList: List<Post> = extractCommentList(blogId, blogCommentListDiv)
         result.add(blogPost)
         result.addAll(commentList)
         return result
     }
 
-    private fun extractCommentList(blogCommentListDiv: JXNode): List<Post> {
+    private fun extractCommentList(blogId: Int, blogCommentListDiv: JXNode): List<Post> {
         val divList = blogCommentListDiv.sel("/div")
         return divList.mapIndexed { idx, div ->
             if (idx != div.asElement().elementSiblingIndex()) return@mapIndexed null
-            return@mapIndexed extractCommentFromCommentPostDiv(div)
-        }.filterNotNull()
+            return@mapIndexed extractCommentFromCommentPostDiv(blogId, null, div)
+        }
+            .filterNotNull()
     }
 
-    private fun extractCommentFromCommentPostDiv(div: JXNode): Post {
-        val postId = div.asElement().attr("id").substring("post_".length+1).toInt()
-        val floorId = div.asElement().attr("name").substring("floor-".length+1).toInt()
-        TODO("TBC")
+    private fun extractCommentFromCommentPostDiv(
+        blogId: Int,
+        mainPostId: Int?,
+        postDiv: JXNode,
+        isSubReply: Boolean = false
+    ): Post {
+        var possibleSubReplyPostList: List<Post>? = null
+
+        val possibleSubReplyListDiv =
+            postDiv.selOne("/div[2]/div[@class=\"reply_content\"]/div[2][@class=\"topic_sub_reply\"]")
+        val postId = postDiv.asElement().attr("id").substring("post_".length).toInt()
+
+        if (possibleSubReplyListDiv != null) {
+            possibleSubReplyPostList = ArrayList<Post>()
+            val subReplyDivList = possibleSubReplyListDiv.sel("/div")
+            subReplyDivList.forEachIndexed { idx, innerDiv ->
+                if (idx != innerDiv.asElement().elementSiblingIndex()) return@forEachIndexed
+                possibleSubReplyPostList.add(
+                    extractCommentFromCommentPostDiv(
+                        blogId,
+                        postId,
+                        innerDiv,
+                        isSubReply = true
+                    )
+                )
+            }
+        }
+
+        val reInfoDiv = postDiv.selOne("/div[1][@class=\"re_info\"]")
+        val reInfoSmall = reInfoDiv.selOne("/small")
+        val reInfoAnchor = reInfoSmall.selOne("/a")
+        val avatarAnchor = postDiv.selOne("/a")
+        val avatarAnchorBgSpan = avatarAnchor.selOne("/span")
+        val innerDiv = postDiv.selOne("/div[@class=\"inner\"]")
+        val userStrong = innerDiv.selOne("/strong")
+        val userSignSpan = innerDiv.selOne("/span[@class=\"tip_j\"]")
+
+        val floorText = reInfoAnchor.asElement().text()
+        var mainFloorNum: Int = -1
+        var subFloorNum: Int? = null
+
+        if (floorText.indexOf("-") >= 0) {
+            subFloorNum = floorText.substring(floorText.indexOf("-") + 1).toInt()
+            mainFloorNum = floorText.substring(floorText.indexOf("#") + 1, floorText.indexOf("-")).toInt()
+        } else {
+            if (isSubReply) throw IllegalStateException("Should be a sub reply but got no sub floor number!")
+            mainFloorNum = floorText.substring(floorText.indexOf("#") + 1).toInt()
+        }
+
+        val dateTextWithoutTrimming = reInfoSmall.asElement().text()
+        val dateText = dateTextWithoutTrimming.substring(dateTextWithoutTrimming.indexOf("-") + 1,
+            dateTextWithoutTrimming.indexOfLast { it.isDigit() })
+        val dateline = SDF_YYYY_M_D_HH_MM.parse(dateText).time / 1000
+
+        val avatarAnchorHref = avatarAnchor.asElement().attr("href")
+        val usernameFromAvatarAnchor = avatarAnchorHref.substring(avatarAnchorHref.lastIndexOf("/") + 1)
+        val avatarBgSpanStyle = avatarAnchorBgSpan.asElement().attr("style")
+        val uidFromAvatarBg = getUidFromAvatarBgOrSrc(avatarBgSpanStyle)
+        var userSign: String? = null
+        if (userSignSpan != null) {
+            val userSignSpanText = userSignSpan.asElement().text()
+            userSign = userSignSpanText.substring(
+                userSignSpanText.indexOf("(").let { if (it < 0) 0 else it } + 1,
+                userSignSpanText.lastIndexOf(")").let { if (it < 0) userSignSpanText.length - 1 else it }
+            )
+        }
+        val userNickname = userStrong.asElement().text()
+        val commentUser: User = makeCommentUser(usernameFromAvatarAnchor, uidFromAvatarBg, userNickname, userSign)
+
+
+        val possibleMainReplyDiv = innerDiv.selOne("/div[@class=\"reply_content\"]/div[contains(@class,\"message\")]")
+        val possibleSubReplyDiv = innerDiv.selOne("/div[@class=\"cmt_sub_content\"]")
+
+        val replyContentHtml: String
+        if (possibleMainReplyDiv != null) {
+            replyContentHtml = possibleMainReplyDiv.asElement().html()
+        } else {
+            if (!isSubReply) throw IllegalStateException("Should be a main reply but can not found main reply div!")
+            replyContentHtml = possibleSubReplyDiv.asElement().html()
+        }
+
+        return Post(
+            id = postId,
+            user = commentUser,
+            floorNum = mainFloorNum,
+            subFloorNum = subFloorNum,
+            mid = blogId,
+            related = mainPostId,
+            contentHtml = replyContentHtml,
+            state = Post.STATE_NORMAL,
+            dateline = dateline,
+            subFloorList = possibleSubReplyPostList
+        )
+    }
+
+    private fun makeCommentUser(
+        usernameFromAvatarAnchor: String,
+        uidFromAvatarBg: Int,
+        userNickname: String,
+        userSign: String?
+    ): User {
+        val uidGuessing = ParserHelper.guessUidFromUsername(usernameFromAvatarAnchor)
+        return User(
+            id = if (uidFromAvatarBg > 0) {
+                uidFromAvatarBg
+            } else uidGuessing,
+            nickname = userNickname,
+            username = usernameFromAvatarAnchor,
+            sign = userSign
+        )
     }
 
     private fun extractBlogEntry(blogId: Int, blogPostUser: User, blogDateline: Long, blogEntryDiv: JXNode): Post {
