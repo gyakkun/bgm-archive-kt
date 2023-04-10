@@ -4,7 +4,7 @@ import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.parser.TopicParserEntranceR398
+import moe.nyamori.bgm.parser.TopicParserEntrance
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Repository
@@ -58,6 +58,8 @@ object CommitToJsonProcessor {
                         SpaceType.SUBJECT
                     } else if (curCommit.fullMessage.startsWith("GROUP")) {
                         SpaceType.GROUP
+                    } else if (curCommit.fullMessage.startsWith("BLOG")) {
+                        SpaceType.BLOG
                     } else {
                         throw IllegalStateException("Not a group or subject topic!")
                     }
@@ -74,22 +76,22 @@ object CommitToJsonProcessor {
                                     SpaceType.GROUP
                                 } else if (path.startsWith("subject") && curCommit.fullMessage.startsWith("SUBJECT")) {
                                     SpaceType.SUBJECT
-                                } else if(path.startsWith("blog") && curCommit.fullMessage.startsWith("BLOG")){
+                                } else if (path.startsWith("blog") && curCommit.fullMessage.startsWith("BLOG")) {
                                     SpaceType.BLOG
                                 } else {
-                                    log.error("Not a subject or group topic! Path: $path, commit full msg: ${curCommit.fullMessage}")
+                                    log.error("Not a subject, group or blog topic! Path: $path, commit full msg: ${curCommit.fullMessage}")
                                     SpaceType.valueOf(path.split("/").first().uppercase())
                                 }
 
                             if (htmlSpaceType != commitSpaceType) {
-                                log.error("Html space type not consistent with commit space type!")
+                                log.error("Html space type not consistent with commit space type! htmlSpaceType=$htmlSpaceType, commitSpaceType=$commitSpaceType")
                             }
 
                             val fileContentInStr = GitHelper.getFileContentInACommit(archiveRepo, curCommit, path)
                             val topicId = path.split("/").last().replace(".html", "").toInt()
 
                             var timing = System.currentTimeMillis()
-                            val (resultTopicEntity, isSuccess) = TopicParserEntranceR398.parseTopic(
+                            val (resultTopicEntity, isSuccess) = TopicParserEntrance.parseTopic(
                                 fileContentInStr,
                                 topicId,
                                 htmlSpaceType
@@ -100,14 +102,14 @@ object CommitToJsonProcessor {
                             }
 
                             if (isSuccess) {
-                                log.info("Parsing $topicId succeeded")
+                                log.info("Parsing $htmlSpaceType-$topicId succeeded")
                                 if (resultTopicEntity?.display == true) {
-                                    log.info("topic id $topicId, title: ${resultTopicEntity.title}")
+                                    log.info("topic id $htmlSpaceType-$topicId, title: ${resultTopicEntity.title}")
                                 }
                                 val json = GitHelper.GSON.toJson(resultTopicEntity)
                                 writeJsonFile(path, json)
                             } else {
-                                log.error("Parsing $topicId failed")
+                                log.error("Parsing $htmlSpaceType-$topicId failed")
                                 noGoodIdTreeSet.add(topicId)
                             }
                         } catch (ex: Exception) {

@@ -4,7 +4,7 @@ import com.google.gson.GsonBuilder
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.parser.TopicParserEntranceR398
+import moe.nyamori.bgm.parser.TopicParserEntrance
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
@@ -31,7 +31,7 @@ class GeneralTest {
 //            val sampleFile2 = File("C:\\Users\\Steve\\source\\bgm-archive-historical\\group\\00\\22\\2226.html")
             val dropDown = File("E:\\[ToBak]\\Desktop_Win10\\group_close_sample.html")
             val str = FileUtil.getFileContent(dropDown)!!
-            val (parseGroupTopic, result) = TopicParserEntranceR398.parseTopic(str, 375099, SpaceType.GROUP)
+            val (parseGroupTopic, result) = TopicParserEntrance.parseTopic(str, 375099, SpaceType.GROUP)
             if (result) {
                 val toJson = gson.toJson(parseGroupTopic)
                 val jsonFile = File(
@@ -64,7 +64,7 @@ class GeneralTest {
                 val fileName = htmlFile.nameWithoutExtension
                 val fileStr = FileUtil.getFileContent(htmlFile)!!
                 val topicId = fileName.toInt()
-                val (topic, result) = TopicParserEntranceR398.parseTopic(fileStr, topicId, SpaceType.GROUP)
+                val (topic, result) = TopicParserEntrance.parseTopic(fileStr, topicId, SpaceType.GROUP)
                 if (!result) {
                     ng.add(htmlFile)
                     ngCounter.incrementAndGet()
@@ -156,45 +156,45 @@ class GeneralTest {
                 System.err.println(floor.asElement().attr("id"))
                 // follow post floor: #{floor}
                 System.err.println(
-                    floor.selOne("div[@class=\"re_info\"]/small/a[@class=\"floor-anchor\"]").asElement().text()
+                    floor.selOne("div[contains(@class,\"re_info\")]/small/a[contains(@class,\"floor-anchor\")]").asElement().text()
                 )
                 // follow post date: ' - {yyyy-M-d HH:mm}'
-                System.err.println(floor.selOne("div[@class=\"re_info\"]/small/text()").asString())
+                System.err.println(floor.selOne("div[contains(@class,\"re_info\")]/small/text()").asString())
                 // follow post user anchor - username: /user/{username}
                 System.err.println(floor.selOne("a").asElement().attr("href"))
                 // follow post user anchor span - uid (plan B): background...
                 // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
                 System.err.println(floor.selOne("a/span").asElement().attr("style"))
                 // follow post user nickname: {nickname}
-                System.err.println(floor.selOne("div[2]/span[@class=\"userInfo\"]/strong/a/text()").asString())
+                System.err.println(floor.selOne("div[2]/span[contains(@class,\"userInfo\")]/strong/a/text()").asString())
                 // follow post user sign: ({sign})
-                System.err.println(floor.selOne("div[2]/span[@class=\"userInfo\"]/span/text()")?.asString())
+                System.err.println(floor.selOne("div[2]/span[contains(@class,\"userInfo\")]/span/text()")?.asString())
 
                 // follow post content div
-                System.err.println(floor.selOne("div/div/div[@class=\"message\"]").asElement().html())
+                System.err.println(floor.selOne("div/div/div[contains(@class,\"message\")]").asElement().html())
 
                 // sub floor
-                val subFloorList: MutableList<JXNode> = floor.sel("div/div/div[@class=\"topic_sub_reply\"]/div")
+                val subFloorList: MutableList<JXNode> = floor.sel("div/div/div[contains(@class,\"topic_sub_reply\")]/div")
                 subFloorList.forEachIndexed inner@{ innerIdx, subFloor ->
                     if (innerIdx != subFloor.asElement().elementSiblingIndex()) return@inner
                     // sub floor pid: post_{pid}
                     System.err.println(subFloor.asElement().attr("id"))
                     // sub floor floor number: #{floor}-#{subFloor}
                     System.err.println(
-                        subFloor.selOne("div[@class=\"re_info\"]/small/a[@class=\"floor-anchor\"]").asElement().text()
+                        subFloor.selOne("div[contains(@class,\"re_info\")]/small/a[contains(@class,\"floor-anchor\")]").asElement().text()
                     )
                     // follow post date: ' - {yyyy-M-d HH:mm}'
-                    System.err.println(subFloor.selOne("div[@class=\"re_info\"]/small/text()").asString())
+                    System.err.println(subFloor.selOne("div[contains(@class,\"re_info\")]/small/text()").asString())
                     // follow post user anchor - username: /user/{username}
                     System.err.println(subFloor.selOne("a").asElement().attr("href"))
                     // follow post user anchor span - uid (plan B): background...
                     // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
                     System.err.println(subFloor.selOne("a/span").asElement().attr("style"))
                     // follow post user nickname: {nickname}
-                    System.err.println(subFloor.selOne("div[2]/strong[@class=\"userName\"]/a/text()").asString())
+                    System.err.println(subFloor.selOne("div[2]/strong[contains(@class,\"userName\")]/a/text()").asString())
 
                     // follow post content div
-                    System.err.println(subFloor.selOne("div[2]/div[@class=\"cmt_sub_content\"]").asElement().html())
+                    System.err.println(subFloor.selOne("div[2]/div[contains(@class,\"cmt_sub_content\")]").asElement().html())
                 }
 
             }

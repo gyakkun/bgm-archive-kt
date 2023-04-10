@@ -209,7 +209,7 @@ object SubjectTopicParserR398 : Parser {
 
                 // follow post content div
                 val floorContentHtml = if (!isSpecialBadge) floor.selOne(XP_FLOOR_CONTENT).asElement()
-                    .html() else floor.selOne("//div[@class=\"inner\"]").asElement().html()
+                    .html() else floor.selOne("//div[contains(@class,\"inner\")]").asElement().html()
 
                 val thisFloor = Post(
                     id = floorPid,

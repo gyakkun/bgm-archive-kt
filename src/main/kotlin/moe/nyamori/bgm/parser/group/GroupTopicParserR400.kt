@@ -57,8 +57,8 @@ object GroupTopicParserR400 : Parser {
     const val SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH = XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV
     const val SPACE_TOPIC_FOLLOW_POST_DIV_LIST = XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST
 
-    const val XP_FLOOR_ANCHOR_R400 = "div[@class=\"post_actions\"]/div[@class=\"action\"]/small/a[@class=\"floor-anchor\"]"
-    const val XP_FLOOR_DATE_SMALL_TEXT_R400 = "div[@class=\"post_actions\"]/div[@class=\"action\"]/small/text()"
+    const val XP_FLOOR_ANCHOR_R400 = "div[contains(@class,\"post_actions\")]/div[contains(@class,\"action\")]/small/a[contains(@class,\"floor-anchor\")]"
+    const val XP_FLOOR_DATE_SMALL_TEXT_R400 = "div[contains(@class,\"post_actions\")]/div[contains(@class,\"action\")]/small/text()"
 
     override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         if (spaceType != SpaceType.GROUP) throw IllegalStateException("Should parse a group topic but got $spaceType")
@@ -211,7 +211,7 @@ object GroupTopicParserR400 : Parser {
 
                 // follow post content div
                 val floorContentHtml = if (!isSpecialBadge) floor.selOne(XP_FLOOR_CONTENT).asElement()
-                    .html() else floor.selOne("//div[@class=\"inner\"]").asElement().html()
+                    .html() else floor.selOne("//div[contains(@class,\"inner\")]").asElement().html()
 
                 val thisFloor = Post(
                     id = floorPid,

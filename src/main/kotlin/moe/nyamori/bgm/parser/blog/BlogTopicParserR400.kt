@@ -31,11 +31,12 @@ object BlogTopicParserR400 : Parser {
             val blogTitleH1: JXNode = bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[1]/h1")!!
             // blog post date
             val blogPostDateSmallText: JXNode =
-                bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[2][@class=\"re_info\"]/small/text()")
+                bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[2][contains(@class,\"re_info\")]/small/text()")
             // main content
             val blogEntryDiv: JXNode =
                 bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[3]/div[1][@id=\"entry_content\"]")
-            val blogTagDiv = bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[3]/div[2][@class=\"tags\"]") // nullable
+            val blogTagDiv =
+                bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[3]/div[2][contains(@class,\"tags\")]") // nullable
             val blogRelatedSubjectUl = bodyNode.selOne("/div[1]/div[2]/div[1]/div[2]/div/ul[1]") // nullable
 
             // comment list
@@ -191,11 +192,11 @@ object BlogTopicParserR400 : Parser {
         var possibleSubReplyPostList: List<Post>? = null
 
         val possibleSubReplyListDiv =
-            postDiv.selOne("/div[2]/div[@class=\"reply_content\"]/div[@class=\"topic_sub_reply\"]")
+            postDiv.selOne("/div[2]/div[contains(@class,\"reply_content\")]/div[contains(@class,\"topic_sub_reply\")]")
         val postId = postDiv.asElement().attr("id").substring("post_".length).toInt()
 
         if (possibleSubReplyListDiv != null) {
-            if(isSubReply) throw IllegalStateException("Sub reply should not have its sub replies!")
+            if (isSubReply) throw IllegalStateException("Sub reply should not have its sub replies!")
             possibleSubReplyPostList = ArrayList()
             val subReplyDivList = possibleSubReplyListDiv.sel("/div")
             subReplyDivList.forEachIndexed { idx, innerDiv ->
@@ -212,13 +213,14 @@ object BlogTopicParserR400 : Parser {
         }
 
         val reInfoDiv = postDiv.selOne("/div[1][contains(@class,\"re_info\")]")
-        val reInfoSmall = reInfoDiv.selOne("/div[@class=\"action\"]/small")
+            ?: postDiv.selOne("/div[1][contains(@class,\"post_actions\")]")
+        val reInfoSmall = reInfoDiv.selOne("/div[contains(@class,\"action\")]//small")
         val reInfoAnchor = reInfoSmall.selOne("/a")
-        val avatarAnchor = postDiv.selOne("/a")
+        val avatarAnchor = postDiv.selOne("//a[contains(@class,\"avatar\")]")
         val avatarAnchorBgSpan = avatarAnchor.selOne("/span")
-        val innerDiv = postDiv.selOne("/div[@class=\"inner\"]")
+        val innerDiv = postDiv.selOne("/div[contains(@class,\"inner\")]")
         val userStrong = innerDiv.selOne("/strong")
-        val userSignSpan = innerDiv.selOne("/span[@class=\"tip_j\"]")
+        val userSignSpan = innerDiv.selOne("/span[contains(@class,\"tip_j\")]")
 
         val floorText = reInfoAnchor.asElement().text()
         var mainFloorNum: Int = -1
@@ -233,7 +235,8 @@ object BlogTopicParserR400 : Parser {
         }
 
         val dateTextWithoutTrimming = reInfoSmall.asElement().text()
-        val dateText = dateTextWithoutTrimming.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
+        val dateText =
+            dateTextWithoutTrimming.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
         val dateline = SDF_YYYY_M_D_HH_MM.parse(dateText).time / 1000
 
         val avatarAnchorHref = avatarAnchor.asElement().attr("href")
@@ -252,8 +255,9 @@ object BlogTopicParserR400 : Parser {
         val commentUser: User = makeCommentUser(usernameFromAvatarAnchor, uidFromAvatarBg, userNickname, userSign)
 
 
-        val possibleMainReplyDiv = innerDiv.selOne("/div[@class=\"reply_content\"]/div[contains(@class,\"message\")]")
-        val possibleSubReplyDiv = innerDiv.selOne("/div[@class=\"cmt_sub_content\"]")
+        val possibleMainReplyDiv =
+            innerDiv.selOne("/div[contains(@class,\"reply_content\")]/div[contains(@class,\"message\")]")
+        val possibleSubReplyDiv = innerDiv.selOne("/div[contains(@class,\"cmt_sub_content\")]")
 
         val replyContentHtml: String
         if (possibleMainReplyDiv != null) {

@@ -77,7 +77,7 @@ object ParserHelper {
             )
         }
 
-        if (bodyNode.selOne("/div[@id=\"wrapperClub\"]/div[@class=\"clubMain\"]") != null
+        if (bodyNode.selOne("/div[@id=\"wrapperClub\"]/div[contains(@class,\"clubMain\")]") != null
         ) {
             return Pair(
                 Topic(

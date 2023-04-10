@@ -15,7 +15,7 @@ object GroupTopicParserR403 : Parser {
 
     override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         val res = GroupTopicParserR402.parseTopic(htmlFileString, topicId, spaceType)
-        if (!res.second) return res
+        if (!res.second || res.first!!.space!! is Reserved) return res
         val metaMap = HashMap<String, Any>()
         val dataLikesList: String? =
             htmlFileString.lineSequence().filter { it.startsWith("var data_likes_list = {") && it.endsWith("};") }
