@@ -213,12 +213,16 @@ object CommitToJsonProcessor {
             it.write(commitMsg)
             it.flush()
         }
+        log.info("About to git add")
         var gitProcess = Runtime.getRuntime()
             .exec("git add *", null, jsonRepoDir)
         printResults(gitProcess)
+        log.info("Complete git add")
+        log.info("About to git commit")
         gitProcess = Runtime.getRuntime()
             .exec("git commit -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
         printResults(gitProcess)
+        log.info("Complete git commit")
         commitMsgFile.delete()
     }
 
@@ -228,6 +232,7 @@ object CommitToJsonProcessor {
         archiveCommit: RevCommit
     ) {
         Git(jsonRepo).use { git ->
+            log.info("About to git add")
             changedFilePathList.forEach { path ->
                 git.add()
                     .addFilepattern(path.replace("html", "json"))
@@ -236,18 +241,25 @@ object CommitToJsonProcessor {
             git.add()
                 .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
                 .call()
+            log.info("Complete git add")
+            log.info("About to git commit")
             git.commit()
                 .setMessage(archiveCommit.fullMessage)
                 .call()
+            log.info("Complete git commit")
         }
     }
 
     fun printResults(process: Process) {
         // Here actually block the process
-        val reader = BufferedReader(InputStreamReader(process.inputStream))
-        var line: String?
-        while (reader.readLine().also { line = it } != null) {
-            System.err.println(line)
+        InputStreamReader(process.inputStream).use { isr->
+            BufferedReader(isr).use { reader->
+                var line: String?
+                reader.readLine()
+                while (reader.readLine().also { line = it } != null) {
+                    System.err.println(line)
+                }
+            }
         }
     }
 
