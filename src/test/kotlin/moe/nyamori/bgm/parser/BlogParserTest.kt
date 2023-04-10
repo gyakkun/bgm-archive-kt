@@ -14,6 +14,28 @@ import org.junit.jupiter.api.Test
 class BlogParserTest {
 
     @Test
+    fun testMisc() {
+        for (i in listOf(
+            "no_avatar",
+            "not_found",
+            "self_post",
+            "doujin",
+            "doujin_2",
+            "no_nickname",
+            "redirect"
+        )) {
+            val ins = ParserHelper.javaClass.getResourceAsStream("/html_samples/blog/$i.html") ?: continue
+            ins.use {
+                System.err.println("Parsing $i")
+                val htmlString = String(it.readAllBytes(), Charsets.UTF_8)
+                val (topic, success) = BlogTopicParserR400.parseTopic(htmlString, 888, SpaceType.BLOG)
+                assert(success)
+            }
+        }
+    }
+
+
+    @Test
     fun testR412() {
         val ins = ParserHelper.javaClass.getResourceAsStream("/html_samples/blog/412.html")
         if (ins == null) return

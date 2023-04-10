@@ -18,9 +18,6 @@ data class Post(
     var dateline: Long,
     var subFloorList: List<Post>? = null
 ) {
-    val isTopPost: Boolean
-        get() = floorNum == 1
-
     companion object {
         const val STATE_NORMAL: Short = 0
         const val STATE_REOPEN: Short = 11

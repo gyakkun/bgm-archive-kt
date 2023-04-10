@@ -22,13 +22,9 @@ object BlogTopicParserR400 : Parser {
         try {
             val doc: JXDocument = JXDocument.create(htmlFileString)
             val bodyNode = doc.selNOne("body")
-
-            if (bodyNode.selOne(XP_404_MSG) != null) {
-                return Pair(
-                    Topic(
-                        id = topicId, space = Reserved(type = spaceType), display = false
-                    ), true
-                )
+            var precheckResult: Pair<Topic?, Boolean>?
+            if (ParserHelper.precheck(topicId, bodyNode, spaceType).also { precheckResult = it } != null) {
+                return precheckResult!!
             }
 
             // user nickname, blog title

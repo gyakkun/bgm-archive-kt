@@ -22,13 +22,9 @@ object BlogTopicParserR398 : Parser {
         try {
             val doc: JXDocument = JXDocument.create(htmlFileString)
             val bodyNode = doc.selNOne("body")
-
-            if (bodyNode.selOne(XP_404_MSG) != null) {
-                return Pair(
-                    Topic(
-                        id = topicId, space = Reserved(type = spaceType), display = false
-                    ), true
-                )
+            var precheckResult: Pair<Topic?, Boolean>?
+            if (ParserHelper.precheck(topicId, bodyNode, spaceType).also { precheckResult = it } != null) {
+                return precheckResult!!
             }
 
             // user nickname, blog title
@@ -65,6 +61,7 @@ object BlogTopicParserR398 : Parser {
             return Pair(null, false)
         }
     }
+
 
     private fun extractBlogInfo(
         blogId: Int,
@@ -129,7 +126,10 @@ object BlogTopicParserR398 : Parser {
     }
 
     private fun getUidFromAvatarBgOrSrc(userAvatarImgSrc: String): Int {
-        return userAvatarImgSrc.substring(userAvatarImgSrc.lastIndexOf("/") + 1, userAvatarImgSrc.lastIndexOf("jpg"))
+        return userAvatarImgSrc.substring(
+            userAvatarImgSrc.lastIndexOf("/") + 1,
+            userAvatarImgSrc.lastIndexOf("jpg")
+        )
             .toCharArray()
             .filter { it.isDigit() }.joinToString(separator = "").let {
                 if (it.isBlank()) {
@@ -236,7 +236,8 @@ object BlogTopicParserR398 : Parser {
         }
 
         val dateTextWithoutTrimming = reInfoSmall.asElement().text()
-        val dateText = dateTextWithoutTrimming.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
+        val dateText =
+            dateTextWithoutTrimming.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
         val dateline = SDF_YYYY_M_D_HH_MM.parse(dateText).time / 1000
 
         val avatarAnchorHref = avatarAnchor.asElement().attr("href")
@@ -255,7 +256,8 @@ object BlogTopicParserR398 : Parser {
         val commentUser: User = makeCommentUser(usernameFromAvatarAnchor, uidFromAvatarBg, userNickname, userSign)
 
 
-        val possibleMainReplyDiv = innerDiv.selOne("/div[@class=\"reply_content\"]/div[contains(@class,\"message\")]")
+        val possibleMainReplyDiv =
+            innerDiv.selOne("/div[@class=\"reply_content\"]/div[contains(@class,\"message\")]")
         val possibleSubReplyDiv = innerDiv.selOne("/div[@class=\"cmt_sub_content\"]")
 
         val replyContentHtml: String
