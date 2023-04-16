@@ -1,5 +1,7 @@
 package moe.nyamori.bgm
 
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.LoadingCache
 import io.javalin.Javalin
 import io.javalin.http.Context
 import io.javalin.http.Handler
@@ -13,6 +15,7 @@ import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.FilePathHelper
 import org.slf4j.LoggerFactory
 import java.lang.IllegalArgumentException
+import java.time.Duration
 import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
@@ -100,6 +103,23 @@ class HttpServer {
 
         object LatestTopicListWrapper : Handler {
             private val lock = ReentrantLock()
+            private val topicListCache: LoadingCache<SpaceType, List<Int>> =
+                Caffeine.newBuilder()
+                    .maximumSize(5)
+                    .expireAfterWrite(Duration.ofMinutes(30))
+                    .build { spaceType ->
+                        getTopicList(spaceType)
+                    }
+
+            private fun getTopicList(spaceType: SpaceType): List<Int> {
+                val topicListFile: String = GitHelper.getFileContentInACommit(
+                    GitHelper.archiveRepoSingleton,
+                    GitHelper.getPrevProcessedCommitRef(),
+                    spaceType.name.lowercase() + "/topiclist.txt"
+                )
+                return topicListFile.lines().mapNotNull { it.toIntOrNull() }.sorted()
+            }
+
             override fun handle(ctx: Context) {
                 val spaceType = checkAndExtractSpaceTypeInContext(ctx)
                 try {
@@ -108,13 +128,7 @@ class HttpServer {
                         ctx.html("The server is busy. Please wait and refresh later.")
                         return
                     }
-
-                    val topicList: String = GitHelper.getFileContentInACommit(
-                        GitHelper.archiveRepoSingleton,
-                        GitHelper.getPrevProcessedCommitRef(),
-                        spaceType.name.lowercase() + "/topiclist.txt"
-                    )
-                    ctx.json(topicList.lines().mapNotNull { it.toIntOrNull() }.sorted())
+                    ctx.json(topicListCache[spaceType])
                 } catch (ex: Exception) {
                     log.error("Ex: ", ex)
                     throw ex
