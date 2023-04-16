@@ -30,7 +30,7 @@ object GitHelper {
 
     fun getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder(): RevWalk {
         val prevProcessedCommit = getPrevProcessedCommitRef()
-        val latestCommit = getLatestCommitRef()
+        val latestCommit = getLatestArchiveRepoCommitRef()
         getArchiveRepo().use { archiveRepo ->
             val revWalk = RevWalk(archiveRepo)
             revWalk.markStart(latestCommit)
@@ -58,8 +58,12 @@ object GitHelper {
         }
     }
 
-    fun getLatestCommitRef(): RevCommit {
-        getArchiveRepo().use { archiveRepo ->
+    fun getLatestArchiveRepoCommitRef(): RevCommit {
+        return getArchiveRepo().getLatestCommitRef()
+    }
+
+    fun Repository.getLatestCommitRef(): RevCommit {
+        this.use { archiveRepo ->
             val revWalk = RevWalk(archiveRepo)
             val latestHeadCommitRevId = archiveRepo.resolve(HEAD)
             val latestHeadCommit = revWalk.parseCommit(latestHeadCommitRevId)
@@ -68,11 +72,19 @@ object GitHelper {
     }
 
     fun getPrevProcessedCommitRevId(): String {
-        val prevProcessedCommitRevIdFile =
-            File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
-        if (!prevProcessedCommitRevIdFile.exists()) return EMPTY_STRING
-        val rawFileStr = FileUtil.getFileContent(prevProcessedCommitRevIdFile)!!
-        return rawFileStr.trim()
+        if (getJsonRepo().isBare) {
+            return getFileContentInACommit(
+                getJsonRepo(),
+                getJsonRepo().getLatestCommitRef(),
+                "last_processed_commit_rev_id"
+            ).trim()
+        } else {
+            val prevProcessedCommitRevIdFile =
+                File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+            if (!prevProcessedCommitRevIdFile.exists()) return EMPTY_STRING
+            val rawFileStr = FileUtil.getFileContent(prevProcessedCommitRevIdFile)!!
+            return rawFileStr.trim()
+        }
     }
 
     fun getArchiveRepo(): Repository {
