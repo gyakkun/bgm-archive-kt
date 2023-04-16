@@ -12,6 +12,7 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.FilePathHelper
 import org.slf4j.LoggerFactory
+import java.lang.IllegalArgumentException
 import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
@@ -31,21 +32,96 @@ class HttpServer {
                 }*/
             }
                 .get("/after-commit-hook", CommitHook())
-                .get("/history/group/{topicId}", FileHistory(SpaceType.GROUP, isRaw = false))
-                .get("/history/group/{topicId}/link", LinkHandler)
-                .get("/history/group/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.GROUP, isRaw = true))
-                .get("/history/group/{topicId}/{timestamp}", FileOnCommit(SpaceType.GROUP))
-                .get("/history/subject/{topicId}", FileHistory(SpaceType.SUBJECT, isRaw = false))
-                .get("/history/subject/{topicId}/link", LinkHandler)
-                .get("/history/subject/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.SUBJECT, isRaw = true))
-                .get("/history/subject/{topicId}/{timestamp}", FileOnCommit(SpaceType.SUBJECT))
-                .get("/history/blog/{topicId}", FileHistory(SpaceType.BLOG, isRaw = false))
-                .get("/history/blog/{topicId}/link", LinkHandler)
-                .get("/history/blog/{topicId}/{timestamp}/html", FileOnCommit(SpaceType.BLOG, isRaw = true))
+                .get("/history/{spaceType}/latest_topic_list", LatestTopicListWrapper)
+                .get("/history/{spaceType}/{topicId}", FileHistoryWrapper)
+                .get("/history/{spaceType}/{topicId}/link", LinkHandlerWrapper)
+                .get("/history/{spaceType}/{topicId}/{timestamp}/html", FileOnCommitWrapper(isHtml = true))
+                .get("/history/{spaceType}/{topicId}/{timestamp}", FileOnCommitWrapper())
                 .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
             Runtime.getRuntime().addShutdownHook(Thread {
                 app.stop()
             })
+        }
+
+        private fun checkAndExtractSpaceTypeInContext(ctx: Context): SpaceType {
+            val spaceTypeFromPath = ctx.pathParam("spaceType")
+            if (SpaceType.values().none {
+                    it.name.equals(spaceTypeFromPath, ignoreCase = true)
+                }
+            ) {
+                throw IllegalArgumentException("$spaceTypeFromPath is not a supported topic type")
+            }
+            return SpaceType.valueOf(spaceTypeFromPath.uppercase())
+        }
+
+        object FileHistoryWrapper : Handler {
+
+            private val fileHistoryJsonHandlerMap = mapOf<SpaceType, Handler>(
+                SpaceType.GROUP to FileHistory(SpaceType.GROUP),
+                SpaceType.SUBJECT to FileHistory(SpaceType.SUBJECT),
+                SpaceType.BLOG to FileHistory(SpaceType.BLOG)
+            )
+
+            override fun handle(ctx: Context) {
+                val spaceType = checkAndExtractSpaceTypeInContext(ctx)
+                fileHistoryJsonHandlerMap[spaceType]!!.handle(ctx)
+            }
+        }
+
+        class FileOnCommitWrapper(val isHtml: Boolean = false) : Handler {
+            private val fileOnCommitJsonHandlerMap = mapOf<SpaceType, Handler>(
+                SpaceType.GROUP to FileOnCommit(SpaceType.GROUP),
+                SpaceType.SUBJECT to FileOnCommit(SpaceType.SUBJECT),
+                SpaceType.BLOG to FileOnCommit(SpaceType.BLOG)
+            )
+
+            private val fileOnCommitHtmlHandlerMap = mapOf<SpaceType, Handler>(
+                SpaceType.GROUP to FileOnCommit(SpaceType.GROUP, isHtml = true),
+                SpaceType.SUBJECT to FileOnCommit(SpaceType.SUBJECT, isHtml = true),
+                SpaceType.BLOG to FileOnCommit(SpaceType.BLOG, isHtml = true)
+            )
+
+            override fun handle(ctx: Context) {
+                val spaceType = checkAndExtractSpaceTypeInContext(ctx)
+                if (isHtml) {
+                    fileOnCommitHtmlHandlerMap[spaceType]!!.handle(ctx)
+                } else {
+                    fileOnCommitJsonHandlerMap[spaceType]!!.handle(ctx)
+                }
+            }
+        }
+
+        object LinkHandlerWrapper : Handler {
+            override fun handle(ctx: Context) {
+                checkAndExtractSpaceTypeInContext(ctx)
+                LinkHandler.handle(ctx)
+            }
+        }
+
+        object LatestTopicListWrapper : Handler {
+            private val lock = ReentrantLock()
+            override fun handle(ctx: Context) {
+                val spaceType = checkAndExtractSpaceTypeInContext(ctx)
+                try {
+                    if (!lock.tryLock(30, TimeUnit.SECONDS)) {
+                        ctx.status(HttpStatus.REQUEST_TIMEOUT)
+                        ctx.html("The server is busy. Please wait and refresh later.")
+                        return
+                    }
+
+                    val topicList: String = GitHelper.getFileContentInACommit(
+                        GitHelper.archiveRepoSingleton,
+                        GitHelper.getPrevProcessedCommitRef(),
+                        spaceType.name.lowercase() + "/topiclist.txt"
+                    )
+                    ctx.json(topicList.lines().mapNotNull { it.toIntOrNull() }.sorted())
+                } catch (ex: Exception) {
+                    log.error("Ex: ", ex)
+                    throw ex
+                } finally {
+                    if (lock.isHeldByCurrentThread) lock.unlock()
+                }
+            }
         }
 
         class CommitHook : Handler {
@@ -71,7 +147,7 @@ class HttpServer {
             }
         }
 
-        class FileHistory(private val spaceType: SpaceType, private val isRaw: Boolean = false) : Handler {
+        class FileHistory(private val spaceType: SpaceType, private val isHtml: Boolean = false) : Handler {
             override fun handle(ctx: Context) {
                 try {
                     if (!lock.tryLock(30, TimeUnit.SECONDS)) {
@@ -80,7 +156,7 @@ class HttpServer {
                         return
                     }
                     val topicId = ctx.pathParam("topicId").toInt()
-                    val timestampList = if (isRaw) {
+                    val timestampList = if (isHtml) {
                         FileHistoryLookup.getArchiveTimestampList(
                             spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".html"
                         )
@@ -100,7 +176,7 @@ class HttpServer {
             }
         }
 
-        class FileOnCommit(private val spaceType: SpaceType, private val isRaw: Boolean = false) : Handler {
+        class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean = false) : Handler {
             override fun handle(ctx: Context) {
                 try {
                     if (!lock.tryLock(30, TimeUnit.SECONDS)) {
@@ -115,8 +191,8 @@ class HttpServer {
                         else if (timestampPathParam.toLongOrNull() != null) timestampPathParam.toLong()
                         else -1L
                     val relativePath =
-                        spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + if (isRaw) ".html" else ".json"
-                    val timestampList = if (isRaw) {
+                        spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + if (isHtml) ".html" else ".json"
+                    val timestampList = if (isHtml) {
                         FileHistoryLookup.getArchiveTimestampList(relativePath)
                     } else {
                         FileHistoryLookup.getJsonTimestampList(relativePath)
@@ -130,7 +206,7 @@ class HttpServer {
                             ceilingTimestamp = ts.first()
                         }
                         ctx.redirect(
-                            if (isRaw) {
+                            if (isHtml) {
                                 ctx.path().replace(Regex("/${timestampPathParam}/html"), "/${ceilingTimestamp}/html")
                             } else {
                                 ctx.path().replace(Regex("/${timestampPathParam}/*\$"), "/${ceilingTimestamp}")
@@ -140,7 +216,7 @@ class HttpServer {
                     }
 
                     ctx.header(CACHE_CONTROL, "max-age=86400")
-                    if (isRaw) {
+                    if (isHtml) {
                         var html = GitHelper.getFileContentInACommit(
                             GitHelper.archiveRepoSingleton,
                             FileHistoryLookup.getArchiveCommitAtTimestamp(relativePath, timestamp),
