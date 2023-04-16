@@ -9,11 +9,13 @@ import io.javalin.http.Header.CACHE_CONTROL
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.CommitToJsonProcessor
+import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
 import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.FilePathHelper
 import org.slf4j.LoggerFactory
+import java.io.File
 import java.lang.IllegalArgumentException
 import java.time.Duration
 import java.util.*
@@ -40,6 +42,26 @@ class HttpServer {
                 .get("/history/{spaceType}/{topicId}/link", LinkHandlerWrapper)
                 .get("/history/{spaceType}/{topicId}/{timestamp}/html", FileOnCommitWrapper(isHtml = true))
                 .get("/history/{spaceType}/{topicId}/{timestamp}", FileOnCommitWrapper())
+                .get("/history/status") { ctx ->
+                    ctx.json(
+                        mapOf(
+                            "jsonRepoStatus" to run {
+                                val gitProcess = Runtime.getRuntime()
+                                    .exec("git count-objects -vH", null, File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR))
+                                gitProcess.blockAndPrintProcessResults().map {
+                                    it.split(":")
+                                }.associate { Pair(it[0].trim(), it[1].trim()) }
+                            },
+                            "archiveRepoStatus" to run {
+                                val gitProcess = Runtime.getRuntime()
+                                    .exec("git count-objects -vH", null, File(Config.BGM_ARCHIVE_GIT_REPO_DIR))
+                                gitProcess.blockAndPrintProcessResults().map {
+                                    it.split(":")
+                                }.associate { Pair(it[0].trim(), it[1].trim()) }
+                            }
+                        )
+                    )
+                }
                 .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
             Runtime.getRuntime().addShutdownHook(Thread {
                 app.stop()

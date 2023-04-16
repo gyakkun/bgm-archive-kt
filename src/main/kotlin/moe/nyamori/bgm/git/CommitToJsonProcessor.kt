@@ -13,6 +13,7 @@ import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.*
+import kotlin.collections.ArrayList
 
 
 object CommitToJsonProcessor {
@@ -191,16 +192,16 @@ object CommitToJsonProcessor {
         for (path in changedFilePathList) {
             val addPathProcess = Runtime.getRuntime()
                 .exec("git add ${path.replace("html", "json")}", null, jsonRepoDir)
-            printResults(addPathProcess)
+            addPathProcess.blockAndPrintProcessResults()
         }
         val addLastCommitIdProcess = Runtime.getRuntime().exec(
             "git add $BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME",
             null, jsonRepoDir
         )
-        printResults(addLastCommitIdProcess)
+        addLastCommitIdProcess.blockAndPrintProcessResults()
         val gitProcess = Runtime.getRuntime()
             .exec("git commit -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
-        printResults(gitProcess)
+        gitProcess.blockAndPrintProcessResults()
         commitMsgFile.delete()
     }
 
@@ -216,12 +217,12 @@ object CommitToJsonProcessor {
         log.info("About to git add")
         var gitProcess = Runtime.getRuntime()
             .exec("git add *", null, jsonRepoDir)
-        printResults(gitProcess)
+        gitProcess.blockAndPrintProcessResults()
         log.info("Complete git add")
         log.info("About to git commit")
         gitProcess = Runtime.getRuntime()
             .exec("git commit -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
-        printResults(gitProcess)
+        gitProcess.blockAndPrintProcessResults()
         log.info("Complete git commit")
         commitMsgFile.delete()
     }
@@ -250,17 +251,20 @@ object CommitToJsonProcessor {
         }
     }
 
-    fun printResults(process: Process) {
+    fun Process.blockAndPrintProcessResults():List<String> {
+        val result = ArrayList<String?>()
         // Here actually block the process
-        InputStreamReader(process.inputStream).use { isr->
+        InputStreamReader(this.inputStream).use { isr->
             BufferedReader(isr).use { reader->
                 var line: String?
                 reader.readLine()
                 while (reader.readLine().also { line = it } != null) {
                     System.err.println(line)
+                    result.add(line)
                 }
             }
         }
+        return result.filterNotNull()
     }
 
     private fun writeJsonFile(path: String, json: String) {
