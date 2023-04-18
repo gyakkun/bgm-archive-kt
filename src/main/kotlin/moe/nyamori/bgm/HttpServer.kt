@@ -37,6 +37,10 @@ class HttpServer {
                 }*/
             }
                 .get("/after-commit-hook", CommitHook())
+                .get("/img/*") { ctx ->
+                    ctx.redirect("https://bgm.tv" + ctx.path())
+                    return@get
+                }
                 .get("/history/{spaceType}/latest_topic_list", LatestTopicListWrapper)
                 .get("/history/{spaceType}/{topicId}", FileHistoryWrapper)
                 .get("/history/{spaceType}/{topicId}/link", LinkHandlerWrapper)
@@ -258,11 +262,8 @@ class HttpServer {
                             FileHistoryLookup.getArchiveCommitAtTimestamp(relativePath, timestamp),
                             relativePath
                         )
-                        html = html.replace("chii.in", "bgm.tv")
-                        html = html.replace("bangumi.tv", "bgm.tv")
-                        html = html.replace("//lain.bgm.tv", "https://lain.bgm.tv")
-                        html = html.replace("src=\"/", "src=\"https://bgm.tv/")
-                        html = html.replace("href=\"/", "href=\"https://bgm.tv/")
+                        html = htmlModifier(html, timestamp)
+
                         ctx.html(html)
                     } else {
                         ctx.json(
@@ -279,6 +280,29 @@ class HttpServer {
                 } finally {
                     if (lock.isHeldByCurrentThread) lock.unlock()
                 }
+            }
+
+            private fun htmlModifier(html: String, timestamp: Long): String {
+                var result = html
+                result = result.replace("chii.in", "bgm.tv")
+                result = result.replace("bangumi.tv", "bgm.tv")
+                result = result.replace("data-theme=\"light\"", "data-theme=\"dark\"")
+                result = result.replace("//lain.bgm.tv", "https://lain.bgm.tv")
+                result = result.replace("src=\"/", "src=\"https://bgm.tv/")
+                result = result.replace("href=\"/", "href=\"https://bgm.tv/")
+
+                // R412 "Tietie"
+                if (timestamp >= 1680307200000) {
+                    result = result.replace(
+                        "</body>", """
+                                            <script src="https://bgm.tv/min/g=ui?r412" type="text/javascript"></script>
+                                            <script src="https://bgm.tv/min/g=mobile?r412" type="text/javascript"></script>
+                                            <script type="text/javascript">chiiLib.topic_history.init();chiiLib.likes.init();</script>
+                                            </body>
+                                        """.trimIndent()
+                    )
+                }
+                return result
             }
         }
 
