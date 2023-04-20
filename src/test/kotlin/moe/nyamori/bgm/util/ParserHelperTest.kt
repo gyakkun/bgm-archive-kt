@@ -1,6 +1,7 @@
 package moe.nyamori.bgm.util
 
 import moe.nyamori.bgm.git.FileHistoryLookup
+import moe.nyamori.bgm.git.FileHistoryLookup.getRevCommitList
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import org.junit.jupiter.api.Assertions.*
@@ -24,7 +25,7 @@ class ParserHelperTest {
     // @Test
     fun writeSampleHtml() {
         val filePath = "blog/" + FilePathHelper.numberToPath(313741) + ".html"
-        val commitList = FileHistoryLookup.getRevCommitList(filePath, GitHelper.archiveRepoSingleton)
+        val commitList = GitHelper.archiveRepoSingleton.getRevCommitList(filePath)
         for (i in commitList) {
             val htmlString = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(i, filePath)
             val revId = ParserHelper.getStyleRevNumberFromHtmlString(htmlString)
