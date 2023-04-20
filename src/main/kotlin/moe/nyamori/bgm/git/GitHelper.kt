@@ -28,6 +28,33 @@ object GitHelper {
     private val log = LoggerFactory.getLogger(GitHelper.javaClass)
     val GSON: Gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
 
+    val jsonRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        getJsonRepo()
+    }
+
+    val archiveRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        getArchiveRepo()
+    }
+
+    val jsonStaticRepoListSingleton by lazy (mode = LazyThreadSafetyMode.SYNCHRONIZED){
+        if(Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
+        else {
+            Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
+                .map { getRepoByPath(it.trim()) }
+                .toList()
+        }
+    }
+
+    val archiveStaticRepoListSingleton by lazy (mode = LazyThreadSafetyMode.SYNCHRONIZED){
+        if(Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
+        else {
+            Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
+                .map { getRepoByPath(it.trim()) }
+                .toList()
+        }
+    }
+
+
     fun getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder(): RevWalk {
         val prevProcessedCommit = getPrevProcessedCommitRef()
         val latestCommit = getLatestArchiveRepoCommitRef()
@@ -87,13 +114,6 @@ object GitHelper {
     }
 
 
-    val jsonRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        getJsonRepo()
-    }
-
-    val archiveRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        getArchiveRepo()
-    }
 
     private fun getRepoByPath(path: String): Repository {
         var repo = File(path)

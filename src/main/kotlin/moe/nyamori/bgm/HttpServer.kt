@@ -257,8 +257,8 @@ class HttpServer {
 
                     ctx.header(CACHE_CONTROL, "max-age=86400")
                     if (isHtml) {
-                        var html = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
-                            FileHistoryLookup.getArchiveCommitAtTimestamp(relativePath, timestamp),
+                        var html = FileHistoryLookup.getArchiveFileContentAsStringAtTimestamp(
+                            timestamp,
                             relativePath
                         )
                         html = htmlModifier(html, timestamp)
@@ -266,8 +266,8 @@ class HttpServer {
                         ctx.html(html)
                     } else {
                         ctx.json(
-                            GitHelper.jsonRepoSingleton.getFileContentAsStringInACommit(
-                                FileHistoryLookup.getJsonCommitAtTimestamp(relativePath, timestamp),
+                            FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
+                                timestamp,
                                 relativePath
                             )
                         )
