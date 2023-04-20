@@ -3,6 +3,8 @@ package moe.nyamori.bgm.git
 import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
+import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.TopicParserEntrance
 import org.eclipse.jgit.api.Git
@@ -65,7 +67,7 @@ object CommitToJsonProcessor {
                         throw IllegalStateException("Not a group or subject topic!")
                     }
 
-                    val changedFilePathList = GitHelper.findChangedFilePaths(archiveRepo, prevCommit, curCommit)
+                    val changedFilePathList = archiveRepo.findChangedFilePaths(prevCommit, curCommit)
 
                     for (pathIdx in changedFilePathList.indices) {
                         val path = changedFilePathList[pathIdx]
@@ -88,7 +90,7 @@ object CommitToJsonProcessor {
                                 log.error("Html space type not consistent with commit space type! htmlSpaceType=$htmlSpaceType, commitSpaceType=$commitSpaceType")
                             }
 
-                            val fileContentInStr = GitHelper.getFileContentInACommit(archiveRepo, curCommit, path)
+                            val fileContentInStr = archiveRepo.getFileContentAsStringInACommit(curCommit, path)
                             val topicId = path.split("/").last().replace(".html", "").toInt()
 
                             var timing = System.currentTimeMillis()

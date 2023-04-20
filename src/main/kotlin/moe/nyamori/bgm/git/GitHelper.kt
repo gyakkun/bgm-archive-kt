@@ -41,7 +41,7 @@ object GitHelper {
     }
 
     fun getPrevProcessedCommitRef(): RevCommit {
-        getArchiveRepo().use { archiveRepo ->
+        archiveRepoSingleton.use { archiveRepo ->
             val revWalk = RevWalk(archiveRepo)
             val prevProcessedCommitRevIdStr = getPrevProcessedCommitRevId()
             val prevProcessedCommitRevId = if (prevProcessedCommitRevIdStr.isBlank()) {
@@ -59,23 +59,22 @@ object GitHelper {
     }
 
     fun getLatestArchiveRepoCommitRef(): RevCommit {
-        return getArchiveRepo().getLatestCommitRef()
+        return archiveRepoSingleton.getLatestCommitRef()
     }
 
     fun Repository.getLatestCommitRef(): RevCommit {
-        this.use { archiveRepo ->
-            val revWalk = RevWalk(archiveRepo)
-            val latestHeadCommitRevId = archiveRepo.resolve(HEAD)
+        this.use { repo ->
+            val revWalk = RevWalk(repo)
+            val latestHeadCommitRevId = repo.resolve(HEAD)
             val latestHeadCommit = revWalk.parseCommit(latestHeadCommitRevId)
             return latestHeadCommit
         }
     }
 
     fun getPrevProcessedCommitRevId(): String {
-        if (getJsonRepo().isBare) {
-            return getFileContentInACommit(
-                getJsonRepo(),
-                getJsonRepo().getLatestCommitRef(),
+        if (jsonRepoSingleton.isBare) {
+            return jsonRepoSingleton.getFileContentAsStringInACommit(
+                jsonRepoSingleton.getLatestCommitRef(),
                 "last_processed_commit_rev_id"
             ).trim()
         } else {
@@ -87,18 +86,6 @@ object GitHelper {
         }
     }
 
-    fun getArchiveRepo(): Repository {
-        var repo = File(Config.BGM_ARCHIVE_GIT_REPO_DIR)
-        if (repo.resolve(DOT_GIT).let { it.exists() && it.isDirectory }) {
-            repo = repo.resolve(DOT_GIT)
-        }
-        return FileRepositoryBuilder()
-            .setGitDir(repo)
-            .readEnvironment() // scan environment GIT_* variables
-            .findGitDir() // scan up the file system tree
-            .build()
-    }
-
 
     val jsonRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
         getJsonRepo()
@@ -108,8 +95,8 @@ object GitHelper {
         getArchiveRepo()
     }
 
-    fun getJsonRepo(): Repository {
-        var repo = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
+    private fun getRepoByPath(path: String): Repository {
+        var repo = File(path)
         if (repo.resolve(DOT_GIT).let { it.exists() && it.isDirectory }) {
             repo = repo.resolve(DOT_GIT)
         }
@@ -120,10 +107,18 @@ object GitHelper {
             .build()
     }
 
-    fun getFileContentInACommit(repo: Repository, commit: RevCommit, path: String): String {
-        TreeWalk.forPath(repo, path, commit.tree).use { treeWalk ->
+    private fun getJsonRepo(): Repository {
+        return getRepoByPath(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
+    }
+
+    private fun getArchiveRepo(): Repository {
+        return getRepoByPath(Config.BGM_ARCHIVE_GIT_REPO_DIR)
+    }
+
+    fun Repository.getFileContentAsStringInACommit(commit: RevCommit, path: String): String {
+        TreeWalk.forPath(this, path, commit.tree).use { treeWalk ->
             val blobId: ObjectId = treeWalk.getObjectId(0)
-            repo.newObjectReader().use { objectReader ->
+            this.newObjectReader().use { objectReader ->
                 val objectLoader: ObjectLoader = objectReader.open(blobId)
                 val bytes = objectLoader.bytes
                 val cd = CharsetDetector()
@@ -142,16 +137,16 @@ object GitHelper {
         }
     }
 
-    fun findChangedFilePaths(repo: Repository, prevCommit: RevCommit, currentCommit: RevCommit): List<String> {
+    fun Repository.findChangedFilePaths(prevCommit: RevCommit, currentCommit: RevCommit): List<String> {
         val prevTree = prevCommit.tree
         val curTree = currentCommit.tree
         val result = ArrayList<String>()
-        repo.newObjectReader().use { reader ->
+        this.newObjectReader().use { reader ->
             val oldTreeIter = CanonicalTreeParser()
             oldTreeIter.reset(reader, prevTree)
             val newTreeIter = CanonicalTreeParser()
             newTreeIter.reset(reader, curTree)
-            Git(repo).use { git ->
+            Git(this).use { git ->
                 git.diff()
                     .setNewTree(newTreeIter)
                     .setOldTree(oldTreeIter)

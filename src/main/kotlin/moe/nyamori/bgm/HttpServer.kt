@@ -12,6 +12,7 @@ import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
 import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.FilePathHelper
 import org.slf4j.LoggerFactory
@@ -138,8 +139,7 @@ class HttpServer {
                     }
 
             private fun getTopicList(spaceType: SpaceType): List<Int> {
-                val topicListFile: String = GitHelper.getFileContentInACommit(
-                    GitHelper.archiveRepoSingleton,
+                val topicListFile: String = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
                     GitHelper.getPrevProcessedCommitRef(),
                     spaceType.name.lowercase() + "/topiclist.txt"
                 )
@@ -257,8 +257,7 @@ class HttpServer {
 
                     ctx.header(CACHE_CONTROL, "max-age=86400")
                     if (isHtml) {
-                        var html = GitHelper.getFileContentInACommit(
-                            GitHelper.archiveRepoSingleton,
+                        var html = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
                             FileHistoryLookup.getArchiveCommitAtTimestamp(relativePath, timestamp),
                             relativePath
                         )
@@ -267,8 +266,7 @@ class HttpServer {
                         ctx.html(html)
                     } else {
                         ctx.json(
-                            GitHelper.getFileContentInACommit(
-                                GitHelper.jsonRepoSingleton,
+                            GitHelper.jsonRepoSingleton.getFileContentAsStringInACommit(
                                 FileHistoryLookup.getJsonCommitAtTimestamp(relativePath, timestamp),
                                 relativePath
                             )
