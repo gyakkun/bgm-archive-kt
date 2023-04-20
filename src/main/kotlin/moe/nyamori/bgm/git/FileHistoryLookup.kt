@@ -36,7 +36,7 @@ object FileHistoryLookup {
                 repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
                     .keys
             }.flatten().stream()
-        ).toList()
+        ).sorted().toList()
     }
 
     fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> {
@@ -46,7 +46,7 @@ object FileHistoryLookup {
                 repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
                     .keys
             }.flatten().stream()
-        ).toList()
+        ).sorted().toList()
     }
 
 
