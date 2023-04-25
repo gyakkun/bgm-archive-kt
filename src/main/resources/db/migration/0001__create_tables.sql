@@ -1,22 +1,21 @@
-
 create table if not exists prev_commit_id
 (
     rev_id text
 );
 create table if not exists ba_user
 (
-    id      integer not null
+    id       integer,
+    username text    not null
         constraint ba_user_pk
-            primary key,
-    username text
+            primary key
 );
 
 create table if not exists ba_topic
 (
-    type  integer not null,
-    id    integer,
-    title text,
-    uid   integer,
+    type     integer not null,
+    id       integer,
+    title    text,
+    uid      integer,
     dateline integer,
     constraint ba_topic_pk
         primary key (type, id, uid)

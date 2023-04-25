@@ -40,7 +40,7 @@ interface BgmDao : Transactional<BgmDao> {
         insert into ba_user (id, username) values (
             :id,
             :username
-        ) on conflict(id) do update set username = :username 
+        ) on conflict(username) do update set id = :id 
         """
     )
     fun batchUpsertUser(@BindBean userList: List<User>): IntArray

@@ -36,8 +36,9 @@ class DbTest {
         fun main(args: Array<String>) {
             runBlocking {
                 Dao.bgmDao().healthCheck()
-                val dbTest = DbTest()
-                dbTest.initQueue()
+                 val dbTest = DbTest()
+                // dbTest.initQueue()
+
                 dbTest.readJsonAndUpsert()
             }
         }
@@ -58,6 +59,10 @@ class DbTest {
         assert(Dao.bgmDao().healthCheck() == 1)
         // Dao.bgmDao().createTables()
         assert(Dao.bgmDao().healthCheck() == 1)
+
+        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi", id = null, nickname = "")))
+        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi1", id = null, nickname = "")))
+        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi3", id = null, nickname = "")))
 
         // Dao.bgmDao().batchUpsertLikes(
         //     listOf(
