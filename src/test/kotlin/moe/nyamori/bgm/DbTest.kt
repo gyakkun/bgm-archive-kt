@@ -6,6 +6,7 @@ import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonWriter
 import com.vladsch.flexmark.util.misc.FileUtil
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
@@ -101,10 +102,10 @@ class DbTest {
                     val postList = topic.getAllPosts().map { processPostWithEmptyUid(it) }
                     val userList = postList.map { it.user }.filterNotNull().distinct()
 
-                    Dao.bgmDao().batchUpsertUser(userList)
-                    Dao.bgmDao().batchUpsertLikes(likeList)
-                    Dao.bgmDao().batchUpsertPost(topic.space!!.type.id, postList)
-                    Dao.bgmDao().batchUpsertTopic(topic.space!!.type.id, listOf(topic))
+                    launch { Dao.bgmDao().batchUpsertUser(userList) }
+                    launch { Dao.bgmDao().batchUpsertLikes(likeList) }
+                    launch { Dao.bgmDao().batchUpsertPost(topic.space!!.type.id, postList) }
+                    launch { Dao.bgmDao().batchUpsertTopic(topic.space!!.type.id, listOf(topic)) }
 
                     //launch { topicQueue.put(topic) }
 //
