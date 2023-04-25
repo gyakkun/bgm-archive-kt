@@ -6,7 +6,6 @@ import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonWriter
 import com.vladsch.flexmark.util.misc.FileUtil
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
@@ -19,6 +18,7 @@ import java.util.*
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import kotlin.concurrent.thread
+import kotlin.math.abs
 import kotlin.reflect.KClass
 import kotlin.streams.asStream
 
@@ -36,7 +36,7 @@ class DbTest {
         fun main(args: Array<String>) {
             runBlocking {
                 Dao.bgmDao().healthCheck()
-                 val dbTest = DbTest()
+                val dbTest = DbTest()
                 // dbTest.initQueue()
 
                 dbTest.readJsonAndUpsert()
@@ -94,11 +94,12 @@ class DbTest {
                     if (!file.extension.equals("json", ignoreCase = true)) return@inner
                     if (file.nameWithoutExtension.hashCode() and 127 == 127) LOGGER.info("$file is processing")
                     val fileStr = FileUtil.getFileContent(file)!!
-                    val topic = GSON.fromJson(fileStr, Topic::class.java)
+                    var topic = GSON.fromJson(fileStr, Topic::class.java)
                     if (!isValidTopic(topic)) return@inner
+                    topic = preProcessTopic(topic)
                     val likeList = getLikeListFromTopic(topic!!)
-                    val postList = topic.getAllPosts()
-                    val userList = postList.map { it.user }.filterNotNull()
+                    val postList = topic.getAllPosts().map { processPostWithEmptyUid(it) }
+                    val userList = postList.map { it.user }.filterNotNull().distinct()
 
                     Dao.bgmDao().batchUpsertUser(userList)
                     Dao.bgmDao().batchUpsertLikes(likeList)
@@ -117,6 +118,34 @@ class DbTest {
             }
         }
         endAll = true
+    }
+
+    private fun preProcessTopic(topic: Topic): Topic {
+        if (topic.uid != null) return topic
+        val topPostPid = topic.topPostPid
+        val topPost = topic.getAllPosts().first { it.id == topPostPid }
+        var topPostUser = topPost.user
+        if (topPostUser == null) {
+            topPostUser = User(id = 0, username = "0", nickname = "0")
+        } else {
+            if (topPostUser.id == null) {
+                topPostUser = topPostUser.let { it.copy(id = genHashingUidFromUsername(it.username)) }
+            }
+        }
+        return topic.copy(uid = topPostUser.id)
+    }
+
+    private fun processPostWithEmptyUid(post: Post): Post {
+        if (post.user != null && post.user!!.id != null) return post
+        var postUser = post.user
+        if (postUser == null) {
+            postUser = User(id = 0, username = "0", nickname = "0")
+        } else {
+            if (postUser.id == null) {
+                postUser = postUser.let { it.copy(id = genHashingUidFromUsername(it.username)) }
+            }
+        }
+        return post.copy(user = postUser)
     }
 
     private fun isValidTopic(topic: Topic): Boolean {
@@ -237,7 +266,7 @@ class DbTest {
                 if (batchList.size >= BATCH_THRESHOLD) {
                     batchList.stream().peek {
                         if (it.id == null) {
-                            it.id = genUidFromUsername(it.username)
+                            it.id = genHashingUidFromUsername(it.username)
                         }
                     }
                     Dao.bgmDao().batchUpsertUser(batchList)
@@ -269,8 +298,30 @@ class DbTest {
 
     }
 
-    fun genUidFromUsername(username: String): Int {
-        return UUID.fromString(username).hashCode()
+    fun hashFunGenerator(radix: Int, mod: Int = 1000000007 /* alternative: 19260817 */): (String) -> Int {
+        val res = fun(str: String): Int {
+            val ca = str.toCharArray()
+            var working = 0L
+            // From 0 to len
+            ca.forEach {
+                working *= radix
+                working %= mod
+                working += it.code
+                working %= mod
+            }
+            return working.toInt()
+        }
+        return res
+    }
+
+    val hashFun1 = hashFunGenerator(17)
+    val hashFun2 = hashFunGenerator(19260817)
+    val mask1 = Short.MAX_VALUE.toInt()
+    val mask2 = Int.MAX_VALUE xor Short.MAX_VALUE.toInt()
+    fun genHashingUidFromUsername(username: String): Int {
+        val hash1 = hashFun1(username) and mask1
+        val hash2 = hashFun2(username) and mask2
+        return -abs(hash1 xor hash2)
     }
 }
 
