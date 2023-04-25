@@ -1,13 +1,15 @@
-create table if not exists prev_commit_id
+create table if not exists meta_data
 (
-    rev_id text
+    k text,
+    v text
 );
+
 create table if not exists ba_user
 (
-    id       integer,
-    username text    not null
+    id       integer
         constraint ba_user_pk
-            primary key
+            primary key,
+    username text not null
 );
 
 create table if not exists ba_topic
