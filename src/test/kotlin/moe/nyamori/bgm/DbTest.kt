@@ -87,11 +87,11 @@ class DbTest {
 
         jsonRepoFolders.forEach outer@{
             val folder = File(it)
-            val fileStream = folder.walkBottomUp().asStream() // .parallel()
+            val fileStream = folder.walkBottomUp().asStream()//.parallel()
             fileStream.forEach inner@{ file ->
                 runCatching {
                     if (file.isDirectory) return@inner
-                    if (file.absolutePath.contains("blog")) return@inner
+                    // if (file.absolutePath.contains("blog")) return@inner
                     if (!file.extension.equals("json", ignoreCase = true)) return@inner
                     if (file.nameWithoutExtension.hashCode() and 127 == 127) LOGGER.info("$file is processing")
                     val fileStr = FileUtil.getFileContent(file)!!
@@ -102,10 +102,11 @@ class DbTest {
                     val postList = topic.getAllPosts().map { processPostWithEmptyUid(it) }
                     val userList = postList.map { it.user }.filterNotNull().distinct()
 
-                    launch { Dao.bgmDao().batchUpsertUser(userList) }
-                    launch { Dao.bgmDao().batchUpsertLikes(likeList) }
-                    launch { Dao.bgmDao().batchUpsertPost(topic.space!!.type.id, postList) }
-                    launch { Dao.bgmDao().batchUpsertTopic(topic.space!!.type.id, listOf(topic)) }
+                    Dao.bgmDao().batchUpsertUser(userList)
+                    // if (topic.space!!.type == SpaceType.BLOG) return@inner
+                    Dao.bgmDao().batchUpsertLikes(likeList)
+                    Dao.bgmDao().batchUpsertPost(topic.space!!.type.id, postList)
+                    Dao.bgmDao().batchUpsertTopic(topic.space!!.type.id, listOf(topic))
 
                     //launch { topicQueue.put(topic) }
 //
@@ -150,8 +151,8 @@ class DbTest {
     }
 
     private fun isValidTopic(topic: Topic): Boolean {
-        return topic.display && topic.space != null &&
-                (topic.space!!.type == SpaceType.GROUP || topic.space!!.type == SpaceType.SUBJECT)
+        return topic.display && topic.space != null
+        // && (topic.space!!.type == SpaceType.GROUP || topic.space!!.type == SpaceType.SUBJECT)
     }
 
     private fun getLikeListFromTopic(topic: Topic): List<Like> {
