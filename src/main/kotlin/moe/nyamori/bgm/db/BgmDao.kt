@@ -22,14 +22,14 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-        select rev_id from prev_commit_id limit 1
+        select v from meta_data where k = 'last_processed_commit_rev_id'
         """
     )
     fun getPrevProcessedCommitId(): String
 
     @SqlUpdate(
         """
-        update prev_commit_id set rev_id = :revId
+        update meta_data set v = :revId where k = 'last_processed_commit_rev_id'
         """
     )
     fun updatePrevProcessedCommitId(prevProcessedCommitId: String): Int
@@ -40,7 +40,7 @@ interface BgmDao : Transactional<BgmDao> {
         insert into ba_user (id, username) values (
             :id,
             :username
-        ) on conflict(username) do update set id = :id 
+        ) on conflict(id) do update set username = :username 
         """
     )
     fun batchUpsertUser(@BindBean userList: List<User>): IntArray
