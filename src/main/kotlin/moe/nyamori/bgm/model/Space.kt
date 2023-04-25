@@ -34,8 +34,8 @@ class Reserved(
     type: SpaceType
 ) : Space(type, null)
 
-enum class SpaceType {
-    GROUP,
-    SUBJECT,
-    BLOG
+enum class SpaceType(val id:Int) {
+    GROUP(8),
+    SUBJECT(10),
+    BLOG(100) // TBC
 }
