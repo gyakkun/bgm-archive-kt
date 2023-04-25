@@ -54,7 +54,6 @@ interface BgmDao : Transactional<BgmDao> {
             :t.uid,
             :t.dateline
         ) on conflict(type,id,uid) do update set title = :t.title
-        where id = :t.id and type = :typeId and uid = :t.uid
     """
     )
     fun batchUpsertTopic(@Bind("typeId") typeId:Int, @BindBean("t") topicList: List<Topic>): IntArray
@@ -81,7 +80,6 @@ interface BgmDao : Transactional<BgmDao> {
                     :value,
                     :total
             ) on conflict(type,mid,pid,value) do update set total = :total
-            where type = :type and mid = :mid and pid = :pid and value = :value
         """
     )
     fun batchUpsertLikes(@BindBean likeList: List<Like>): IntArray
