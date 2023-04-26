@@ -1,5 +1,6 @@
 package moe.nyamori.bgm.db
 
+import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.model.Like
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Topic
@@ -9,8 +10,10 @@ import org.jdbi.v3.sqlobject.customizer.BindBean
 import org.jdbi.v3.sqlobject.statement.SqlBatch
 import org.jdbi.v3.sqlobject.statement.SqlQuery
 import org.jdbi.v3.sqlobject.statement.SqlUpdate
+import org.jdbi.v3.sqlobject.transaction.Transaction
 import org.jdbi.v3.sqlobject.transaction.Transactional
 
+@JvmDefaultWithCompatibility
 interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
@@ -20,19 +23,29 @@ interface BgmDao : Transactional<BgmDao> {
     )
     fun healthCheck(): Int
 
-    @SqlQuery(
-        """
-        select v from meta_data where k = 'last_processed_commit_rev_id'
-        """
-    )
-    fun getPrevProcessedCommitId(): String
 
     @SqlUpdate(
         """
-        update meta_data set v = :revId where k = 'last_processed_commit_rev_id'
+        insert into meta_data (k,v) values (:k,:v) on conflict(k) do update set v = :v
         """
     )
-    fun updatePrevProcessedCommitId(prevProcessedCommitId: String): Int
+    @Transaction
+    fun upsertMetaData(@Bind("k") k: String, @Bind("v") v: String): Int
+
+    @SqlQuery(
+        """
+        select v from meta_data where k = :k
+        """
+    )
+    fun getMetaData(@Bind("k") k: String): String
+
+    fun updatePrevProcessedCommitId(prevProcessedCommitId: String): Int {
+        return upsertMetaData(Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME, prevProcessedCommitId)
+    }
+
+    fun getPrevProcessedCommitId(): String {
+        return getMetaData(Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+    }
 
 
     @SqlBatch(
@@ -43,6 +56,7 @@ interface BgmDao : Transactional<BgmDao> {
         ) on conflict(id) do update set username = :username 
         """
     )
+    @Transaction
     fun batchUpsertUser(@BindBean userList: List<User>): IntArray
 
     @SqlBatch(
@@ -57,7 +71,8 @@ interface BgmDao : Transactional<BgmDao> {
         ) on conflict(type,id,uid) do update set title = :t.title, sid = :t.sid, dateline = :t.dateline
     """
     )
-    fun batchUpsertTopic(@Bind("typeId") typeId:Int, @BindBean("t") topicList: List<Topic>): IntArray
+    @Transaction
+    fun batchUpsertTopic(@Bind("typeId") typeId: Int, @BindBean("t") topicList: List<Topic>): IntArray
 
     @SqlBatch(
         """
@@ -70,6 +85,7 @@ interface BgmDao : Transactional<BgmDao> {
         ) on conflict(type,id,mid,uid) do nothing
     """
     )
+    @Transaction
     fun batchUpsertPost(@Bind("typeId") typeId: Int, @BindBean("p") topicList: List<Post>): IntArray
 
     @SqlBatch(
@@ -83,6 +99,7 @@ interface BgmDao : Transactional<BgmDao> {
             ) on conflict(type,mid,pid,value) do update set total = :total
         """
     )
+    @Transaction
     fun batchUpsertLikes(@BindBean likeList: List<Like>): IntArray
 
 }

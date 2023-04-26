@@ -61,35 +61,37 @@ class DbTest {
         // Dao.bgmDao().createTables()
         assert(Dao.bgmDao().healthCheck() == 1)
 
-        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi", id = null, nickname = "")))
-        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi1", id = null, nickname = "")))
-        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi3", id = null, nickname = "")))
-        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi4", id = 123456, nickname = "")))
+        Dao.bgmDao().updatePrevProcessedCommitId(GitHelper.getPrevProcessedCommitRevId())
 
-        Dao.bgmDao().batchUpsertTopic(
-            typeId = SpaceType.GROUP.id, listOf(
-                Topic(
-                    id = 12345,
-                    space = Group(
-                        name = "hihihi",
-                        displayName = "Hi there!"
-                    ),
-                    uid = 12345,
-                    title = "hihihi",
-                    dateline = System.currentTimeMillis() / 1000,
-                ),
-                Topic(
-                    id = 45678,
-                    space = Subject(
-                        name = "77777",
-                        displayName = "Hi there!"
-                    ),
-                    uid = 12345,
-                    title = "hihihi",
-                    dateline = System.currentTimeMillis() / 1000,
-                )
-            )
-        )
+        // Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi", id = null, nickname = "")))
+        // Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi1", id = null, nickname = "")))
+        // Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi3", id = null, nickname = "")))
+        // Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi4", id = 123456, nickname = "")))
+//
+        // Dao.bgmDao().batchUpsertTopic(
+        //     typeId = SpaceType.GROUP.id, listOf(
+        //         Topic(
+        //             id = 12345,
+        //             space = Group(
+        //                 name = "hihihi",
+        //                 displayName = "Hi there!"
+        //             ),
+        //             uid = 12345,
+        //             title = "hihihi",
+        //             dateline = System.currentTimeMillis() / 1000,
+        //         ),
+        //         Topic(
+        //             id = 45678,
+        //             space = Subject(
+        //                 name = "77777",
+        //                 displayName = "Hi there!"
+        //             ),
+        //             uid = 12345,
+        //             title = "hihihi",
+        //             dateline = System.currentTimeMillis() / 1000,
+        //         )
+        //     )
+        // )
 
         // Dao.bgmDao().batchUpsertLikes(
         //     listOf(
