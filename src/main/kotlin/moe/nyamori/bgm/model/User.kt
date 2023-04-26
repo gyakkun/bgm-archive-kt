@@ -5,7 +5,7 @@ import moe.nyamori.bgm.util.StringHashingHelper
 data class User(
     var id: Int?,
     var username: String,
-    var nickname: String,
+    var nickname: String? = null,
     var sign: String? = null
 ) {
     fun getId(): Int {
