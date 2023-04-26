@@ -65,3 +65,15 @@ create index if not exists ba_likes_pid_index
 
 create index if not exists ba_likes_type_mid_index
     on ba_likes (type, mid);
+
+create table if not exists ba_space_alias
+(
+    type  integer,
+    sid   integer,
+    alias TEXT,
+    constraint ba_space_alias_pk
+        primary key (type, sid)
+);
+
+create index if not exists ba_space_alias_type_alias_index
+    on ba_space_alias (type, alias);
