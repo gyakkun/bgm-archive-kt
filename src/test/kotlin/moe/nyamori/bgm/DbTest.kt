@@ -5,8 +5,6 @@ import com.google.gson.reflect.TypeToken
 import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonWriter
 import com.vladsch.flexmark.util.misc.FileUtil
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
@@ -35,13 +33,15 @@ class DbTest {
         @Throws(IOException::class)
         @JvmStatic
         fun main(args: Array<String>) {
-            runBlocking {
-                Dao.bgmDao().healthCheck()
-                val dbTest = DbTest()
-                // dbTest.initQueue()
+            Dao.bgmDao().healthCheck()
+            val dbTest = DbTest()
+            // dbTest.readJsonAndUpsert()
 
-                dbTest.readJsonAndUpsert()
-            }
+//            LOGGER.info("neg user {}", Dao.bgmDao().getNegativeUidUsers())
+//            LOGGER.info("prev commit id {}", Dao.bgmDao().getPrevProcessedCommitId())
+//            Dao.bgmDao().handleNegativeUid()
+//            LOGGER.info("neg user after handling {}", Dao.bgmDao().getNegativeUidUsers())
+            dbTest.readJsonUpdateSpaceAliasMapping()
         }
     }
 
@@ -58,53 +58,52 @@ class DbTest {
     @Test
     fun healthCheck() {
         assert(Dao.bgmDao().healthCheck() == 1)
-        // Dao.bgmDao().createTables()
-        assert(Dao.bgmDao().healthCheck() == 1)
+    }
 
-        Dao.bgmDao().updatePrevProcessedCommitId(GitHelper.getPrevProcessedCommitRevId())
+    // @Test
+    fun insertTest() {
+        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi", id = null, nickname = "")))
+        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi1", id = null, nickname = "")))
+        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi3", id = null, nickname = "")))
+        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi4", id = 123456, nickname = "")))
 
-        // Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi", id = null, nickname = "")))
-        // Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi1", id = null, nickname = "")))
-        // Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi3", id = null, nickname = "")))
-        // Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi4", id = 123456, nickname = "")))
-//
-        // Dao.bgmDao().batchUpsertTopic(
-        //     typeId = SpaceType.GROUP.id, listOf(
-        //         Topic(
-        //             id = 12345,
-        //             space = Group(
-        //                 name = "hihihi",
-        //                 displayName = "Hi there!"
-        //             ),
-        //             uid = 12345,
-        //             title = "hihihi",
-        //             dateline = System.currentTimeMillis() / 1000,
-        //         ),
-        //         Topic(
-        //             id = 45678,
-        //             space = Subject(
-        //                 name = "77777",
-        //                 displayName = "Hi there!"
-        //             ),
-        //             uid = 12345,
-        //             title = "hihihi",
-        //             dateline = System.currentTimeMillis() / 1000,
-        //         )
-        //     )
-        // )
+        Dao.bgmDao().batchUpsertTopic(
+            typeId = SpaceType.GROUP.id, listOf(
+                Topic(
+                    id = 12345,
+                    space = Group(
+                        name = "hihihi",
+                        displayName = "Hi there!"
+                    ),
+                    uid = 12345,
+                    title = "hihihi",
+                    dateline = System.currentTimeMillis() / 1000,
+                ),
+                Topic(
+                    id = 45678,
+                    space = Subject(
+                        name = "77777",
+                        displayName = "Hi there!"
+                    ),
+                    uid = 12345,
+                    title = "hihihi",
+                    dateline = System.currentTimeMillis() / 1000,
+                )
+            )
+        )
 
-        // Dao.bgmDao().batchUpsertLikes(
-        //     listOf(
-        //         Like(1, 2, 3, 4, 5),
-        //         Like(1, 2, 3, 4, 5),
-        //         Like(1, 2, 3, 4, 5),
-        //         Like(1, 2, 3, 4, 5),
-        //     )
-        // )
+        Dao.bgmDao().batchUpsertLikes(
+            listOf(
+                Like(1, 2, 3, 4, 5),
+                Like(1, 2, 3, 4, 5),
+                Like(1, 2, 3, 4, 5),
+                Like(1, 2, 3, 4, 5),
+            )
+        )
     }
 
     @Test
-    suspend fun readJsonAndUpsert() = coroutineScope {
+    fun readJsonAndUpsert() {
         val jsonRepoFolders = ArrayList<String>()
         Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
             .map {
@@ -136,12 +135,6 @@ class DbTest {
                     Dao.bgmDao().batchUpsertPost(topic.space!!.type.id, postList)
                     Dao.bgmDao().batchUpsertTopic(topic.space!!.type.id, listOf(topic))
 
-                    //launch { topicQueue.put(topic) }
-//
-                    //launch { likeList.forEach { likeQueue.put(it) } }
-//
-                    //launch { postList.map { Pair(topic.space!!.type, it) }.forEach { postQueue.put(it) } }
-                    //launch { userList.forEach { userQueue.put(it) } }
                 }.onFailure { ex ->
                     LOGGER.error("Ex when handling $file: ", ex)
                 }
@@ -149,6 +142,44 @@ class DbTest {
         }
         Dao.bgmDao().updatePrevProcessedCommitId(GitHelper.getPrevProcessedCommitRevId())
         endAll = true
+    }
+
+    @Test
+    fun readJsonUpdateSpaceAliasMapping() {
+        val jsonRepoFolders = ArrayList<String>()
+        Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
+            .map {
+                jsonRepoFolders.add(it.trim())
+            }
+        Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
+        val sidAliasMappingSet = HashSet<Triple<Int, Int, String>>()
+
+        jsonRepoFolders.forEach outer@{
+            val folder = File(it)
+            val fileStream = folder.walkBottomUp().asStream().parallel()
+            fileStream.forEach inner@{ file ->
+                runCatching {
+                    if (file.isDirectory) return@inner
+                    if (!file.absolutePath.contains("group")) return@inner
+                    if (!file.extension.equals("json", ignoreCase = true)) return@inner
+                    if (file.nameWithoutExtension.hashCode() and 127 == 127) LOGGER.info("$file is processing")
+                    val fileStr = FileUtil.getFileContent(file)!!
+                    var topic = GSON.fromJson(fileStr, Topic::class.java)
+                    if (!isValidTopic(topic)) return@inner
+
+                    if (topic.space!!.type != SpaceType.GROUP) return@inner
+                    val gs = (topic.space!! as Group)
+                    sidAliasMappingSet.add(
+                        Triple(
+                            SpaceType.GROUP.id,
+                            stringHash(gs.name!!),
+                            gs.name!!
+                        )
+                    )
+                }
+            }
+        }
+        Dao.bgmDao().upsertSidAlias(sidAliasMappingSet.toList())
     }
 
     private fun preProcessTopic(topic: Topic): Topic {
