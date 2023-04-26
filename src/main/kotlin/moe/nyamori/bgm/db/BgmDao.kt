@@ -1,20 +1,23 @@
 package moe.nyamori.bgm.db
 
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.model.Like
-import moe.nyamori.bgm.model.Post
-import moe.nyamori.bgm.model.Topic
-import moe.nyamori.bgm.model.User
+import moe.nyamori.bgm.model.*
 import org.jdbi.v3.sqlobject.customizer.Bind
 import org.jdbi.v3.sqlobject.customizer.BindBean
+import org.jdbi.v3.sqlobject.kotlin.RegisterKotlinMapper
 import org.jdbi.v3.sqlobject.statement.SqlBatch
 import org.jdbi.v3.sqlobject.statement.SqlQuery
 import org.jdbi.v3.sqlobject.statement.SqlUpdate
 import org.jdbi.v3.sqlobject.transaction.Transaction
 import org.jdbi.v3.sqlobject.transaction.Transactional
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 @JvmDefaultWithCompatibility
 interface BgmDao : Transactional<BgmDao> {
+
+    val LOGGER: Logger
+        get() = LoggerFactory.getLogger(BgmDao::class.java)
 
     @SqlQuery(
         """
@@ -102,4 +105,98 @@ interface BgmDao : Transactional<BgmDao> {
     @Transaction
     fun batchUpsertLikes(@BindBean likeList: List<Like>): IntArray
 
+
+    @SqlQuery(
+        """
+        with a as (select username from ( select count(*) c, username
+        from ba_user
+        -- where id < 0
+        group by username
+        having c >= 2))
+        select * from ba_user where username in a;
+    """
+    )
+    @RegisterKotlinMapper(User::class)
+    fun getNegativeUidUsers(): List<User>
+
+    @SqlBatch(
+        """
+        UPDATE ba_topic
+        SET uid = :p.first -- positive
+        WHERE 
+          uid = :p.second -- negative
+    """
+    )
+    fun updateNegativeUidInTopic(@BindBean("p") userList: List<Pair<Int, Int>>): IntArray
+
+
+    @SqlBatch(
+        """
+        UPDATE ba_post
+        SET uid = :p.first -- positive
+        WHERE 
+          uid = :p.second -- negative
+    """
+    )
+    fun updateNegativeUidInPost(@BindBean("p") userList: List<Pair<Int, Int>>): IntArray
+
+    @SqlBatch(
+        """
+        UPDATE ba_topic
+        SET sid = :p.first -- positive
+        WHERE 
+          sid = :p.second -- negative
+          and type = 100 -- \$\{SpaceType.BLOG.id}
+    """
+    )
+    fun updateNegativeSidInBlogTopic(@BindBean("p") userList: List<Pair<Int, Int>>): IntArray
+
+    @SqlBatch(
+        """
+            DELETE FROM ba_user WHERE id = :p.second;
+        """
+    )
+    fun removeNegativeUidUser(@BindBean("p") userList: List<Pair<Int, Int>>)
+
+    @Transaction
+    fun handleNegativeUid() {
+        val negativeUidUsers = getNegativeUidUsers()
+        val userList = negativeUidUsers.groupBy { it.username }.map {
+            if (it.value.size > 2) {
+                LOGGER.error("${it.key} has more than 2 uids: ${it.value}")
+                return@map null
+            } else {
+                var pos: Int? = null
+                var neg: Int? = null
+                it.value.forEach {
+                    if (it.id!! > 0) pos = it.id!!
+                    if (it.id!! < 0) neg = it.id!!
+                }
+                if (pos == null || neg == null) {
+                    LOGGER.error("Something null when hanlding neg / pos uid: pos=$pos, neg=$neg, username = ${it.key}")
+                    return@map null
+                } else {
+                    return@map Pair(pos!!, neg!!)
+                }
+            }
+        }.filterNotNull()
+
+        updateNegativeUidInTopic(userList)
+        updateNegativeUidInPost(userList)
+        updateNegativeSidInBlogTopic(userList)
+        removeNegativeUidUser(userList)
+    }
+
+
+    @SqlBatch(
+        """
+        insert into ba_space_alias (type,sid,alias) values (
+            :t.first,
+            :t.second,
+            :t.third
+        ) on conflict(type,sid) do nothing
+    """
+    )
+    @Transaction
+    fun upsertSidAlias(@BindBean("t") sidAliasMappingList: List<Triple<Int, Int, String>>):IntArray
 }
