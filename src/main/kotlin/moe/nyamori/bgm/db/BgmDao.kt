@@ -47,13 +47,14 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlBatch(
         """
-        insert into ba_topic (type, id,title,uid,dateline) values (
+        insert into ba_topic (type, id,uid,sid, title,dateline) values (
             :typeId,
             :t.id,
-            :t.title,
             :t.uid,
+            :t.sid,
+            :t.title,
             :t.dateline
-        ) on conflict(type,id,uid) do update set title = :t.title
+        ) on conflict(type,id,uid) do update set title = :t.title, sid = :t.sid, dateline = :t.dateline
     """
     )
     fun batchUpsertTopic(@Bind("typeId") typeId:Int, @BindBean("t") topicList: List<Topic>): IntArray

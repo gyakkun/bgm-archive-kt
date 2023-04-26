@@ -1,7 +1,5 @@
 package moe.nyamori.bgm.model
 
-import java.util.Objects
-
 
 sealed class Space(
     val type: SpaceType,
@@ -34,7 +32,7 @@ class Reserved(
     type: SpaceType
 ) : Space(type, null)
 
-enum class SpaceType(val id:Int) {
+enum class SpaceType(val id: Int) {
     GROUP(8),
     SUBJECT(10),
     BLOG(100) // TBC
