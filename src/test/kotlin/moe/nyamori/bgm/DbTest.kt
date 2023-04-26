@@ -6,11 +6,12 @@ import com.google.gson.stream.JsonReader
 import com.google.gson.stream.JsonWriter
 import com.vladsch.flexmark.util.misc.FileUtil
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
+import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.util.StringHashingHelper.stringHash
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -19,7 +20,6 @@ import java.util.*
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 import kotlin.concurrent.thread
-import kotlin.math.abs
 import kotlin.reflect.KClass
 import kotlin.streams.asStream
 
@@ -64,6 +64,32 @@ class DbTest {
         Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi", id = null, nickname = "")))
         Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi1", id = null, nickname = "")))
         Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi3", id = null, nickname = "")))
+        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi4", id = 123456, nickname = "")))
+
+        Dao.bgmDao().batchUpsertTopic(
+            typeId = SpaceType.GROUP.id, listOf(
+                Topic(
+                    id = 12345,
+                    space = Group(
+                        name = "hihihi",
+                        displayName = "Hi there!"
+                    ),
+                    uid = 12345,
+                    title = "hihihi",
+                    dateline = System.currentTimeMillis() / 1000,
+                ),
+                Topic(
+                    id = 45678,
+                    space = Subject(
+                        name = "77777",
+                        displayName = "Hi there!"
+                    ),
+                    uid = 12345,
+                    title = "hihihi",
+                    dateline = System.currentTimeMillis() / 1000,
+                )
+            )
+        )
 
         // Dao.bgmDao().batchUpsertLikes(
         //     listOf(
@@ -119,6 +145,7 @@ class DbTest {
                 }
             }
         }
+        Dao.bgmDao().updatePrevProcessedCommitId(GitHelper.getPrevProcessedCommitRevId())
         endAll = true
     }
 
@@ -131,7 +158,7 @@ class DbTest {
             topPostUser = User(id = 0, username = "0", nickname = "0")
         } else {
             if (topPostUser.id == null) {
-                topPostUser = topPostUser.let { it.copy(id = genHashingUidFromUsername(it.username)) }
+                topPostUser = topPostUser.let { it.copy(id = stringHash(it.username)) }
             }
         }
         return topic.copy(uid = topPostUser.id)
@@ -144,7 +171,7 @@ class DbTest {
             postUser = User(id = 0, username = "0", nickname = "0")
         } else {
             if (postUser.id == null) {
-                postUser = postUser.let { it.copy(id = genHashingUidFromUsername(it.username)) }
+                postUser = postUser.let { it.copy(id = stringHash(it.username)) }
             }
         }
         return post.copy(user = postUser)
@@ -268,7 +295,7 @@ class DbTest {
                 if (batchList.size >= BATCH_THRESHOLD) {
                     batchList.stream().peek {
                         if (it.id == null) {
-                            it.id = genHashingUidFromUsername(it.username)
+                            it.id = stringHash(it.username)
                         }
                     }
                     Dao.bgmDao().batchUpsertUser(batchList)
@@ -300,31 +327,7 @@ class DbTest {
 
     }
 
-    fun hashFunGenerator(radix: Int, mod: Int = 1000000007 /* alternative: 19260817 */): (String) -> Int {
-        val res = fun(str: String): Int {
-            val ca = str.toCharArray()
-            var working = 0L
-            // From 0 to len
-            ca.forEach {
-                working *= radix
-                working %= mod
-                working += it.code
-                working %= mod
-            }
-            return working.toInt()
-        }
-        return res
-    }
 
-    val hashFun1 = hashFunGenerator(17)
-    val hashFun2 = hashFunGenerator(19260817)
-    val mask1 = Short.MAX_VALUE.toInt()
-    val mask2 = Int.MAX_VALUE xor Short.MAX_VALUE.toInt()
-    fun genHashingUidFromUsername(username: String): Int {
-        val hash1 = hashFun1(username) and mask1
-        val hash2 = hashFun2(username) and mask2
-        return -abs(hash1 xor hash2)
-    }
 }
 
 private class SealedTypeAdapterFactory<T : Any> private constructor(
