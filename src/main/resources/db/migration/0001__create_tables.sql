@@ -11,17 +11,19 @@ create table if not exists ba_user
     id       integer not null
         constraint ba_user_pk
             primary key,
-    username text not null
+    username text    not null
 );
 
 create table if not exists ba_topic
 (
-    type     integer not null,
-    id       integer not null,
-    uid      integer not null,
-    sid      integer not null,
-    title    text,
-    dateline integer not null,
+    type          integer not null,
+    id            integer not null,
+    uid           integer not null,
+    sid           integer,
+    dateline      integer,
+    state         integer,
+    last_post_pid integer,
+    title         text,
     constraint ba_topic_pk
         primary key (type, id, uid)
 );
@@ -37,11 +39,12 @@ create index if not exists ba_topic_type_sid_index
 
 create table if not exists ba_post
 (
-    type     integer,
-    id       integer,
-    mid      integer,
-    uid      integer,
+    type     integer not null,
+    id       integer not null,
+    mid      integer not null,
+    uid      integer not null,
     dateline integer,
+    state    integer,
     constraint ba_post_pk
         primary key (type, id, mid, uid)
 );
@@ -68,9 +71,9 @@ create index if not exists ba_likes_type_mid_index
 
 create table if not exists ba_space_naming_mapping -- Should be for group/subject only
 (
-    type  integer,
-    sid   integer,
-    name TEXT,
+    type         integer,
+    sid          integer,
+    name         TEXT,
     display_name TEXT,
     constraint ba_space_naming_mapping_pk
         primary key (type, sid)
