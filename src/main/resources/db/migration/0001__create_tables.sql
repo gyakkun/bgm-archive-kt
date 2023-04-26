@@ -1,12 +1,14 @@
 create table if not exists meta_data
 (
-    k text,
+    k text not null
+        constraint ba_meta_data_pk
+            primary key,
     v text
 );
 
 create table if not exists ba_user
 (
-    id       integer
+    id       integer not null
         constraint ba_user_pk
             primary key,
     username text not null
@@ -15,10 +17,11 @@ create table if not exists ba_user
 create table if not exists ba_topic
 (
     type     integer not null,
-    id       integer,
+    id       integer not null,
+    uid      integer not null,
+    sid      integer not null,
     title    text,
-    uid      integer,
-    dateline integer,
+    dateline integer not null,
     constraint ba_topic_pk
         primary key (type, id, uid)
 );
@@ -28,6 +31,9 @@ create index if not exists ba_topic_type_uid_index
 
 create index if not exists ba_topic_uid_index
     on ba_topic (uid);
+
+create index if not exists ba_topic_type_sid_index
+    on ba_topic (type, sid);
 
 create table if not exists ba_post
 (
@@ -42,7 +48,6 @@ create table if not exists ba_post
 
 create index if not exists ba_post_type_uid_index
     on ba_post (type, uid);
-
 
 create table if not exists ba_likes
 (
