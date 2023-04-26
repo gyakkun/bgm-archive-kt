@@ -44,8 +44,12 @@ object Config {
     val BGM_ARCHIVE_PORT: Int =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_PORT", "5926").toInt()
 
-    val BGM_ARCHIVE_SQLITE_FILE: String = System.getenv().getOrDefault(
-        "E_BGM_ARCHIVE_SQLITE_FILE",
-        File(System.getProperty("user.home")).resolve("source/bgm-archive-db/bgm-archive.sqlite").absolutePath
-    )
+    val BGM_ARCHIVE_SQLITE_FILE: String =
+        System.getProperty(
+            "E_BGM_ARCHIVE_SQLITE_FILE",
+            System.getenv().getOrDefault(
+                "E_BGM_ARCHIVE_SQLITE_FILE",
+                File(System.getProperty("user.home")).resolve("source/bgm-archive-db/bgm-archive.sqlite").absolutePath
+            )
+        )
 }
