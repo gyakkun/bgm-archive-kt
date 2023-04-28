@@ -131,6 +131,7 @@ object CommitToJsonProcessor {
                     if (commitIdx % 100 == 0) {
                         Git(jsonRepo).gc()
                     }
+                    SpotChecker.genSpotCheckListFile(commitSpaceType)
                 } catch (ex: Exception) {
                     log.error("Ex occurs when processing commit: $curCommit", ex)
                 }

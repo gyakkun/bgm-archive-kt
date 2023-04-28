@@ -1,4 +1,4 @@
-package moe.nyamori.bgm
+package moe.nyamori.bgm.git
 
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
@@ -17,8 +17,8 @@ import java.io.FileWriter
 import java.util.*
 import kotlin.streams.asStream
 
-object BitSetTest {
-    private val LOGGER = LoggerFactory.getLogger(BitSetTest::class.java)
+object SpotChecker {
+    private val LOGGER = LoggerFactory.getLogger(SpotChecker::class.java)
     private val GSON = GsonBuilder()
         .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
         .registerTypeAdapterFactory(
@@ -27,7 +27,7 @@ object BitSetTest {
     const val HIDDEN_TOPIC_MASK_FILE_NAME = "hidden_topic_mask.txt"
     const val SPOT_CHECK_BITSET_FILE_NAME = "spot_check_bitset.txt"
     const val SPOT_CHECK_LIST_FILE_NAME = "sc.txt"
-    const val MIN_SPOT_CHECK_SIZE = 7
+    const val MIN_SPOT_CHECK_SIZE = 10
 
 
     @JvmStatic
@@ -55,18 +55,15 @@ object BitSetTest {
         }
     }
 
-    fun randomSelectTopicIds(spaceType: SpaceType): List<Int> {
+    private fun randomSelectTopicIds(spaceType: SpaceType): List<Int> {
         val result = mutableListOf<Int>()
         val spotCheckedBs = getSpotCheckedTopicMask(spaceType)
         val hiddenBs = getHiddenTopicMask(spaceType)
         val fakeMaxId = hiddenBs.size() - 1
 
-         // Test
-         spotCheckedBs.set(0, fakeMaxId)
-         spotCheckedBs.clear(fakeMaxId - 10, fakeMaxId)
-
         spotCheckedBs.or(hiddenBs)
         val remainZeroCount = spotCheckedBs.size() - spotCheckedBs.cardinality()
+        val fakeTotalCount = hiddenBs.size() - hiddenBs.cardinality()
         // System.err.println(remainZeroCount)
         if (remainZeroCount <= Long.SIZE_BITS /*Bitset alloc unit*/) {
             var tmpId: Int = 0
@@ -83,7 +80,7 @@ object BitSetTest {
             generateTopicMaskFile(spaceType)
             return result
         }
-        val samplingSize = (remainZeroCount / (30 * 24 * 4)).coerceAtLeast(MIN_SPOT_CHECK_SIZE)
+        val samplingSize = (fakeTotalCount / (30 * 24 * 4)).coerceAtLeast(MIN_SPOT_CHECK_SIZE)
         val r = Random()
 
         repeat(samplingSize) {
@@ -105,14 +102,14 @@ object BitSetTest {
         return result
     }
 
-    fun getSpotCheckedTopicMask(spaceType: SpaceType): BitSet {
+    private fun getSpotCheckedTopicMask(spaceType: SpaceType): BitSet {
         val maskFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
         if (!maskFile.exists()) return BitSet()
         return getBitsetFromLongPlaintextFile(maskFile)
     }
 
-    fun getHiddenTopicMask(spaceType: SpaceType): BitSet {
+    private fun getHiddenTopicMask(spaceType: SpaceType): BitSet {
         val maskFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
         if (!maskFile.exists()) generateTopicMaskFile(spaceType)
@@ -120,7 +117,7 @@ object BitSetTest {
         return getBitsetFromLongPlaintextFile(maskFile)
     }
 
-    fun getBitsetFromLongPlaintextFile(maskFile: File): BitSet {
+    private fun getBitsetFromLongPlaintextFile(maskFile: File): BitSet {
         val maskStr = FileUtil.getFileContent(maskFile)
         val longList = mutableListOf<Long>()
         maskStr!!.lines().mapNotNull { it.toLongOrNull() }.forEach { longList.add(it) }
@@ -128,7 +125,7 @@ object BitSetTest {
         return BitSet.valueOf(longArr)
     }
 
-    fun generateTopicMaskFile(spaceType: SpaceType) {
+    private fun generateTopicMaskFile(spaceType: SpaceType) {
         val maxId = getMaxId(spaceType)
         val bs = BitSet(maxId + 1)
         walkThroughJson { file ->
@@ -162,7 +159,7 @@ object BitSetTest {
         }
     }
 
-    fun getMaxId(spaceType: SpaceType): Int {
+    private fun getMaxId(spaceType: SpaceType): Int {
         val prevProcessed = GitHelper.getPrevProcessedArchiveCommitRef() // archive repo
         val topiclist = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
             prevProcessed,
@@ -172,7 +169,7 @@ object BitSetTest {
     }
 
 
-    fun walkThroughJson(parallel: Boolean = false, handler: (File) -> Boolean) {
+    private fun walkThroughJson(parallel: Boolean = false, handler: (File) -> Boolean) {
         val jsonRepoFolders = ArrayList<String>()
         Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
             .map {
