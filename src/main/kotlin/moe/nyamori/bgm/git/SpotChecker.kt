@@ -181,7 +181,7 @@ object SpotChecker {
         }
     }
 
-    private fun getMaxId(spaceType: SpaceType): Int {
+    fun getMaxId(spaceType: SpaceType): Int {
         val prevProcessed = GitHelper.getPrevProcessedArchiveCommitRef() // archive repo
         val topiclist = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
             prevProcessed,
