@@ -34,10 +34,10 @@ object SpotChecker {
     fun main(argv: Array<String>) {
         LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
         // generateTopicMaskFile(SpaceType.GROUP)
-         System.err.println(randomSelectTopicIds(SpaceType.GROUP))
-//        SpaceType.values().forEach {
-//            genSpotCheckListFile(it)
-//        }
+//         System.err.println(randomSelectTopicIds(SpaceType.GROUP))
+        SpaceType.values().forEach {
+            genSpotCheckListFile(it)
+        }
     }
 
     fun genSpotCheckListFile(spaceType: SpaceType) {
@@ -143,6 +143,10 @@ object SpotChecker {
         }
         val hiddenTopicMaskFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
+        if (hiddenTopicMaskFile.exists()) {
+            val oldBs = getBitsetFromLongPlaintextFile(hiddenTopicMaskFile)
+            bs.or(oldBs)
+        }
         writeBitsetToFile(bs, hiddenTopicMaskFile)
     }
 
