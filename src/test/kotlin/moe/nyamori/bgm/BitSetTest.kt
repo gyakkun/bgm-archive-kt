@@ -163,7 +163,7 @@ object BitSetTest {
     }
 
     fun getMaxId(spaceType: SpaceType): Int {
-        val prevProcessed = GitHelper.getPrevProcessedCommitRef() // archive repo
+        val prevProcessed = GitHelper.getPrevProcessedArchiveCommitRef() // archive repo
         val topiclist = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
             prevProcessed,
             "${spaceType.name.lowercase()}/topiclist.txt"

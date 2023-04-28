@@ -140,7 +140,7 @@ class HttpServer {
 
             private fun getTopicList(spaceType: SpaceType): List<Int> {
                 val topicListFile: String = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
-                    GitHelper.getPrevProcessedCommitRef(),
+                    GitHelper.getPrevProcessedArchiveCommitRef(),
                     spaceType.name.lowercase() + "/topiclist.txt"
                 )
                 return topicListFile.lines().mapNotNull { it.toIntOrNull() }.sorted()

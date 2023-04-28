@@ -20,6 +20,8 @@ import kotlin.collections.ArrayList
 
 object CommitToJsonProcessor {
     private val log = LoggerFactory.getLogger(CommitToJsonProcessor.javaClass)
+    private const val NO_GOOD_FILE_NAME = "ng.txt"
+
 
     @JvmStatic
     fun main(arg: Array<String>) {
@@ -28,26 +30,26 @@ object CommitToJsonProcessor {
 
     fun job() {
         val walk =
-            GitHelper.getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder()
+            GitHelper.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder()
         val archiveRepo = GitHelper.archiveRepoSingleton
         val jsonRepo = GitHelper.jsonRepoSingleton
-        var prevCommit = walk.next()
-        val lastProcessedCommit = GitHelper.getPrevProcessedCommitRef()
+        var prev = walk.next() // used in the iteration (now = next() ... prev = now)
+        val prevProcessedArchiveCommitRef = GitHelper.getPrevProcessedArchiveCommitRef()
 
         // FIXME: Workaround the inclusive walk boundary
-        while (prevCommit != null) {
-            if (lastProcessedCommit == prevCommit) {
+        while (prev != null) {
+            if (prevProcessedArchiveCommitRef == prev) {
                 break
             }
-            prevCommit = walk.next()
+            prev = walk.next()
         }
 
-        log.info("The previously processed commit: $prevCommit")
+        log.info("The previously processed commit: $prev")
         run breakable@{
             walk.forEachIndexed { commitIdx, curCommit ->
                 try {
                     val noGoodIdTreeSet = TreeSet<Int>()
-                    if (curCommit == prevCommit) {
+                    if (curCommit == prev) {
                         log.error("The first commit being iterated twice!")
                         return@breakable
                     }
@@ -67,7 +69,7 @@ object CommitToJsonProcessor {
                         throw IllegalStateException("Not a group or subject topic!")
                     }
 
-                    val changedFilePathList = archiveRepo.findChangedFilePaths(prevCommit, curCommit)
+                    val changedFilePathList = archiveRepo.findChangedFilePaths(prev, curCommit)
 
                     for (pathIdx in changedFilePathList.indices) {
                         val path = changedFilePathList[pathIdx]
@@ -121,7 +123,7 @@ object CommitToJsonProcessor {
                     }
                     writeJsonRepoLastCommitId(curCommit, jsonRepo)
                     commitJsonRepo(jsonRepo, commitSpaceType, curCommit, changedFilePathList)
-                    prevCommit = curCommit
+                    prev = curCommit
                     writeNoGoodFile(noGoodIdTreeSet, commitSpaceType)
                     if (noGoodIdTreeSet.isNotEmpty()) {
                         log.error("NG LIST during $curCommit:\n $noGoodIdTreeSet")
@@ -149,7 +151,7 @@ object CommitToJsonProcessor {
     }
 
     private fun writeNoGoodFile(noGoodIdTreeSet: TreeSet<Int>, commitSpaceType: SpaceType) {
-        val noGoodFilePath = Config.BGM_ARCHIVE_GIT_REPO_DIR + "/" + commitSpaceType.name.lowercase() + "/ng.txt"
+        val noGoodFilePath = "${Config.BGM_ARCHIVE_GIT_REPO_DIR}/${commitSpaceType.name.lowercase()}/$NO_GOOD_FILE_NAME"
         val noGoodFile = File(noGoodFilePath)
         FileWriter(noGoodFile, true).use { fw ->
             BufferedWriter(fw).use { bfw ->
@@ -253,11 +255,11 @@ object CommitToJsonProcessor {
         }
     }
 
-    fun Process.blockAndPrintProcessResults():List<String> {
+    fun Process.blockAndPrintProcessResults(): List<String> {
         val result = ArrayList<String?>()
         // Here actually block the process
-        InputStreamReader(this.inputStream).use { isr->
-            BufferedReader(isr).use { reader->
+        InputStreamReader(this.inputStream).use { isr ->
+            BufferedReader(isr).use { reader ->
                 var line: String?
                 reader.readLine()
                 while (reader.readLine().also { line = it } != null) {

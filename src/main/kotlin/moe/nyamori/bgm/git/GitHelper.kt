@@ -55,22 +55,22 @@ object GitHelper {
     }
 
 
-    fun getWalkBetweenPrevProcessedCommitAndLatestCommitInReverseOrder(): RevWalk {
-        val prevProcessedCommit = getPrevProcessedCommitRef()
-        val latestCommit = getLatestArchiveRepoCommitRef()
-        getArchiveRepo().use { archiveRepo ->
+    fun getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(): RevWalk {
+        val prevProcessedArchiveCommit = getPrevProcessedArchiveCommitRef()
+        val latestArchiveCommit = getLatestArchiveCommitRef()
+        archiveRepoSingleton .use { archiveRepo ->
             val revWalk = RevWalk(archiveRepo)
-            revWalk.markStart(latestCommit)
-            revWalk.markUninteresting(prevProcessedCommit)
-            revWalk.sort(RevSort.REVERSE, true)
+            revWalk.markStart(latestArchiveCommit)
+            revWalk.markUninteresting(prevProcessedArchiveCommit)
+            revWalk.sort(RevSort.REVERSE, true) // from prevProcessed to latestArchiveCommit
             return revWalk
         }
     }
 
-    fun getPrevProcessedCommitRef(): RevCommit {
+    fun getPrevProcessedArchiveCommitRef(): RevCommit {
         archiveRepoSingleton.use { archiveRepo ->
             val revWalk = RevWalk(archiveRepo)
-            val prevProcessedCommitRevIdStr = getPrevProcessedCommitRevId()
+            val prevProcessedCommitRevIdStr = getPrevProcessedArchiveCommitRevId()
             val prevProcessedCommitRevId = if (prevProcessedCommitRevIdStr.isBlank()) {
                 val headObj = archiveRepo.resolve(HEAD)
                 val headCommit = archiveRepo.parseCommit(headObj)
@@ -85,7 +85,7 @@ object GitHelper {
         }
     }
 
-    fun getLatestArchiveRepoCommitRef(): RevCommit {
+    fun getLatestArchiveCommitRef(): RevCommit {
         return archiveRepoSingleton.getLatestCommitRef()
     }
 
@@ -98,7 +98,7 @@ object GitHelper {
         }
     }
 
-    fun getPrevProcessedCommitRevId(): String {
+    fun getPrevProcessedArchiveCommitRevId(): String {
         if (jsonRepoSingleton.isBare) {
             return jsonRepoSingleton.getFileContentAsStringInACommit(
                 jsonRepoSingleton.getLatestCommitRef(),
