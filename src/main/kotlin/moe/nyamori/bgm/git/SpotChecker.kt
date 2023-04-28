@@ -4,7 +4,6 @@ import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
@@ -41,6 +40,7 @@ object SpotChecker {
     }
 
     fun genSpotCheckListFile(spaceType: SpaceType) {
+        LOGGER.info("Generating spot check list file $SPOT_CHECK_BITSET_FILE_NAME for $spaceType.")
         val scList = randomSelectTopicIds(spaceType)
         val scFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_LIST_FILE_NAME")
@@ -64,20 +64,25 @@ object SpotChecker {
         spotCheckedBs.or(hiddenBs)
         val remainZeroCount = spotCheckedBs.size() - spotCheckedBs.cardinality()
         val fakeTotalCount = hiddenBs.size() - hiddenBs.cardinality()
+        LOGGER.info("Current approximate not spot-checked count: $spaceType - $remainZeroCount / $fakeTotalCount")
         // System.err.println(remainZeroCount)
         if (remainZeroCount <= Long.SIZE_BITS /*Bitset alloc unit*/) {
-            var tmpId: Int = 0
+            LOGGER.warn("$spaceType remain zero count less than bitset alloc unit 64. Wrap them all to sc.txt")
+            var tmpId = 0
             while (spotCheckedBs.nextClearBit(tmpId).also { tmpId = it } < fakeMaxId) {
                 spotCheckedBs.set(tmpId)
                 result.add(tmpId)
             }
+            LOGGER.info("The last batch to spot check for $spaceType: $result")
             // Reset the bitset file
+            LOGGER.info("Writing empty spot check bitset file for $spaceType.")
             writeBitsetToFile(
                 BitSet(),
                 File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
             )
             // Reset the mask file
-            generateTopicMaskFile(spaceType)
+            LOGGER.info("Going to re generate hidden topic mask file for $spaceType.")
+            genHiddenTopicMaskFile(spaceType)
             return result
         }
         val samplingSize = (fakeTotalCount / (30 * 24 * 4)).coerceAtLeast(MIN_SPOT_CHECK_SIZE)
@@ -99,20 +104,27 @@ object SpotChecker {
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
         )
 
+        LOGGER.info("Spot check id selected: $spaceType - $result")
         return result
     }
 
     private fun getSpotCheckedTopicMask(spaceType: SpaceType): BitSet {
         val maskFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
-        if (!maskFile.exists()) return BitSet()
+        if (!maskFile.exists()) {
+            LOGGER.warn("Spot checked mask bitset file not found for $spaceType. Creating one.")
+            return BitSet()
+        }
         return getBitsetFromLongPlaintextFile(maskFile)
     }
 
     private fun getHiddenTopicMask(spaceType: SpaceType): BitSet {
         val maskFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
-        if (!maskFile.exists()) generateTopicMaskFile(spaceType)
+        if (!maskFile.exists()) {
+            LOGGER.warn("Hidden topic mask file not found for $spaceType. Creating one.")
+            genHiddenTopicMaskFile(spaceType)
+        }
         assert(maskFile.exists())
         return getBitsetFromLongPlaintextFile(maskFile)
     }
@@ -125,7 +137,8 @@ object SpotChecker {
         return BitSet.valueOf(longArr)
     }
 
-    private fun generateTopicMaskFile(spaceType: SpaceType) {
+    private fun genHiddenTopicMaskFile(spaceType: SpaceType) {
+        LOGGER.info("Generating hidden topic mask file for $spaceType.")
         val maxId = getMaxId(spaceType)
         val bs = BitSet(maxId + 1)
         walkThroughJson { file ->
@@ -141,16 +154,21 @@ object SpotChecker {
             }
             return@walkThroughJson true
         }
+        LOGGER.info("New bitset size: ${bs.size()}. Cardinality: ${bs.cardinality()}. Zero count: ${bs.size() - bs.cardinality()}")
         val hiddenTopicMaskFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
         if (hiddenTopicMaskFile.exists()) {
+            LOGGER.warn("Old hidden topic mask file exists. Perform OR bitwise operation to gen a new one.")
             val oldBs = getBitsetFromLongPlaintextFile(hiddenTopicMaskFile)
+            LOGGER.info("Old bitset size: ${oldBs.size()}. Cardinality: ${oldBs.cardinality()}. Zero count: ${oldBs.size() - bs.cardinality()}")
             bs.or(oldBs)
+            LOGGER.info("After OR op, new bitset size: ${bs.size()}. Cardinality: ${bs.cardinality()}. Zero count: ${bs.size() - bs.cardinality()}")
         }
         writeBitsetToFile(bs, hiddenTopicMaskFile)
     }
 
     private fun writeBitsetToFile(bs: BitSet, file: File) {
+        LOGGER.info("Writing bitset to file: ${file.absolutePath}")
         val longs = bs.toLongArray()
         FileWriter(file).use { fw ->
             BufferedWriter(fw).use { bw ->
@@ -169,30 +187,33 @@ object SpotChecker {
             prevProcessed,
             "${spaceType.name.lowercase()}/topiclist.txt"
         )
-        return topiclist.lines().map { it.toIntOrNull() }.filterNotNull().max()
+        val result = topiclist.lines().mapNotNull { it.toIntOrNull() }.max()
+        LOGGER.info("Max id for $spaceType: $result")
+        return result
     }
 
 
     private fun walkThroughJson(parallel: Boolean = false, handler: (File) -> Boolean) {
+        LOGGER.info("Walking through json repo folders.")
         val jsonRepoFolders = ArrayList<String>()
         Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
             .map {
                 jsonRepoFolders.add(it.trim())
             }
         Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
-
+        LOGGER.info("Json repo folders: $jsonRepoFolders")
 
         jsonRepoFolders.forEach outer@{
             val folder = File(it)
-            val fileStream = folder.walkBottomUp().asStream().let {
-                if (parallel) it.parallel()
-                it
+            val fileStream = folder.walkBottomUp().asStream().let { stream ->
+                if (parallel) stream.parallel()
+                stream
             }
             fileStream.forEach inner@{ file ->
                 runCatching {
                     handler(file)
-                }.onFailure {
-                    LOGGER.error("Ex: ", it)
+                }.onFailure { th ->
+                    LOGGER.error("Ex: ", th)
                 }
             }
             LOGGER.info("Finished walking through json folders.")
