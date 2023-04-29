@@ -59,17 +59,24 @@ object SpotChecker {
         val result = mutableListOf<Int>()
         val spotCheckedBs = getSpotCheckedTopicMask(spaceType)
         val hiddenBs = getHiddenTopicMask(spaceType)
-        val fakeMaxId = hiddenBs.size() - 1
 
         spotCheckedBs.or(hiddenBs)
         val remainZeroCount = spotCheckedBs.size() - spotCheckedBs.cardinality()
         val fakeTotalCount = hiddenBs.size() - hiddenBs.cardinality()
-        LOGGER.info("Current approximate not spot-checked count: $spaceType - $remainZeroCount / $fakeTotalCount")
+        LOGGER.info(
+            "Current approximate not spot-checked count: $spaceType - $remainZeroCount / $fakeTotalCount ," +
+                    " spot-checked ratio: ${
+                        String.format(
+                            "%.2f",
+                            (fakeTotalCount - remainZeroCount).toDouble() / fakeTotalCount.toDouble() * 100.0
+                        )
+                    }%"
+        )
         // System.err.println(remainZeroCount)
         if (remainZeroCount <= Long.SIZE_BITS /*Bitset alloc unit*/) {
             LOGGER.warn("$spaceType remain zero count less than bitset alloc unit 64. Wrap them all to sc.txt")
             var tmpId = 0
-            while (spotCheckedBs.nextClearBit(tmpId).also { tmpId = it } < fakeMaxId) {
+            while (spotCheckedBs.nextClearBit(tmpId).also { tmpId = it } < spotCheckedBs.size()) {
                 spotCheckedBs.set(tmpId)
                 result.add(tmpId)
             }
@@ -89,13 +96,11 @@ object SpotChecker {
         val r = Random()
 
         repeat(samplingSize) {
-            var victim: Int? = null
-            while (victim == null) {
-                val seed = (r.nextDouble() * spotCheckedBs.size()).toInt()
-                if (seed >= fakeMaxId) continue
-                victim = spotCheckedBs.nextClearBit(seed)
-                spotCheckedBs.set(victim)
-            }
+            var victim: Int
+            do {
+                victim = spotCheckedBs.nextClearBit(r.nextInt(0, spotCheckedBs.size()))
+            } while (victim >= spotCheckedBs.size())
+            spotCheckedBs.set(victim)
             result.add(victim)
         }
 
@@ -105,7 +110,7 @@ object SpotChecker {
         )
 
         LOGGER.info("Spot check id selected: $spaceType - $result")
-        return result
+        return result.sorted()
     }
 
     private fun getSpotCheckedTopicMask(spaceType: SpaceType): BitSet {
