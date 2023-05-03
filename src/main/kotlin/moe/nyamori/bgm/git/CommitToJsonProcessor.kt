@@ -96,6 +96,7 @@ object CommitToJsonProcessor {
                             val topicId = path.split("/").last().replace(".html", "").toInt()
 
                             var timing = System.currentTimeMillis()
+                            noGoodIdTreeSet.add(topicId) // Proactively add id to ng list, otherwise ex throws and id not being added
                             val (resultTopicEntity, isSuccess) = TopicParserEntrance.parseTopic(
                                 fileContentInStr,
                                 topicId,
@@ -107,6 +108,7 @@ object CommitToJsonProcessor {
                             }
 
                             if (isSuccess) {
+                                noGoodIdTreeSet.remove(topicId)
                                 log.info("Parsing $htmlSpaceType-$topicId succeeded")
                                 if (resultTopicEntity?.display == true) {
                                     log.info("topic id $htmlSpaceType-$topicId, title: ${resultTopicEntity.title}")
@@ -115,7 +117,7 @@ object CommitToJsonProcessor {
                                 writeJsonFile(path, json)
                             } else {
                                 log.error("Parsing $htmlSpaceType-$topicId failed")
-                                noGoodIdTreeSet.add(topicId)
+                                // noGoodIdTreeSet.add(topicId)
                             }
                         } catch (ex: Exception) {
                             log.error("Exception occurs when handling $path", ex)
