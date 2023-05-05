@@ -48,3 +48,9 @@ fun Topic.getAllPosts(): List<Post> {
     }
     return result
 }
+
+fun Topic.getLastPostPid(): Int {
+    val allPosts = getAllPosts()
+    if(allPosts.isEmpty()) return -1
+    return allPosts.maxBy { it.id }.id
+}
