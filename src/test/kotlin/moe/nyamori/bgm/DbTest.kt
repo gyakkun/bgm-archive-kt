@@ -140,7 +140,7 @@ class DbTest {
                 }
             }
         }
-        Dao.bgmDao().updatePrevProcessedCommitId(GitHelper.getPrevProcessedCommitRevId())
+        Dao.bgmDao().updatePrevProcessedCommitId(GitHelper.getPrevProcessedArchiveCommitRevId())
         endAll = true
     }
 
