@@ -1,5 +1,6 @@
 package moe.nyamori.bgm.util
 
+import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Reserved
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
@@ -63,7 +64,7 @@ object ParserHelper {
         if (bodyNode.selOne(XPathHelper.XP_404_MSG) != null) {
             return Pair(
                 Topic(
-                    id = topicId, space = Reserved(type = spaceType), display = false
+                    id = topicId, space = Reserved(type = spaceType), display = false, state = Post.STATE_DELETED
                 ), true
             )
         }
@@ -72,16 +73,17 @@ object ParserHelper {
             LOGGER.info("Redirect post $spaceType-$topicId")
             return Pair(
                 Topic(
-                    id = topicId, space = Reserved(type = spaceType), display = false
+                    id = topicId, space = Reserved(type = spaceType), display = false, state = Post.STATE_BLOG_REDIRECT
                 ), true
             )
         }
 
         if (bodyNode.selOne("/div[@id=\"wrapperClub\"]/div[contains(@class,\"clubMain\")]") != null
         ) {
+            LOGGER.info("Club blog post $spaceType-$topicId")
             return Pair(
                 Topic(
-                    id = topicId, space = Reserved(type = spaceType), display = false
+                    id = topicId, space = Reserved(type = spaceType), display = false, state = Post.STATE_BLOG_CLUB
                 ), true
             )
         }

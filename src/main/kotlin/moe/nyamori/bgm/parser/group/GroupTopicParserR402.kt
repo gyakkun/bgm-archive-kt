@@ -2,6 +2,7 @@ package moe.nyamori.bgm.parser.group
 
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.model.Post.Companion.STATE_CLOSED
+import moe.nyamori.bgm.model.Post.Companion.STATE_DELETED
 import moe.nyamori.bgm.model.Post.Companion.STATE_NORMAL
 import moe.nyamori.bgm.model.Post.Companion.STATE_REOPEN
 import moe.nyamori.bgm.model.Post.Companion.STATE_SILENT
@@ -71,7 +72,7 @@ object GroupTopicParserR402 : Parser {
             if (bodyNode.selOne(XP_404_MSG) != null) {
                 return Pair(
                     Topic(
-                        id = topicId, space = Reserved(type = spaceType), display = false
+                        id = topicId, space = Reserved(type = spaceType), display = false, state = STATE_DELETED
                     ), true
                 )
             }

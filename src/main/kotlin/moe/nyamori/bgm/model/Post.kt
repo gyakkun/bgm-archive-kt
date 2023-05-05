@@ -25,5 +25,7 @@ data class Post(
         const val STATE_SILENT: Long = 1 shl 2
         const val STATE_REOPEN: Long = 1 shl 3
         const val STATE_ADMIN_DELETED: Long = 1 shl 4
+        const val STATE_BLOG_REDIRECT: Long = 1 shl 5
+        const val STATE_BLOG_CLUB: Long = 1 shl 6
     }
 }

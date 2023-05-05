@@ -69,7 +69,7 @@ object SubjectTopicParserR398 : Parser {
             if (bodyNode.selOne(XP_404_MSG) != null) {
                 return Pair(
                     Topic(
-                        id = topicId, space = Reserved(type = spaceType), display = false
+                        id = topicId, space = Reserved(type = spaceType), display = false, state = Post.STATE_DELETED
                     ), true
                 )
             }
