@@ -10,8 +10,8 @@ data class Topic(
     var dateline: Long? = null,
     var display: Boolean = false,
     var topPostPid: Int? = null,
-    var postList: List<Post>? = null,
-    var state: Long = Post.STATE_NORMAL
+    var state: Long = Post.STATE_NORMAL,
+    var postList: List<Post>? = null
 ) {
     fun getSid(): Int {
         if (this.space == null) {

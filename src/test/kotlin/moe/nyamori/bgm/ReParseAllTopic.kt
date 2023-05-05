@@ -46,6 +46,9 @@ object ReParseAllTopic {
                 runCatching {
                     if (file.isDirectory) return@inner
                     if (file.extension != "html") return@inner
+                    if (file.absolutePath.hashCode() and 511 == 511) {
+                        LOGGER.info("Processing ${file.absolutePath}")
+                    }
                     val spaceType = file.absolutePath.let { filepath ->
                         if (filepath.contains("group")) SpaceType.GROUP
                         else if (filepath.contains("subject")) SpaceType.SUBJECT
