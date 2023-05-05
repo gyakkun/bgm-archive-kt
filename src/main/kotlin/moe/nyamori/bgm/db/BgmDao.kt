@@ -60,7 +60,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun batchUpsertUser(@BindBean userList: List<User>): IntArray
+    fun batchUpsertUser(@BindBean userList: Iterable<User>): IntArray
 
     @SqlBatch(
         """
@@ -75,7 +75,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun batchUpsertTopic(@Bind("typeId") typeId: Int, @BindBean("t") topicList: List<Topic>): IntArray
+    fun batchUpsertTopic(@Bind("typeId") typeId: Int, @BindBean("t") topicList: Iterable<Topic>): IntArray
 
     @SqlBatch(
         """
@@ -89,7 +89,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun batchUpsertPost(@Bind("typeId") typeId: Int, @BindBean("p") topicList: List<Post>): IntArray
+    fun batchUpsertPost(@Bind("typeId") typeId: Int, @BindBean("p") topicList: Iterable<Post>): IntArray
 
     @SqlBatch(
         """
@@ -103,7 +103,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun batchUpsertLikes(@BindBean likeList: List<Like>): IntArray
+    fun batchUpsertLikes(@BindBean likeList: Iterable<Like>): IntArray
 
 
     @SqlQuery(
@@ -117,7 +117,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @RegisterKotlinMapper(User::class)
-    fun getNegativeUidUsers(): List<User>
+    fun getNegativeUidUsers(): Iterable<User>
 
     @SqlBatch(
         """
@@ -127,7 +127,7 @@ interface BgmDao : Transactional<BgmDao> {
           uid = :p.second -- negative
     """
     )
-    fun updateNegativeUidInTopic(@BindBean("p") userList: List<Pair<Int, Int>>): IntArray
+    fun updateNegativeUidInTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
 
     @SqlBatch(
@@ -138,7 +138,7 @@ interface BgmDao : Transactional<BgmDao> {
           uid = :p.second -- negative
     """
     )
-    fun updateNegativeUidInPost(@BindBean("p") userList: List<Pair<Int, Int>>): IntArray
+    fun updateNegativeUidInPost(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
     @SqlBatch(
         """
@@ -149,14 +149,14 @@ interface BgmDao : Transactional<BgmDao> {
           and type = 100 -- \$\{SpaceType.BLOG.id}
     """
     )
-    fun updateNegativeSidInBlogTopic(@BindBean("p") userList: List<Pair<Int, Int>>): IntArray
+    fun updateNegativeSidInBlogTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
     @SqlBatch(
         """
             DELETE FROM ba_user WHERE id = :p.second;
         """
     )
-    fun removeNegativeUidUser(@BindBean("p") userList: List<Pair<Int, Int>>)
+    fun removeNegativeUidUser(@BindBean("p") userList: Iterable<Pair<Int, Int>>)
 
     @Transaction
     fun handleNegativeUid() {
@@ -199,5 +199,27 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun upsertSidAlias(@BindBean("t") sidAliasMappingList: Iterable<SpaceNameMappingData>):IntArray
+    fun upsertSidAlias(@BindBean("t") sidAliasMappingList: Iterable<SpaceNameMappingData>): IntArray
+
+    @SqlBatch(
+        """
+            insert into ba_blog_subject_id_mapping (blog_topic_id, subject_id) values (
+            :t.first,
+            :t.second
+        ) on conflict(blog_topic_id, subject_id) do nothing
+        """
+    )
+    @Transaction
+    fun upsertBlogSubjectIdMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, Int>>)
+
+    @SqlBatch(
+        """
+            insert into ba_blog_tag_mapping (blog_topic_id, tag) values (
+            :t.first,
+            :t.second
+        ) on conflict(blog_topic_id, tag) do nothing
+        """
+    )
+    @Transaction
+    fun upsertBlogTagMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, String>>)
 }

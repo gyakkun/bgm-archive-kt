@@ -78,3 +78,26 @@ create table if not exists ba_space_naming_mapping -- Should be for group/subjec
 
 create index if not exists ba_space_naming_mapping_type_name_index
     on ba_space_naming_mapping (type, name);
+
+CREATE TABLE ba_blog_subject_id_mapping -- Should be for blog only
+(
+    blog_topic_id integer,
+    subject_id    integer,
+    constraint ba_blog_subject_id_mapping_pk
+        primary key (blog_topic_id, subject_id)
+);
+
+CREATE INDEX ba_blog_subject_id_mapping_subject_id_index
+    on ba_blog_subject_id_mapping (subject_id);
+
+create table ba_blog_tag_mapping
+(
+    blog_topic_id integer,
+    tag           integer,
+    constraint ba_blog_tag_mapping_pk
+        primary key (blog_topic_id, tag)
+);
+
+create index ba_blog_tag_mapping_tag_index
+    on ba_blog_tag_mapping (tag);
+

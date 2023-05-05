@@ -33,7 +33,7 @@ class DbTest {
         fun main(args: Array<String>) {
             Dao.bgmDao().healthCheck()
             val dbTest = DbTest()
-            // dbTest.readJsonAndUpsert()
+            dbTest.readJsonAndUpsert()
 
 //            LOGGER.info("neg user {}", Dao.bgmDao().getNegativeUidUsers())
 //            LOGGER.info("prev commit id {}", Dao.bgmDao().getPrevProcessedCommitId())
@@ -49,6 +49,7 @@ class DbTest {
     lateinit var userQueue: BlockingQueue<User>
     val QUEUE_LEN = 1000
     val BATCH_THRESHOLD = 200
+    val TITLE_MAX_LENGTH = 100
 
     @Volatile
     var endAll = false
@@ -123,16 +124,18 @@ class DbTest {
                     var topic = GSON.fromJson(fileStr, Topic::class.java)
                     if (!isValidTopic(topic)) return@inner
                     topic = preProcessTopic(topic)
-                    val likeList = getLikeListFromTopic(topic!!)
+                    val likeList = getLikeListFromTopic(topic)
                     val postList = topic.getAllPosts().map { processPostWithEmptyUid(it) }
-                    val userList = postList.map { it.user }.filterNotNull().distinct()
+                    val userList = postList.mapNotNull { it.user }.distinct()
 
                     Dao.bgmDao().batchUpsertUser(userList)
-                    // if (topic.space!!.type == SpaceType.BLOG) return@inner
                     Dao.bgmDao().batchUpsertLikes(likeList)
                     Dao.bgmDao().batchUpsertPost(topic.space!!.type.id, postList)
                     Dao.bgmDao().batchUpsertTopic(topic.space!!.type.id, listOf(topic))
 
+                    if (topic.space!! is Blog) {
+                        handleBlogTagAndRelatedSubject(topic)
+                    }
                 }.onFailure { ex ->
                     LOGGER.error("Ex when handling $file: ", ex)
                 }
@@ -140,6 +143,18 @@ class DbTest {
         }
         Dao.bgmDao().updatePrevProcessedCommitId(GitHelper.getPrevProcessedArchiveCommitRevId())
         endAll = true
+    }
+
+    private fun handleBlogTagAndRelatedSubject(topic: Topic) {
+        val blogSpace = topic.space!! as Blog
+        val relatedSubjectIds = blogSpace.relatedSubjectIds
+        val tags = blogSpace.tags
+        if (!relatedSubjectIds.isNullOrEmpty()) {
+            Dao.bgmDao().upsertBlogSubjectIdMapping(relatedSubjectIds.map { Pair(topic.id, it) })
+        }
+        if (!tags.isNullOrEmpty()) {
+            Dao.bgmDao().upsertBlogTagMapping(tags.map { Pair(topic.id, it) })
+        }
     }
 
     @Test
@@ -198,7 +213,9 @@ class DbTest {
 
 
     private fun preProcessTopic(topic: Topic): Topic {
-        if (topic.uid != null) return topic
+        if (topic.uid != null) {
+            return topic.copy(title = topic.title?.substring(0, topic.title!!.length.coerceAtMost(TITLE_MAX_LENGTH)))
+        }
         val topPostPid = topic.topPostPid
         val topPost = topic.getAllPosts().first { it.id == topPostPid }
         var topPostUser = topPost.user
@@ -209,7 +226,10 @@ class DbTest {
                 topPostUser = topPostUser.let { it.copy(id = stringHash(it.username)) }
             }
         }
-        return topic.copy(uid = topPostUser.id)
+        return topic.copy(
+            uid = topPostUser.id,
+            title = topic.title?.substring(0, topic.title!!.length.coerceAtMost(TITLE_MAX_LENGTH))
+        )
     }
 
     private fun processPostWithEmptyUid(post: Post): Post {
