@@ -14,7 +14,7 @@ data class Post(
     var contentHtml: String? = null,
     @Nullable
     var contentBbcode: String? = null,
-    var state: Long,
+    var state: Long = STATE_NORMAL,
     var dateline: Long,
     var subFloorList: List<Post>? = null
 ) {

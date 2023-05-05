@@ -11,7 +11,7 @@ data class Topic(
     var display: Boolean = false,
     var topPostPid: Int? = null,
     var postList: List<Post>? = null,
-    var state: Long = 0
+    var state: Long = Post.STATE_NORMAL
 ) {
     fun getSid(): Int {
         if (this.space == null) {

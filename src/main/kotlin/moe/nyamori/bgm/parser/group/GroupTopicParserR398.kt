@@ -9,6 +9,7 @@ import moe.nyamori.bgm.parser.Parser
 import moe.nyamori.bgm.util.ParserHelper.getUidFromBgStyle
 import moe.nyamori.bgm.util.ParserHelper.getUserSign
 import moe.nyamori.bgm.util.ParserHelper.guessUidFromUsername
+import moe.nyamori.bgm.util.PostToStateHelper
 import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_CLOSED_SPAN
 import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_DISABLED_FLOOR_DATE_SPAN
 import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_DISABLED_FLOOR_AUTHOR_ANCHOR
@@ -220,8 +221,15 @@ object GroupTopicParserR398 : Parser {
                     related = null,
                     contentHtml = floorContentHtml,
                     contentBbcode = null,
-                    // state = if (isSilent) STATE_SILENT else if (isClosed) STATE_CLOSED else STATE_NORMAL,
-                    state = if (isSilent) STATE_SILENT else if (isClosed) STATE_CLOSED else if (isReopen) STATE_REOPEN else STATE_NORMAL,
+                    state = if (isSilent) {
+                        STATE_SILENT
+                    } else if (isClosed) {
+                        STATE_CLOSED
+                    } else if (isReopen) {
+                        STATE_REOPEN
+                    } else {
+                        PostToStateHelper.fromPostHtmlToState(floorContentHtml)
+                    },
                     dateline = floorDate,
                     user = User(
                         id = floorUserUid,
@@ -286,6 +294,13 @@ object GroupTopicParserR398 : Parser {
                 postList.add(thisFloor)
             }
             thisTopic.postList = postList
+            thisTopic.state = thisTopic.getAllPosts().map { it.state }.distinct().let {
+                var res = STATE_NORMAL
+                if (it.contains(STATE_SILENT)) res = res or STATE_SILENT
+                if (it.contains(STATE_CLOSED)) res = res or STATE_CLOSED
+                if (it.contains(STATE_REOPEN)) res = res or STATE_REOPEN
+                res
+            }
             return Pair(thisTopic, true)
         } catch (ex: Exception) {
             LOGGER.error("Ex: ", ex)
