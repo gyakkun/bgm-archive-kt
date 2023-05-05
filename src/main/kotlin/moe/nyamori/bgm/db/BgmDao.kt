@@ -64,14 +64,20 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlBatch(
         """
-        insert into ba_topic (type, id,uid,sid, title,dateline) values (
+        insert into ba_topic (type, id,uid,sid, dateline, state, last_post_pid, title) values (
             :typeId,
             :t.id,
             :t.uid,
             :t.sid,
-            :t.title,
-            :t.dateline
-        ) on conflict(type,id,uid) do update set title = :t.title, sid = :t.sid, dateline = :t.dateline
+            :t.dateline,
+            :t.state,
+            :t.lastPostPid,
+            :t.title
+        ) on conflict(type,id,uid) do update set
+            sid = :t.sid,
+            state = :t.state,
+            last_post_pid = :t.lastPostPid,
+            title = :t.title
     """
     )
     @Transaction
@@ -79,13 +85,14 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlBatch(
         """
-        insert into ba_post (type, id, mid, uid,dateline) values (
+        insert into ba_post (type, id, mid, uid,dateline,state) values (
             :typeId,
             :p.id,
             :p.mid,
             :p.user.id,
-            :p.dateline
-        ) on conflict(type,id,mid,uid) do nothing
+            :p.dateline,
+            :p.state
+        ) on conflict(type,id,mid,uid) do update set state = :p.state
     """
     )
     @Transaction

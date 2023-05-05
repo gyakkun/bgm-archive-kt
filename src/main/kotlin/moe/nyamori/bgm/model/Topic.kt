@@ -35,22 +35,24 @@ data class Topic(
             }
         }
     }
-}
 
-fun Topic.getAllPosts(): List<Post> {
-    if (this.postList == null) return emptyList()
-    val result = ArrayList<Post>()
-    this.postList!!.forEach {
-        result.add(it)
-        if (it.subFloorList != null) {
-            result.addAll(it.subFloorList!!)
+    fun getAllPosts(): List<Post> {
+        if (this.postList == null) return emptyList()
+        val result = ArrayList<Post>()
+        this.postList!!.forEach {
+            result.add(it)
+            if (it.subFloorList != null) {
+                result.addAll(it.subFloorList!!)
+            }
         }
+        return result
     }
-    return result
+
+    fun getLastPostPid(): Int {
+        val allPosts = getAllPosts()
+        if (allPosts.isEmpty()) return -1
+        return allPosts.maxBy { it.id }.id
+    }
+
 }
 
-fun Topic.getLastPostPid(): Int {
-    val allPosts = getAllPosts()
-    if(allPosts.isEmpty()) return -1
-    return allPosts.maxBy { it.id }.id
-}
