@@ -10,26 +10,27 @@ data class Topic(
     var dateline: Long? = null,
     var display: Boolean = false,
     var topPostPid: Int? = null,
-    var postList: List<Post>? = null
+    var postList: List<Post>? = null,
+    var state: Long = 0
 ) {
     fun getSid(): Int {
-        if(this.space==null) {
+        if (this.space == null) {
             throw IllegalStateException("Not able to get sid for null space!")
         }
-        return when(space!!){
+        return when (space!!) {
             is Subject -> {
                 StringHashingHelper.stringHash((space!! as Subject).name!!)
             }
 
-            is Group ->{
+            is Group -> {
                 StringHashingHelper.stringHash((space!! as Group).name!!)
             }
 
-            is Blog ->{
+            is Blog -> {
                 uid!!
             }
 
-            is Reserved ->{
+            is Reserved -> {
                 throw IllegalStateException("Not able to get sid for reserved space!")
             }
         }
