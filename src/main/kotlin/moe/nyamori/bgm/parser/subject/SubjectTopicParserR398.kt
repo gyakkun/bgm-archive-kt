@@ -175,7 +175,7 @@ object SubjectTopicParserR398 : Parser {
                 val floorDateStr: String
                 val floorDate: Long
 
-                if (isSpecialBadge) {
+                if (isTopicDisabled) {
                     thisTopic.display = false
                     val dateSpan = floor.selOne(XP_TOPIC_DISABLED_FLOOR_DATE_SPAN)
                     floorNum = postList.size + 1
