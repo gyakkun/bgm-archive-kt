@@ -1,14 +1,13 @@
 package moe.nyamori.bgm
 
 import com.google.gson.*
-import com.google.gson.reflect.TypeToken
-import com.google.gson.stream.JsonReader
-import com.google.gson.stream.JsonWriter
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
+import moe.nyamori.bgm.db.SpaceNameMappingData
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper.stringHash
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
@@ -16,9 +15,8 @@ import java.io.File
 import java.io.IOException
 import java.util.*
 import java.util.concurrent.BlockingQueue
-import java.util.concurrent.LinkedBlockingQueue
-import kotlin.concurrent.thread
-import kotlin.reflect.KClass
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentMap
 import kotlin.streams.asStream
 
 class DbTest {
@@ -152,7 +150,7 @@ class DbTest {
                 jsonRepoFolders.add(it.trim())
             }
         Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
-        val sidAliasMappingSet = HashSet<Triple<Int, Int, String>>()
+        val sidNameMappingSet = ConcurrentHashMap.newKeySet<SpaceNameMappingData>()
 
         jsonRepoFolders.forEach outer@{
             val folder = File(it)
@@ -160,27 +158,44 @@ class DbTest {
             fileStream.forEach inner@{ file ->
                 runCatching {
                     if (file.isDirectory) return@inner
-                    if (!file.absolutePath.contains("group")) return@inner
+                    if (!file.absolutePath.contains("group") && !file.absolutePath.contains("subject")) return@inner
                     if (!file.extension.equals("json", ignoreCase = true)) return@inner
                     if (file.nameWithoutExtension.hashCode() and 127 == 127) LOGGER.info("$file is processing")
                     val fileStr = FileUtil.getFileContent(file)!!
-                    var topic = GSON.fromJson(fileStr, Topic::class.java)
+                    val topic = GSON.fromJson(fileStr, Topic::class.java)
                     if (!isValidTopic(topic)) return@inner
 
-                    if (topic.space!!.type != SpaceType.GROUP) return@inner
-                    val gs = (topic.space!! as Group)
-                    sidAliasMappingSet.add(
-                        Triple(
-                            SpaceType.GROUP.id,
-                            stringHash(gs.name!!),
-                            gs.name!!
+                    if (topic.space!!.type != SpaceType.GROUP && topic.space!!.type != SpaceType.SUBJECT) return@inner
+                    if (topic.space!! is Group) {
+                        val groupSpace = (topic.space!! as Group)
+                        sidNameMappingSet.add(
+                            SpaceNameMappingData(
+                                SpaceType.GROUP.id,
+                                stringHash(groupSpace.name!!),
+                                groupSpace.name!!,
+                                groupSpace.displayName!!
+                            )
                         )
-                    )
+                    }
+                    if (topic.space!! is Subject) {
+                        val subjectSpace = (topic.space!! as Subject)
+                        sidNameMappingSet.add(
+                            SpaceNameMappingData(
+                                SpaceType.SUBJECT.id,
+                                stringHash(subjectSpace.name!!),
+                                subjectSpace.name!!,
+                                subjectSpace.displayName!!
+                            )
+                        )
+                    }
+                }.onFailure {
+                    LOGGER.error("Ex when updating alias for file ${file.absolutePath}", it)
                 }
             }
         }
-        Dao.bgmDao().upsertSidAlias(sidAliasMappingSet.toList())
+        Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
     }
+
 
     private fun preProcessTopic(topic: Topic): Topic {
         if (topic.uid != null) return topic
@@ -249,172 +264,5 @@ class DbTest {
             }
         }.flatten().toList()
 
-    }
-
-    private fun initQueue() {
-        topicQueue = LinkedBlockingQueue(QUEUE_LEN)
-        postQueue = LinkedBlockingQueue(QUEUE_LEN)
-        likeQueue = LinkedBlockingQueue(QUEUE_LEN)
-        userQueue = LinkedBlockingQueue(QUEUE_LEN)
-        thread(name = "topicThread") {
-            var batchList = ArrayList<Topic>()
-            var tmp: Topic
-            while (!endAll) {
-                if (topicQueue.isEmpty()) {
-                    Thread.sleep(500)
-                    continue
-                }
-                tmp = topicQueue.take()
-                batchList.add(tmp)
-                if (batchList.size >= BATCH_THRESHOLD) {
-                    batchList
-                        .filter { it.space != null }
-                        .filter { it.space!!.type != null }
-                        .groupBy { it.space!!.type }
-                        .forEach { type, list ->
-                            Dao.bgmDao().batchUpsertTopic(type.id, list)
-                        }
-                    batchList.clear()
-                }
-            }
-            batchList.addAll(topicQueue)
-            batchList
-                .filter { it.space != null }
-                .filter { it.space!!.type != null }
-                .groupBy { it.space!!.type }
-                .forEach { type, list ->
-                    Dao.bgmDao().batchUpsertTopic(type.id, list)
-                }
-        }
-
-        thread(name = "postThread") {
-            var batchList = ArrayList<Pair<SpaceType, Post>>()
-            var tmp: Pair<SpaceType, Post>
-            while (!endAll) {
-                if (postQueue.isEmpty()) {
-                    Thread.sleep(500)
-                    continue
-                }
-                tmp = postQueue.take()
-                batchList.add(tmp)
-                if (batchList.size >= BATCH_THRESHOLD) {
-                    batchList
-                        .groupBy { it.first }
-                        .forEach { type, list ->
-                            Dao.bgmDao().batchUpsertPost(type.id, list.map { it.second })
-                        }
-                    batchList.clear()
-                }
-            }
-            batchList.addAll(postQueue)
-            batchList
-                .groupBy { it.first }
-                .forEach { type, list ->
-                    Dao.bgmDao().batchUpsertPost(type.id, list.map { it.second })
-                }
-        }
-
-
-        thread(name = "userThread") {
-            var batchList = ArrayList<User>()
-            var tmp: User
-            while (!endAll) {
-                if (userQueue.isEmpty()) {
-                    Thread.sleep(500)
-                    continue
-                }
-                tmp = userQueue.take()
-                batchList.add(tmp)
-                if (batchList.size >= BATCH_THRESHOLD) {
-                    batchList.stream().peek {
-                        if (it.id == null) {
-                            it.id = stringHash(it.username)
-                        }
-                    }
-                    Dao.bgmDao().batchUpsertUser(batchList)
-                    batchList.clear()
-                }
-            }
-            batchList.addAll(userQueue)
-            Dao.bgmDao().batchUpsertUser(batchList)
-        }
-
-
-        thread(name = "likeThread") {
-            var batchList = ArrayList<Like>()
-            var tmp: Like
-            while (!endAll) {
-                if (likeQueue.isEmpty()) {
-                    Thread.sleep(500)
-                }
-                tmp = likeQueue.take()
-                batchList.add(tmp)
-                if (batchList.size >= BATCH_THRESHOLD) {
-                    Dao.bgmDao().batchUpsertLikes(batchList)
-                    batchList.clear()
-                }
-            }
-            batchList.addAll(likeQueue)
-            Dao.bgmDao().batchUpsertLikes(batchList)
-        }
-
-    }
-
-
-}
-
-private class SealedTypeAdapterFactory<T : Any> private constructor(
-    private val baseType: KClass<T>,
-    private val typeFieldName: String
-) : TypeAdapterFactory {
-
-    private val subclasses = baseType.sealedSubclasses
-    private val nameToSubclass = subclasses.associateBy { it.simpleName!!.lowercase() }
-
-    init {
-        if (!baseType.isSealed) throw IllegalArgumentException("$baseType is not a sealed class")
-    }
-
-    override fun <R : Any> create(gson: Gson, type: TypeToken<R>?): TypeAdapter<R>? {
-        if (type == null || subclasses.isEmpty() || subclasses.none { type.rawType.isAssignableFrom(it.java) }) return null
-
-        val elementTypeAdapter = gson.getAdapter(JsonElement::class.java)
-        val subclassToDelegate: Map<KClass<*>, TypeAdapter<*>> = subclasses.associateWith {
-            gson.getDelegateAdapter(this, TypeToken.get(it.java))
-        }
-        return object : TypeAdapter<R>() {
-            override fun write(writer: JsonWriter, value: R) {
-                val srcType = value::class
-                val label = srcType.simpleName!!
-                @Suppress("UNCHECKED_CAST") val delegate = subclassToDelegate[srcType] as TypeAdapter<R>
-                val jsonObject = delegate.toJsonTree(value).asJsonObject
-
-                if (jsonObject.has(typeFieldName)) {
-                    throw JsonParseException("cannot serialize $label because it already defines a field named $typeFieldName")
-                }
-                val clone = JsonObject()
-                clone.add(typeFieldName, JsonPrimitive(label))
-                jsonObject.entrySet().forEach {
-                    clone.add(it.key, it.value)
-                }
-                elementTypeAdapter.write(writer, clone)
-            }
-
-            override fun read(reader: JsonReader): R {
-                val element = elementTypeAdapter.read(reader)
-                val labelElement = element.asJsonObject.remove(typeFieldName) ?: throw JsonParseException(
-                    "cannot deserialize $baseType because it does not define a field named $typeFieldName"
-                )
-                val name = labelElement.asString.lowercase()
-                val subclass =
-                    nameToSubclass[name] ?: throw JsonParseException("cannot find $name subclass of $baseType")
-                @Suppress("UNCHECKED_CAST")
-                return (subclass.objectInstance as? R) ?: (subclassToDelegate[subclass]!!.fromJsonTree(element) as R)
-            }
-        }
-    }
-
-    companion object {
-        fun <T : Any> of(clz: KClass<T>) = SealedTypeAdapterFactory(clz, "type")
     }
 }

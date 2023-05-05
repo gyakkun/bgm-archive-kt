@@ -66,14 +66,15 @@ create index if not exists ba_likes_pid_index
 create index if not exists ba_likes_type_mid_index
     on ba_likes (type, mid);
 
-create table if not exists ba_space_alias
+create table if not exists ba_space_naming_mapping -- Should be for group/subject only
 (
     type  integer,
     sid   integer,
-    alias TEXT,
-    constraint ba_space_alias_pk
+    name TEXT,
+    display_name TEXT,
+    constraint ba_space_naming_mapping_pk
         primary key (type, sid)
 );
 
-create index if not exists ba_space_alias_type_alias_index
-    on ba_space_alias (type, alias);
+create index if not exists ba_space_naming_mapping_type_name_index
+    on ba_space_naming_mapping (type, name);

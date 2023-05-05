@@ -190,13 +190,14 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlBatch(
         """
-        insert into ba_space_alias (type,sid,alias) values (
-            :t.first,
-            :t.second,
-            :t.third
+        insert into ba_space_naming_mapping (type,sid,name,display_name) values (
+            :t.type,
+            :t.sid,
+            :t.name,
+            :t.displayName
         ) on conflict(type,sid) do nothing
     """
     )
     @Transaction
-    fun upsertSidAlias(@BindBean("t") sidAliasMappingList: List<Triple<Int, Int, String>>):IntArray
+    fun upsertSidAlias(@BindBean("t") sidAliasMappingList: Iterable<SpaceNameMappingData>):IntArray
 }
