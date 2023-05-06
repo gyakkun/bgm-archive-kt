@@ -154,7 +154,7 @@ object SpotChecker {
             if (file.nameWithoutExtension.hashCode() and 127 == 127) LOGGER.info("$file is processing")
             val fileStr = FileUtil.getFileContent(file)!!
             val topic = GSON.fromJson(fileStr, Topic::class.java)
-            if (!topic.display) {
+            if (topic.isEmptyTopic()) {
                 bs.set(topic.id)
             }
             return@walkThroughJson true

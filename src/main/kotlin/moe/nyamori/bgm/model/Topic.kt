@@ -17,6 +17,7 @@ data class Topic(
         if (this.space == null) {
             throw IllegalStateException("Not able to get sid for null space!")
         }
+        if (this.isEmptyTopic()) return 0
         return when (space!!) {
             is Subject -> {
                 StringHashingHelper.stringHash((space!! as Subject).name!!)
@@ -54,5 +55,40 @@ data class Topic(
         return allPosts.maxBy { it.id }.id
     }
 
+    fun isNormal(): Boolean {
+        return state and 1L == Post.STATE_NORMAL
+    }
+
+    fun isDeleted(): Boolean {
+        return state and Post.STATE_DELETED == Post.STATE_DELETED
+    }
+
+    fun isClosed(): Boolean {
+        return state and Post.STATE_CLOSED == Post.STATE_CLOSED
+    }
+
+    fun isReopen(): Boolean {
+        return state and Post.STATE_REOPEN == Post.STATE_REOPEN
+    }
+
+    fun isSilent(): Boolean {
+        return state and Post.STATE_SILENT == Post.STATE_SILENT
+    }
+
+    fun isAdminDeleted(): Boolean {
+        return state and Post.STATE_ADMIN_DELETED == Post.STATE_ADMIN_DELETED
+    }
+
+    fun isBlogClub(): Boolean {
+        return state and Post.STATE_BLOG_CLUB == Post.STATE_BLOG_CLUB
+    }
+
+    fun isBlogRedirect(): Boolean {
+        return state and Post.STATE_BLOG_REDIRECT == Post.STATE_BLOG_REDIRECT
+    }
+
+    fun isEmptyTopic(): Boolean {
+        return isBlogClub() || isBlogRedirect() || isDeleted() || postList.isNullOrEmpty() || topPostPid == null
+    }
 }
 

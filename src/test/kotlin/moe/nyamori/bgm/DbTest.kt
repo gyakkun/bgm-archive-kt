@@ -216,7 +216,10 @@ class DbTest {
         if (topic.uid != null) {
             return topic.copy(title = topic.title?.substring(0, topic.title!!.length.coerceAtMost(TITLE_MAX_LENGTH)))
         }
-        val topPostPid = topic.topPostPid
+        if (topic.isEmptyTopic()) {
+            return topic.copy(uid = 0, dateline = 0)
+        }
+        val topPostPid = topic.topPostPid!!
         val topPost = topic.getAllPosts().first { it.id == topPostPid }
         var topPostUser = topPost.user
         if (topPostUser == null) {
@@ -246,7 +249,7 @@ class DbTest {
     }
 
     private fun isValidTopic(topic: Topic): Boolean {
-        return topic.display && topic.space != null
+        return topic.space != null
         // && (topic.space!!.type == SpaceType.GROUP || topic.space!!.type == SpaceType.SUBJECT)
     }
 
