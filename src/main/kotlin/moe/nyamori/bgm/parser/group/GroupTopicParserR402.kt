@@ -279,7 +279,7 @@ object GroupTopicParserR402 : Parser {
                         related = floorPid,
                         contentHtml = subFloorContentHtml,
                         contentBbcode = null,
-                        state = STATE_NORMAL,
+                        state = PostToStateHelper.fromPostHtmlToState(subFloorContentHtml),
                         dateline = subFloorDate,
                         user = User(
                             id = subFloorUserUid,
