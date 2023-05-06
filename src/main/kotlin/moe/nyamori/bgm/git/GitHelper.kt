@@ -102,7 +102,7 @@ object GitHelper {
         if (jsonRepoSingleton.isBare) {
             return jsonRepoSingleton.getFileContentAsStringInACommit(
                 jsonRepoSingleton.getLatestCommitRef(),
-                "last_processed_commit_rev_id"
+                BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
             ).trim()
         } else {
             val prevProcessedCommitRevIdFile =

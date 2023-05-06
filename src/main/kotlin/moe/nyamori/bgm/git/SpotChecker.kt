@@ -35,7 +35,7 @@ object SpotChecker {
         // generateTopicMaskFile(SpaceType.GROUP)
 //         System.err.println(randomSelectTopicIds(SpaceType.GROUP))
         SpaceType.values().forEach {
-            genSpotCheckListFile(it)
+            genHiddenTopicMaskFile(it)
         }
     }
 

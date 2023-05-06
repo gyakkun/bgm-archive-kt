@@ -42,12 +42,12 @@ interface BgmDao : Transactional<BgmDao> {
     )
     fun getMetaData(@Bind("k") k: String): String
 
-    fun updatePrevProcessedCommitId(prevProcessedCommitId: String): Int {
-        return upsertMetaData(Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME, prevProcessedCommitId)
+    fun updatePrevPersistedCommitId(prevPersistRevId: String): Int {
+        return upsertMetaData(Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID, prevPersistRevId)
     }
 
-    fun getPrevProcessedCommitId(): String {
-        return getMetaData(Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+    fun getPrevPersistedCommitId(): String {
+        return getMetaData(Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID)
     }
 
 

@@ -52,4 +52,9 @@ object Config {
                 File(System.getProperty("user.home")).resolve("source/bgm-archive-db/bgm-archive.sqlite").absolutePath
             )
         )
+
+    val BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID: String = System.getenv().getOrDefault(
+        "E_BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID",
+        "prev_persisted_json_commit_rev_id"
+    )
 }

@@ -6,17 +6,17 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.db.SpaceNameMappingData
 import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper.stringHash
+import org.eclipse.jgit.lib.ObjectId
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
 import java.util.*
-import java.util.concurrent.BlockingQueue
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentMap
 import kotlin.streams.asStream
 
 class DbTest {
@@ -35,20 +35,10 @@ class DbTest {
             val dbTest = DbTest()
             dbTest.readJsonAndUpsert()
 
-//            LOGGER.info("neg user {}", Dao.bgmDao().getNegativeUidUsers())
-//            LOGGER.info("prev commit id {}", Dao.bgmDao().getPrevProcessedCommitId())
-//            Dao.bgmDao().handleNegativeUid()
-//            LOGGER.info("neg user after handling {}", Dao.bgmDao().getNegativeUidUsers())
             dbTest.readJsonUpdateSpaceAliasMapping()
         }
     }
 
-    lateinit var topicQueue: BlockingQueue<Topic>
-    lateinit var postQueue: BlockingQueue<Pair<SpaceType, Post>>
-    lateinit var likeQueue: BlockingQueue<Like>
-    lateinit var userQueue: BlockingQueue<User>
-    val QUEUE_LEN = 1000
-    val BATCH_THRESHOLD = 200
     val TITLE_MAX_LENGTH = 100
 
     @Volatile
@@ -141,7 +131,7 @@ class DbTest {
                 }
             }
         }
-        Dao.bgmDao().updatePrevProcessedCommitId(GitHelper.getPrevProcessedArchiveCommitRevId())
+        Dao.bgmDao().updatePrevPersistedCommitId(ObjectId.toString(GitHelper.jsonRepoSingleton.getLatestCommitRef()))
         endAll = true
     }
 
