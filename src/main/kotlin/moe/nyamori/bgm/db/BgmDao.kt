@@ -188,10 +188,103 @@ interface BgmDao : Transactional<BgmDao> {
             }
         }.filterNotNull()
 
+        // If having conflict (more than 2 rows actually share the same primary key), first remove the row with neg uid
+        preRemoveConflictTopic(userList)
         updateNegativeUidInTopic(userList)
+        preRemoveConflictPost(userList)
         updateNegativeUidInPost(userList)
+        preRemoveConflictSidInBlog(userList)
         updateNegativeSidInBlogTopic(userList)
         removeNegativeUidUser(userList)
+    }
+
+
+    @SqlQuery(
+        """
+        select type, id
+        from (select bat.*, count(*) c from ba_topic bat where  uid = :t.first  or uid = :t.second  group by type, id having c >= 2)
+    """
+    )
+    @RegisterKotlinMapper(DeRepetitiveTopicData::class)
+    fun selectTopicTypeAndIdByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveTopicData>
+
+    data class DeRepetitiveTopicData(val type: Int, val id: Int)
+
+    @SqlUpdate(
+        """
+        delete from ba_topic where type = :t.type and id = :t.id and uid < 0
+    """
+    )
+    fun doRemoveConflictTopic(@BindBean("t") t: DeRepetitiveTopicData): Int
+
+    fun preRemoveConflictTopic(userList: List<Pair<Int, Int>>) {
+        for (i in userList) {
+            val deRepetitiveTopicData = selectTopicTypeAndIdByUidListAndGroupByPk(i)
+            if (deRepetitiveTopicData.isEmpty()) continue
+            for (j in deRepetitiveTopicData) {
+                val res = doRemoveConflictTopic(j)
+                LOGGER.info("$res rows removed from ba_topic by key $j")
+            }
+        }
+    }
+
+
+    @SqlQuery(
+        """
+        select type, id, mid
+        from (select bap.*, count(*) c from ba_post bap where  uid = :t.first or uid = :t.second  group by type, id, mid having c >= 2)
+    """
+    )
+    @RegisterKotlinMapper(DeRepetitivePostData::class)
+    fun selectPostTypeAndIdAndMidByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitivePostData>
+
+    data class DeRepetitivePostData(val type: Int, val id: Int, val mid: Int)
+
+    @SqlUpdate(
+        """
+        delete from ba_post where type = :t.type and id = :t.id and mid = :t.mid and uid < 0
+    """
+    )
+    fun doRemoveConflictPost(@BindBean("t") t: DeRepetitivePostData): Int
+
+    fun preRemoveConflictPost(userList: List<Pair<Int, Int>>) {
+        for (i in userList) {
+            val deRepetitivePostData = selectPostTypeAndIdAndMidByUidListAndGroupByPk(i)
+            if (deRepetitivePostData.isEmpty()) continue
+            for (j in deRepetitivePostData) {
+                val res = doRemoveConflictPost(j)
+                LOGGER.info("$res rows removed from ba_topic by key $j")
+            }
+        }
+    }
+
+
+    @SqlQuery(
+        """
+        select type, id
+        from (select bat.*, count(*) c from ba_topic bat where type = 100 and ( uid = :t.first or uid = :t.second ) group by type, id, sid having c >= 2)
+    """
+    )
+    @RegisterKotlinMapper(DeRepetitiveBlogTopicData::class)
+    fun selectBlogTopicTypeAndIdByUidListAndGroupByTypeIdAndSid(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveBlogTopicData>
+
+    data class DeRepetitiveBlogTopicData(val type: Int, val id: Int)
+
+    @SqlUpdate(
+        """
+        delete from ba_topic where type = 100 and id = :t.id and sid < 0
+    """
+    )
+    fun doRemoveConflictBlogTopic(@BindBean("t") t: DeRepetitiveBlogTopicData): Int
+    fun preRemoveConflictSidInBlog(userList: List<Pair<Int, Int>>) {
+        for (i in userList) {
+            val deRepetitiveBlogTopicData = selectBlogTopicTypeAndIdByUidListAndGroupByTypeIdAndSid(i)
+            if (deRepetitiveBlogTopicData.isEmpty()) continue
+            for (j in deRepetitiveBlogTopicData) {
+                val res = doRemoveConflictBlogTopic(j)
+                LOGGER.info("$res rows removed from ba_topic by key $j")
+            }
+        }
     }
 
 
