@@ -124,7 +124,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @RegisterKotlinMapper(User::class)
-    fun getNegativeUidUsers(): Iterable<User>
+    fun getNegativeUidUsers(): List<User>
 
     @SqlBatch(
         """
@@ -229,4 +229,28 @@ interface BgmDao : Transactional<BgmDao> {
     )
     @Transaction
     fun upsertBlogTagMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, String>>)
+
+    @SqlQuery(
+        """
+        select * from ba_post where type = :type and mid = :topicId
+    """
+    )
+    @RegisterKotlinMapper(PostRow::class)
+    fun getPostListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<PostRow>
+
+    @SqlQuery(
+        """
+        select * from ba_likes where type = :type and mid = :topicId
+    """
+    )
+    @RegisterKotlinMapper(PostRow::class)
+    fun getLikeListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRow>
+
+    @SqlQuery(
+        """
+        select * from ba_topic where type = :type and id = :topicId
+    """
+    )
+    @RegisterKotlinMapper(PostRow::class)
+    fun getTopicListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<TopicRow>
 }
