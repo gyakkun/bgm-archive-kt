@@ -5,9 +5,11 @@ import com.google.gson.ToNumberPolicy
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
+import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.util.PostToStateHelper.fromPostHtmlToState
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
@@ -222,6 +224,56 @@ object SpotChecker {
                 }
             }
             LOGGER.info("Finished walking through json folders.")
+        }
+    }
+
+    // FIXME: Move out of this class
+    fun checkState() {
+        walkThroughJson(parallel = true) { file ->
+            if (file.isDirectory || !file.absolutePath.endsWith("json")) return@walkThroughJson false
+            val fileStr = FileUtil.getFileContent(file)
+            val topic = GSON.fromJson(fileStr, Topic::class.java)
+            if (topic.isEmptyTopic()) return@walkThroughJson false
+            val postList = topic.getAllPosts()
+            var changed = false
+            postList.forEach { post ->
+                if (post.contentHtml == null) return@forEach
+                val correctState = fromPostHtmlToState(post.contentHtml!!)
+                val readoutState = post.state
+                if (!(post.isClosed() || post.isReopen() || post.isSilent()) && correctState != readoutState) {
+                    LOGGER.error("Not correct state ( update ba_post set state = $correctState where state = $readoutState and type = ${topic.space!!.type.id} and mid = ${topic.id} and id = ${post.id} ")
+                    post.state = correctState
+                    changed = true
+                }
+            }
+            val correctTopicState = topic.getAllPosts().map { it.state }.distinct().let {
+                var res = Post.STATE_NORMAL
+                if (it.contains(Post.STATE_SILENT)) {
+                    res = res or Post.STATE_SILENT
+                }
+                if (it.contains(Post.STATE_CLOSED)) {
+                    res = res or Post.STATE_CLOSED
+                }
+                if (it.contains(Post.STATE_REOPEN)) {
+                    res = res or Post.STATE_REOPEN
+                }
+                return@let res
+            }
+            val oldState = topic.state
+            if (oldState != correctTopicState) {
+                topic.state = correctTopicState
+                changed = true
+                LOGGER.error("Not correct state ( update ba_topic set state = $correctTopicState where state = $oldState and type = ${topic.space!!.type.id} and id = ${topic.id} ")
+            }
+            if (false && changed) {
+                FileWriter(file).use { fw ->
+                    BufferedWriter(fw).use { bw ->
+                        bw.write(GitHelper.GSON.toJson(topic))
+                        bw.flush()
+                    }
+                }
+            }
+            return@walkThroughJson true
         }
     }
 }

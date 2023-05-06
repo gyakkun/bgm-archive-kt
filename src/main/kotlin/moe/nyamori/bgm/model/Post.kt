@@ -28,4 +28,36 @@ data class Post(
         const val STATE_BLOG_REDIRECT: Long = 1 shl 5
         const val STATE_BLOG_CLUB: Long = 1 shl 6
     }
+
+    fun isNormal(): Boolean {
+        return state and 1L == Post.STATE_NORMAL
+    }
+
+    fun isDeleted(): Boolean {
+        return state and Post.STATE_DELETED == Post.STATE_DELETED
+    }
+
+    fun isClosed(): Boolean {
+        return state and Post.STATE_CLOSED == Post.STATE_CLOSED
+    }
+
+    fun isReopen(): Boolean {
+        return state and Post.STATE_REOPEN == Post.STATE_REOPEN
+    }
+
+    fun isSilent(): Boolean {
+        return state and Post.STATE_SILENT == Post.STATE_SILENT
+    }
+
+    fun isAdminDeleted(): Boolean {
+        return state and Post.STATE_ADMIN_DELETED == Post.STATE_ADMIN_DELETED
+    }
+
+    fun isBlogClub(): Boolean {
+        return state and Post.STATE_BLOG_CLUB == Post.STATE_BLOG_CLUB
+    }
+
+    fun isBlogRedirect(): Boolean {
+        return state and Post.STATE_BLOG_REDIRECT == Post.STATE_BLOG_REDIRECT
+    }
 }

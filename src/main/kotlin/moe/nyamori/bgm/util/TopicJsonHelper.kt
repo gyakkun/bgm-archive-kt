@@ -6,7 +6,7 @@ import java.util.ArrayList
 
 object TopicJsonHelper {
     const val TITLE_MAX_LENGTH = 100
-    fun getUserListFromTopic(postList: List<Post>) =
+    fun getUserListFromPostList(postList: List<Post>) =
         postList.mapNotNull { it.user }.distinct()
 
     fun getPostListFromTopic(topic: Topic): List<Post> {
@@ -17,6 +17,7 @@ object TopicJsonHelper {
     }
 
     fun handleBlogTagAndRelatedSubject(topic: Topic) {
+        // TODO: Remove not-existing tags
         if (!isValidTopic(topic)) return
         if (topic.space!!.type != SpaceType.BLOG) return
         val blogSpace = topic.space!! as Blog
