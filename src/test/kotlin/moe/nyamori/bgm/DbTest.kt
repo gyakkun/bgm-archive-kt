@@ -27,22 +27,22 @@ class DbTest {
             .registerTypeAdapterFactory(
                 SealedTypeAdapterFactory.of(Space::class)
             ).create()
+        val TITLE_MAX_LENGTH = 100
 
         @Throws(IOException::class)
         @JvmStatic
         fun main(args: Array<String>) {
             Dao.bgmDao().healthCheck()
-            val dbTest = DbTest()
-            dbTest.readJsonAndUpsert()
+             val dbTest = DbTest()
+             dbTest.readJsonAndUpsert()
 
-            dbTest.readJsonUpdateSpaceAliasMapping()
+             dbTest.readJsonUpdateSpaceAliasMapping()
+
+
+            }
         }
-    }
 
-    val TITLE_MAX_LENGTH = 100
 
-    @Volatile
-    var endAll = false
 
     @Test
     fun healthCheck() {
@@ -132,7 +132,6 @@ class DbTest {
             }
         }
         Dao.bgmDao().updatePrevPersistedCommitId(ObjectId.toString(GitHelper.jsonRepoSingleton.getLatestCommitRef()))
-        endAll = true
     }
 
     private fun handleBlogTagAndRelatedSubject(topic: Topic) {
