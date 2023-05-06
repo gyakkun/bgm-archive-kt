@@ -1,84 +1,168 @@
 package moe.nyamori.bgm
 
 import com.google.gson.GsonBuilder
-import com.vladsch.flexmark.util.misc.FileUtil
-import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.parser.TopicParserEntrance
+import com.google.gson.ToNumberPolicy
+import moe.nyamori.bgm.db.Dao
+import moe.nyamori.bgm.db.SpaceNameMappingData
+import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
+import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
+import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
+import moe.nyamori.bgm.git.GitHelper.getRevCommitById
+import moe.nyamori.bgm.git.GitHelper.getWalkBetweenCommitInReverseOrder
+import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.util.SealedTypeAdapterFactory
+import moe.nyamori.bgm.util.StringHashingHelper
+import moe.nyamori.bgm.util.TopicJsonHelper
+import moe.nyamori.bgm.util.TopicJsonHelper.getLikeListFromTopic
+import moe.nyamori.bgm.util.TopicJsonHelper.getPostListFromTopic
+import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
+import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
+import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
+import org.eclipse.jgit.lib.ObjectId
 import org.slf4j.LoggerFactory
-import java.io.File
-import java.io.FileWriter
 import java.io.IOException
 import java.util.*
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.ConcurrentSkipListSet
-import java.util.concurrent.atomic.AtomicLong
-import kotlin.streams.asStream
 
 class GeneralTest {
     companion object {
         val LOGGER = LoggerFactory.getLogger(GeneralTest.javaClass)
-        val gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
+        val GSON = GsonBuilder()
+            .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+            .registerTypeAdapterFactory(
+                SealedTypeAdapterFactory.of(Space::class)
+            ).create()
 
         @Throws(IOException::class)
         @JvmStatic
         fun main(args: Array<String>) {
-//            val converter: FlexmarkHtmlConverter = FlexmarkHtmlConverter.builder().build()
-            val archiveFolder = File(Config.BGM_ARCHIVE_GIT_REPO_DIR)
-
-
-            val ts = ConcurrentSkipListSet<Pair<Long, File>>(Comparator.comparingLong { -it.first })
-            val ng = ConcurrentHashMap.newKeySet<File>()
-            val ngCounter = AtomicLong()
-            val totalCounter = AtomicLong()
-            val _404Counter = AtomicLong()
-            archiveFolder.walk().asStream().parallel().forEach allMatch@{ htmlFile ->
-                if (htmlFile.isDirectory) return@allMatch
-                if (htmlFile.extension != "html") return@allMatch
-                totalCounter.incrementAndGet()
-                var timing = System.currentTimeMillis()
-                val fileName = htmlFile.nameWithoutExtension
-                val fileStr = FileUtil.getFileContent(htmlFile)!!
-                val topicId = fileName.toInt()
-                val (topic, result) = TopicParserEntrance.parseTopic(fileStr, topicId, SpaceType.GROUP)
-                if (!result) {
-                    ng.add(htmlFile)
-                    ngCounter.incrementAndGet()
-//                    LOGGER.error("NG: ${htmlFile.absolutePath}")
-                    return@allMatch
-                } else {
-                    if (topic == null) {
-                        _404Counter.incrementAndGet()
-                        return@allMatch
+            val latestCommit = GitHelper.jsonRepoSingleton.getLatestCommitRef()
+            val prevPersistedCommit =
+                GitHelper.jsonRepoSingleton.getRevCommitById(Dao.bgmDao().getPrevPersistedCommitId())
+            val walk = GitHelper.jsonRepoSingleton.getWalkBetweenCommitInReverseOrder(latestCommit, prevPersistedCommit)
+            var prev = walk.next()
+            val sidNameMappingSet = mutableSetOf<SpaceNameMappingData>()
+            run breakable@{
+                walk.forEach outer@{ cur ->
+                    if (cur == prev) {
+                        LOGGER.warn("Commit $cur has been iterated twice!")
+                        return@breakable
                     }
-                    timing = System.currentTimeMillis() - timing
-                    // LOGGER.info("$timing ms : ${htmlFile.absolutePath}")
-                    ts.add(Pair(timing, htmlFile))
-                    if (!topic!!.display!!) return@allMatch
-//                    val toJson = gson.toJson(topic)
-//                    val jsonFile = File(
-//                        htmlFile.absolutePath.replace("bgm-archive", "bgm-archive-json")
-//                            .replace(".html", ".json")
-//                    )
-//                    jsonFile.parentFile.mkdirs()
-//                    val fileWriter =
-//                        FileWriter(
-//                            jsonFile
-//                        )
-//                    fileWriter.write(toJson)
-//                    fileWriter.flush()
-//                    fileWriter.close()
-                    return@allMatch
+                    val curCommitId = ObjectId.toString(cur)
+                    val curCommitFullMsg = cur.fullMessage
+                    if (curCommitFullMsg.startsWith("META", ignoreCase = true)) {
+                        Dao.bgmDao().updatePrevPersistedCommitId(curCommitId)
+                        prev = cur
+                        return@outer
+                    }
+                    LOGGER.info("Persisting $curCommitFullMsg - $curCommitId")
+                    val changedFilePathList = GitHelper.jsonRepoSingleton.findChangedFilePaths(prev, cur)
+                    changedFilePathList.forEach inner@{ path ->
+                        if (!path.endsWith("json")) return@inner
+                        LOGGER.info("Path $path")
+                        val jsonStr = GitHelper.jsonRepoSingleton.getFileContentAsStringInACommit(cur, path)
+                        runCatching {
+                            val topicUnmod = GSON.fromJson(jsonStr, Topic::class.java)
+
+                            if (!isValidTopic(topicUnmod)) return@inner
+                            val topic = preProcessTopic(topicUnmod)
+                            val space = topic.space!!
+                            val spaceTypeId = topic.space!!.type.id
+                            val topicId = topic.id
+                            val topicListFromDb =
+                                Dao.bgmDao().getTopicListByTypeAndTopicId(spaceTypeId, topicId)
+                            val postListFromDb =
+                                Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
+                            val likeListFromDb = Dao.bgmDao().getLikeListByTypeAndTopicId(spaceTypeId, topicId)
+                            LOGGER.debug("topic {}", topicListFromDb)
+                            LOGGER.debug("post {}", postListFromDb)
+                            LOGGER.debug("like {}", likeListFromDb)
+
+                            val postListFromFile = getPostListFromTopic(topic)
+                            val likeListFromFile = getLikeListFromTopic(topic)
+                            val userListFromFile = getUserListFromPostList(postListFromFile)
+
+                            // DONE : Calculate diff and update zero like,
+                            val processedLikeList = calZeroLike(likeListFromFile, likeListFromDb)
+
+
+                            Dao.bgmDao().batchUpsertUser(userListFromFile)
+                            Dao.bgmDao().batchUpsertLikes(processedLikeList)
+                            Dao.bgmDao().batchUpsertPost(spaceTypeId, postListFromFile)
+                            Dao.bgmDao().batchUpsertTopic(spaceTypeId, listOf(topic))
+
+                            if (space is Blog) {
+                                // TODO: Remove deleted post
+                                TopicJsonHelper.handleBlogTagAndRelatedSubject(topic)
+                            } else if (space is Subject) {
+                                sidNameMappingSet.add(
+                                    SpaceNameMappingData(
+                                        SpaceType.SUBJECT.id,
+                                        StringHashingHelper.stringHash(space.name!!),
+                                        space.name!!,
+                                        space.displayName!!
+                                    )
+                                )
+                            } else if (space is Group) {
+                                sidNameMappingSet.add(
+                                    SpaceNameMappingData(
+                                        SpaceType.SUBJECT.id,
+                                        StringHashingHelper.stringHash(space.name!!),
+                                        space.name!!,
+                                        space.displayName!!
+                                    )
+                                )
+                            } else {
+                                //
+                            }
+
+                        }.onFailure {
+                            LOGGER.error("Ex when checking content of $it at commit ${ObjectId.toString(cur)}")
+                            LOGGER.error("Json Str: $jsonStr")
+                        }
+                    }
+
+                    Dao.bgmDao().updatePrevPersistedCommitId(curCommitId)
+                    prev = cur
+                }
+                Dao.bgmDao().handleNegativeUid()
+                Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
+            }
+        }
+
+        private fun calZeroLike(likeListFromFile: List<Like>, likeListFromDb: List<Like>): List<Like> {
+            if (likeListFromFile.isEmpty() && likeListFromDb.isEmpty()) return emptyList()
+            val merged = mutableSetOf<Like>().apply {
+                addAll(likeListFromFile)
+                addAll(likeListFromDb)
+            }
+            val typeId = merged.first().type
+            val mid = merged.first().mid
+            val result = mutableSetOf<Like>().apply { addAll(likeListFromFile) }
+
+
+            val fileLikeKeys = likeListFromFile.groupBy { it.pid to it.value }.keys
+            val dbLikeKeys = likeListFromDb.groupBy { it.pid to it.value }.keys
+            val fileLikeKeyCopy = fileLikeKeys.toMutableSet()
+            val dbLikeKeysCopy = dbLikeKeys.toMutableSet()
+            // If some keys not in file but in db, then update the result to set zero of these types
+            dbLikeKeysCopy.removeAll(fileLikeKeys)
+            if (dbLikeKeysCopy.isNotEmpty()) {
+                LOGGER.info("Some keys not in file but in db. Updating them to zero.")
+                dbLikeKeysCopy.forEach {
+                    LOGGER.info("Zero for type-$typeId, mid-$mid, pid-${it.first}, value-${it.second}")
+                    result.add(
+                        Like(
+                            type = typeId,
+                            mid = mid,
+                            pid = it.first,
+                            value = it.second,
+                            total = 0
+                        )
+                    )
                 }
             }
-
-            LOGGER.info("NG COUNT: ${ngCounter.get()}")
-            LOGGER.info("404 COUNT: ${_404Counter.get()}")
-            LOGGER.info("TOT COUNT: ${totalCounter.get()}")
-            LOGGER.info("Top 10 time consumed: ${ts.toList().subList(0, 10)}")
-            LOGGER.info("NG: ${ng.map { i -> i.nameWithoutExtension }.sorted().toList()}")
-
-
+            return result.toList()
         }
     }
 }
