@@ -178,8 +178,8 @@ object GroupTopicParserR398 : Parser {
                 val floorDateStr: String
                 val floorDate: Long
 
-                if (isTopicDisabled) {
-                    thisTopic.display = false
+                if (isSpecialBadge) {
+                    thisTopic.display = !isTopicDisabled
                     val dateSpan = floor.selOne(XP_TOPIC_DISABLED_FLOOR_DATE_SPAN)
                     floorNum = postList.size + 1
                     floorDateStr = dateSpan.asElement().html()
