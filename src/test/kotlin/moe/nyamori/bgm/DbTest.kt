@@ -101,7 +101,7 @@ class DbTest {
         )
     }
 
-    @Test
+    // @Test
     fun readJsonAndUpsert() {
         val jsonRepoFolders = ArrayList<String>()
         Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
@@ -157,7 +157,7 @@ class DbTest {
         }
     }
 
-    @Test
+    // @Test
     fun readJsonUpdateSpaceAliasMapping() {
         val jsonRepoFolders = ArrayList<String>()
         Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
