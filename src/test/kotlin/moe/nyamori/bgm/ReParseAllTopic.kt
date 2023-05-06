@@ -63,7 +63,7 @@ object ReParseAllTopic {
                     )
                     if (success) {
                         val jsonPath = file.absolutePath
-                            .replace("bgm-archive-", "bgm-archive-json-")
+                            .replace("bgm-archive", "bgm-archive-json")
                             .replace("html", "json")
                         val jsonFileLoc = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(jsonPath)
                         val json = GitHelper.GSON.toJson(topic)
