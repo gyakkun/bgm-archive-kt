@@ -36,8 +36,8 @@ object GitHelper {
         getArchiveRepo()
     }
 
-    val jsonStaticRepoListSingleton by lazy (mode = LazyThreadSafetyMode.SYNCHRONIZED){
-        if(Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
+    val jsonStaticRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        if (Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
         else {
             Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
                 .map { getRepoByPath(it.trim()) }
@@ -45,8 +45,8 @@ object GitHelper {
         }
     }
 
-    val archiveStaticRepoListSingleton by lazy (mode = LazyThreadSafetyMode.SYNCHRONIZED){
-        if(Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
+    val archiveStaticRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        if (Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
         else {
             Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
                 .map { getRepoByPath(it.trim()) }
@@ -58,12 +58,28 @@ object GitHelper {
     fun getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(): RevWalk {
         val prevProcessedArchiveCommit = getPrevProcessedArchiveCommitRef()
         val latestArchiveCommit = getLatestArchiveCommitRef()
-        archiveRepoSingleton .use { archiveRepo ->
-            val revWalk = RevWalk(archiveRepo)
-            revWalk.markStart(latestArchiveCommit)
-            revWalk.markUninteresting(prevProcessedArchiveCommit)
-            revWalk.sort(RevSort.REVERSE, true) // from prevProcessed to latestArchiveCommit
-            return revWalk
+        return archiveRepoSingleton.getWalkBetweenCommitInReverseOrder(latestArchiveCommit, prevProcessedArchiveCommit)
+    }
+
+    fun Repository.getWalkBetweenCommitInReverseOrder(topCommit: RevCommit, bottomCommit: RevCommit): RevWalk {
+        this.use {
+            val walk = RevWalk(it)
+            walk.markStart(topCommit)
+            walk.markUninteresting(bottomCommit)
+            walk.sort(RevSort.REVERSE, true) // // from bottom to top
+            // the walk will include (bottom-1) commit
+            // step next in advance
+            walk.next()
+            return walk
+        }
+    }
+
+    fun Repository.getRevCommitById(id: String): RevCommit {
+        this.use { repo ->
+            val revWalk = RevWalk(repo)
+            val revId = repo.resolve(id)
+            val revCommit = revWalk.parseCommit(revId)
+            return revCommit
         }
     }
 
@@ -112,7 +128,6 @@ object GitHelper {
             return rawFileStr.trim()
         }
     }
-
 
 
     private fun getRepoByPath(path: String): Repository {
