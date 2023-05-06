@@ -23,6 +23,7 @@ object ReParseAllTopic {
 
     val jsonRepoFolders = ArrayList<String>()
     val archiveRepoFolders = ArrayList<String>()
+    val ng = mutableSetOf<Pair<SpaceType, Int>>()
 
     init {
         Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
@@ -46,7 +47,7 @@ object ReParseAllTopic {
                 runCatching {
                     if (file.isDirectory) return@inner
                     if (file.extension != "html") return@inner
-                    if (file.absolutePath.hashCode() and 511 == 511) {
+                    if (file.absolutePath.hashCode() and 255 == 255) {
                         LOGGER.info("Processing ${file.absolutePath}")
                     }
                     val spaceType = file.absolutePath.let { filepath ->
@@ -56,12 +57,14 @@ object ReParseAllTopic {
                         else throw IllegalStateException("No space type matched!")
                     }
                     val topicId = file.nameWithoutExtension.toInt()
+                    ng.add(Pair(spaceType, topicId))
                     val (topic, success) = TopicParserEntrance.parseTopic(
                         FileUtil.getFileContent(file)!!,
                         topicId,
                         spaceType
                     )
                     if (success) {
+                        ng.remove(Pair(spaceType, topicId))
                         val jsonPath = file.absolutePath
                             .replace("bgm-archive", "bgm-archive-json")
                             .replace("html", "json")
@@ -82,5 +85,6 @@ object ReParseAllTopic {
                 }
             }
         }
+        LOGGER.error("NG LIST: $ng")
     }
 }

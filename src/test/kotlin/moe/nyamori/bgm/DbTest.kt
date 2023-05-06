@@ -12,7 +12,7 @@ import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper.stringHash
 import moe.nyamori.bgm.util.TopicJsonHelper.getLikeListFromTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.getPostListFromTopic
-import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromTopic
+import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
 import moe.nyamori.bgm.util.TopicJsonHelper.handleBlogTagAndRelatedSubject
 import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
@@ -33,7 +33,6 @@ class DbTest {
             .registerTypeAdapterFactory(
                 SealedTypeAdapterFactory.of(Space::class)
             ).create()
-        val TITLE_MAX_LENGTH = 100
 
         @Throws(IOException::class)
         @JvmStatic
@@ -121,7 +120,7 @@ class DbTest {
                     topic = preProcessTopic(topic)
                     val likeList = getLikeListFromTopic(topic)
                     val postList = getPostListFromTopic(topic)
-                    val userList = getUserListFromTopic(postList)
+                    val userList = getUserListFromPostList(postList)
 
                     Dao.bgmDao().batchUpsertUser(userList)
                     Dao.bgmDao().batchUpsertLikes(likeList)
@@ -136,6 +135,7 @@ class DbTest {
                 }
             }
         }
+        Dao.bgmDao().handleNegativeUid()
         Dao.bgmDao().updatePrevPersistedCommitId(ObjectId.toString(GitHelper.jsonRepoSingleton.getLatestCommitRef()))
     }
 
