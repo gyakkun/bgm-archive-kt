@@ -58,10 +58,17 @@ object GitHelper {
     fun getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(): RevWalk {
         val prevProcessedArchiveCommit = getPrevProcessedArchiveCommitRef()
         val latestArchiveCommit = getLatestArchiveCommitRef()
-        return archiveRepoSingleton.getWalkBetweenCommitInReverseOrder(latestArchiveCommit, prevProcessedArchiveCommit)
+        return archiveRepoSingleton.getWalkBetweenCommitInReverseOrder(
+            latestArchiveCommit,
+            prevProcessedArchiveCommit,
+            stepInAdvance = false)
     }
 
-    fun Repository.getWalkBetweenCommitInReverseOrder(topCommit: RevCommit, bottomCommit: RevCommit): RevWalk {
+    fun Repository.getWalkBetweenCommitInReverseOrder(
+        topCommit: RevCommit,
+        bottomCommit: RevCommit,
+        stepInAdvance: Boolean = true
+    ): RevWalk {
         this.use {
             val walk = RevWalk(it)
             walk.markStart(topCommit)
@@ -69,7 +76,7 @@ object GitHelper {
             walk.sort(RevSort.REVERSE, true) // // from bottom to top
             // the walk will include (bottom-1) commit
             // step next in advance
-            walk.next()
+            if (stepInAdvance) walk.next()
             return walk
         }
     }
