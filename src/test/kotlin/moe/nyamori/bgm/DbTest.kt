@@ -10,6 +10,12 @@ import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper.stringHash
+import moe.nyamori.bgm.util.TopicJsonHelper.getLikeListFromTopic
+import moe.nyamori.bgm.util.TopicJsonHelper.getPostListFromTopic
+import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromTopic
+import moe.nyamori.bgm.util.TopicJsonHelper.handleBlogTagAndRelatedSubject
+import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
+import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
 import org.eclipse.jgit.lib.ObjectId
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
@@ -33,15 +39,14 @@ class DbTest {
         @JvmStatic
         fun main(args: Array<String>) {
             Dao.bgmDao().healthCheck()
-             val dbTest = DbTest()
-             dbTest.readJsonAndUpsert()
+            val dbTest = DbTest()
+            dbTest.readJsonAndUpsert()
 
-             dbTest.readJsonUpdateSpaceAliasMapping()
+            dbTest.readJsonUpdateSpaceAliasMapping()
 
 
-            }
         }
-
+    }
 
 
     @Test
@@ -115,8 +120,8 @@ class DbTest {
                     if (!isValidTopic(topic)) return@inner
                     topic = preProcessTopic(topic)
                     val likeList = getLikeListFromTopic(topic)
-                    val postList = topic.getAllPosts().map { processPostWithEmptyUid(it) }
-                    val userList = postList.mapNotNull { it.user }.distinct()
+                    val postList = getPostListFromTopic(topic)
+                    val userList = getUserListFromTopic(postList)
 
                     Dao.bgmDao().batchUpsertUser(userList)
                     Dao.bgmDao().batchUpsertLikes(likeList)
@@ -134,17 +139,6 @@ class DbTest {
         Dao.bgmDao().updatePrevPersistedCommitId(ObjectId.toString(GitHelper.jsonRepoSingleton.getLatestCommitRef()))
     }
 
-    private fun handleBlogTagAndRelatedSubject(topic: Topic) {
-        val blogSpace = topic.space!! as Blog
-        val relatedSubjectIds = blogSpace.relatedSubjectIds
-        val tags = blogSpace.tags
-        if (!relatedSubjectIds.isNullOrEmpty()) {
-            Dao.bgmDao().upsertBlogSubjectIdMapping(relatedSubjectIds.map { Pair(topic.id, it) })
-        }
-        if (!tags.isNullOrEmpty()) {
-            Dao.bgmDao().upsertBlogTagMapping(tags.map { Pair(topic.id, it) })
-        }
-    }
 
     // @Test
     fun readJsonUpdateSpaceAliasMapping() {
@@ -202,80 +196,4 @@ class DbTest {
     }
 
 
-    private fun preProcessTopic(topic: Topic): Topic {
-        if (topic.uid != null) {
-            return topic.copy(title = topic.title?.substring(0, topic.title!!.length.coerceAtMost(TITLE_MAX_LENGTH)))
-        }
-        if (topic.isEmptyTopic()) {
-            return topic.copy(uid = 0, dateline = 0)
-        }
-        val topPostPid = topic.topPostPid!!
-        val topPost = topic.getAllPosts().first { it.id == topPostPid }
-        var topPostUser = topPost.user
-        if (topPostUser == null) {
-            topPostUser = User(id = 0, username = "0", nickname = "0")
-        } else {
-            if (topPostUser.id == null) {
-                topPostUser = topPostUser.let { it.copy(id = stringHash(it.username)) }
-            }
-        }
-        return topic.copy(
-            uid = topPostUser.id,
-            title = topic.title?.substring(0, topic.title!!.length.coerceAtMost(TITLE_MAX_LENGTH))
-        )
-    }
-
-    private fun processPostWithEmptyUid(post: Post): Post {
-        if (post.user != null && post.user!!.id != null) return post
-        var postUser = post.user
-        if (postUser == null) {
-            postUser = User(id = 0, username = "0", nickname = "0")
-        } else {
-            if (postUser.id == null) {
-                postUser = postUser.let { it.copy(id = stringHash(it.username)) }
-            }
-        }
-        return post.copy(user = postUser)
-    }
-
-    private fun isValidTopic(topic: Topic): Boolean {
-        return topic.space != null
-        // && (topic.space!!.type == SpaceType.GROUP || topic.space!!.type == SpaceType.SUBJECT)
-    }
-
-    private fun getLikeListFromTopic(topic: Topic): List<Like> {
-        if (!isValidTopic(topic)) return emptyList()
-
-        if (topic.space?.meta?.get("data_likes_list") == null) return emptyList()
-        val dataLikesList = topic.space!!.meta!!["data_likes_list"] as Map<String, Any?>
-        return dataLikesList.map {
-            val pid = it.key.toInt()
-            val faces = it.value
-            if (faces is Map<*, *>) {
-                val res = ArrayList<Like>()
-                (faces as Map<String, Any?>).forEach {
-                    val faceId = it.key.toInt()
-                    val m = it.value as Map<String, Any?>
-                    val mid = (m["main_id"] as Double).toInt()
-                    val value = (m["value"] as String).toInt()
-                    val total = (m["total"] as String).toInt()
-                    res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
-                }
-                return@map res
-            } else if (faces is List<*>) {
-                val res = ArrayList<Like>()
-                (faces as List<Map<String, Any?>>).forEach {
-                    val m = it
-                    val mid = (m["main_id"] as Double).toInt()
-                    val value = (m["value"] as String).toInt()
-                    val total = (m["total"] as String).toInt()
-                    res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
-                }
-                return@map res
-            } else {
-                return@map emptyList<Like>()
-            }
-        }.flatten().toList()
-
-    }
 }
