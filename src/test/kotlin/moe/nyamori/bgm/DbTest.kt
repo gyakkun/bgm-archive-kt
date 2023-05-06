@@ -179,6 +179,7 @@ class DbTest {
                     val fileStr = FileUtil.getFileContent(file)!!
                     val topic = GSON.fromJson(fileStr, Topic::class.java)
                     if (!isValidTopic(topic)) return@inner
+                    if (topic.isEmptyTopic()) return@inner
 
                     if (topic.space!!.type != SpaceType.GROUP && topic.space!!.type != SpaceType.SUBJECT) return@inner
                     if (topic.space!! is Group) {
