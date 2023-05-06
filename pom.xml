@@ -15,11 +15,11 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <kotlin.code.style>official</kotlin.code.style>
         <kotlin.compiler.jvmTarget>17</kotlin.compiler.jvmTarget>
-        <kt.major.version>1.8.20</kt.major.version>
+        <kt.major.version>1.8.21</kt.major.version>
         <junit.version>5.9.2</junit.version>
-        <jdbi.version>3.37.1</jdbi.version>
+        <jdbi.version>3.38.2</jdbi.version>
         <slf4j.version>2.0.7</slf4j.version>
-        <jackson.version>2.14.2</jackson.version>
+        <jackson.version>2.15.0</jackson.version>
     </properties>
 
     <dependencyManagement>
@@ -136,7 +136,7 @@
         <dependency>
             <groupId>io.javalin</groupId>
             <artifactId>javalin</artifactId>
-            <version>5.4.2</version>
+            <version>5.5.0</version>
         </dependency>
 
         <dependency>
@@ -154,7 +154,7 @@
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
             <artifactId>caffeine</artifactId>
-            <version>3.1.5</version>
+            <version>3.1.6</version>
         </dependency>
 
         <dependency>
@@ -198,7 +198,7 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>9.16.3</version>
+            <version>9.17.0</version>
         </dependency>
 
     </dependencies>
