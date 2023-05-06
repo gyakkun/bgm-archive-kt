@@ -27,15 +27,15 @@ object ReParseAllTopic {
     init {
         Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
             .map {
-                jsonRepoFolders.add(it.trim())
+                if (it.isNotBlank()) jsonRepoFolders.add(it.trim())
             }
         Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
 
         Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
             .map {
-                archiveRepoFolders.add(it.trim())
+                if (it.isNotBlank()) archiveRepoFolders.add(it.trim())
             }
-        Config.BGM_ARCHIVE_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
+        Config.BGM_ARCHIVE_GIT_REPO_DIR.let { archiveRepoFolders.add(it) }
     }
 
     fun walkAllArchiveFolders() {
