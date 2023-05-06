@@ -42,6 +42,7 @@ object SpotChecker {
     }
 
     fun genSpotCheckListFile(spaceType: SpaceType) {
+        if (Config.BGM_ARCHIVE_DISABLE_SPOT_CHECK) return
         LOGGER.info("Generating spot check list file $SPOT_CHECK_BITSET_FILE_NAME for $spaceType.")
         val scList = randomSelectTopicIds(spaceType)
         val scFile =
