@@ -25,6 +25,13 @@ from ba_topic bt
          inner join ba_post bp on bt.last_post_pid = bp.id and bt.type = bp.type
          inner join ba_user bu on bu.id = bt.uid;
 
+create view if not exists ba_v_post_username_rank_by_last_reply_and_dateline as
+select bp.*,
+       bu.username as username,
+       rank() over (partition by bp.type,bp.mid, bp.uid order by bp.dateline,bp.id desc) rank_last_reply
+from ba_post bp
+         inner join ba_user bu on  bu.id = bp.uid;
+
 create view if not exists ba_v_all_post_count_group_by_type_uid_state as
 select bp.type, bp.uid, bu.username, bp.state, count(*) count_all_post
 from ba_post bp
