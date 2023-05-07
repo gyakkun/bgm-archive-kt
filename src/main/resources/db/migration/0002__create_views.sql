@@ -25,13 +25,13 @@ from ba_topic bt
          inner join ba_post bp on bt.last_post_pid = bp.id and bt.type = bp.type
          inner join ba_user bu on bu.id = bt.uid;
 
-create view if not exists ba_v_post_group_by_type_uid_state as
+create view if not exists ba_v_all_post_count_group_by_type_uid_state as
 select bp.type, bp.uid, bu.username, bp.state, count(*) count_all_post
 from ba_post bp
          inner join ba_user bu on bp.uid = bu.id
 group by type, uid , state;
 
-create view if not exists ba_v_topic_group_by_type_uid_state as
+create view if not exists ba_v_all_topic_count_group_by_type_uid_state as
 select bt.type, bt.uid, bu.username, bt.state, count(*) count_all_topic
 from ba_topic bt
          inner join ba_user bu on bt.uid = bu.id
