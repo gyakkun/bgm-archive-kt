@@ -15,18 +15,38 @@ from tmp
 group by tmp.space_type, tmp.face_key, tmp.uid, tmp.username
 having count > 0;
 
-create view if not exists ba_v_topic_username_rank_by_last_reply as
+create view if not exists ba_v_topic_username_rank_by_last_reply_and_dateline as
 select bt.*,
        bp.dateline as                                                      last_update_time,
        bu.username as                                                      username,
-       rank() over (partition by bt.type,bt.uid order by bp.dateline desc) tr
+       rank() over (partition by bt.type,bt.uid order by bp.dateline desc) rank_last_reply,
+       rank() over (partition by bt.type,bt.uid order by bp.dateline desc) rank_dateline
 from ba_topic bt
          inner join ba_post bp on bt.last_post_pid = bp.id and bt.type = bp.type
          inner join ba_user bu on bu.id = bt.uid;
+
+create view if not exists ba_v_post_group_by_type_uid_state as
+select bp.type, bp.uid, bu.username, bp.state, count(*) c
+from ba_post bp
+         inner join ba_user bu on bp.uid = bu.id
+group by type, uid , state;
+
+create view if not exists ba_v_topic_group_by_type_uid_state as
+select bt.type, bt.uid, bu.username, bt.state, count(*) c
+from ba_topic bt
+         inner join ba_user bu on bt.uid = bu.id
+group by type, uid , state;
 
 create index if not exists ba_post_dateline_index
     on ba_post (dateline desc);
 
 create index if not exists ba_post_type_mid_index
-    on ba_post (type, mid)
+    on ba_post (type, mid);
+
+create index if not exists ba_post_type_uid_state_index
+    on ba_post (type, uid, state);
+
+create index if not exists ba_topic_type_uid_state_index
+    on ba_topic (type, uid, state);
+
 
