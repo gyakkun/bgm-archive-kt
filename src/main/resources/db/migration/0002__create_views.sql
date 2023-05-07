@@ -8,12 +8,12 @@ with tmp as (select bl.type     as space_type,
                     bu.username as username
              from ba_likes bl
                       inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type
-                      inner join ba_topic bt on bp.type = bt.type and bp.mid = bt.id and bt.state != 1
+                      inner join ba_topic bt on bp.type = bt.type and bp.mid = bt.id --  and bt.state != 1
                       inner join ba_user bu on bp.uid = bu.id)
-select tmp.space_type, tmp.face_key, tmp.uid, tmp.username, sum(tmp.face_count) count
+select tmp.space_type, tmp.face_key, tmp.uid, tmp.username, sum(tmp.face_count) count_like
 from tmp
 group by tmp.space_type, tmp.face_key, tmp.uid, tmp.username
-having count > 0;
+having count_like > 0;
 
 create view if not exists ba_v_topic_username_rank_by_last_reply_and_dateline as
 select bt.*,
@@ -26,16 +26,32 @@ from ba_topic bt
          inner join ba_user bu on bu.id = bt.uid;
 
 create view if not exists ba_v_post_group_by_type_uid_state as
-select bp.type, bp.uid, bu.username, bp.state, count(*) c
+select bp.type, bp.uid, bu.username, bp.state, count(*) count_all_post
 from ba_post bp
          inner join ba_user bu on bp.uid = bu.id
 group by type, uid , state;
 
 create view if not exists ba_v_topic_group_by_type_uid_state as
-select bt.type, bt.uid, bu.username, bt.state, count(*) c
+select bt.type, bt.uid, bu.username, bt.state, count(*) count_all_topic
 from ba_topic bt
          inner join ba_user bu on bt.uid = bu.id
 group by type, uid , state;
+
+create view if not exists ba_v_post_count_group_by_type_space_uid_state as
+select bp.type, bp.uid, bsnm.name, bsnm.display_name, bu.username, bp.state, count(bp.id) count_space_post
+from ba_post bp
+         inner join ba_topic bt on bt.type = bp.type and bt.id = bp.mid
+         inner join ba_user bu on bp.uid = bu.id
+         inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+group by bp.type, bp.uid, bt.sid, bp.state;
+
+create view if not exists ba_v_topic_count_group_by_type_space_uid_state as
+select bt.type, bt.uid, bt.state, bsnm.name, bsnm.display_name, bu.username, count(*) count_space_topic
+from ba_topic bt
+         inner join ba_user bu on bt.uid = bu.id
+         inner join ba_space_naming_mapping bsnm on bt.sid = bsnm.sid
+group by bt.type, bt.uid,bt.sid, bt.state;
+
 
 create index if not exists ba_post_dateline_index
     on ba_post (dateline desc);
