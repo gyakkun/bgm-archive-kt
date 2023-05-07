@@ -4,6 +4,7 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.model.*
 import org.jdbi.v3.sqlobject.customizer.Bind
 import org.jdbi.v3.sqlobject.customizer.BindBean
+import org.jdbi.v3.sqlobject.customizer.BindList
 import org.jdbi.v3.sqlobject.kotlin.RegisterKotlinMapper
 import org.jdbi.v3.sqlobject.statement.SqlBatch
 import org.jdbi.v3.sqlobject.statement.SqlQuery
@@ -12,6 +13,7 @@ import org.jdbi.v3.sqlobject.transaction.Transaction
 import org.jdbi.v3.sqlobject.transaction.Transactional
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.rmi.server.UID
 
 @JvmDefaultWithCompatibility
 interface BgmDao : Transactional<BgmDao> {
@@ -346,4 +348,86 @@ interface BgmDao : Transactional<BgmDao> {
     )
     @RegisterKotlinMapper(PostRow::class)
     fun getTopicListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<TopicRow>
+
+    @SqlQuery(
+        """
+            select * from ba_v_all_post_count_group_by_type_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VAllPostCountRow::class)
+    fun getAllPostCountByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VAllPostCountRow>
+
+
+    @SqlQuery(
+        """
+            select * from ba_v_all_topic_count_group_by_type_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VAllTopicCountRow::class)
+    fun getAllTopicCountByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VAllTopicCountRow>
+
+    @SqlQuery(
+        """
+            select * from ba_v_likes_sum_by_space_face_key_uid_username where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VLikesSumRow::class)
+    fun getLikesSumByTypeAndUsernameList(@Bind("t") type: Int, @BindList("l") l: Iterable<String>): List<VLikesSumRow>
+
+    @SqlQuery(
+        """
+            select * from ba_v_post_count_group_by_type_space_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VPostCountSpaceRow::class)
+    fun getPostCountSpaceByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VPostCountSpaceRow>
+
+
+
+    @SqlQuery(
+        """
+            select * from ba_v_topic_count_group_by_type_space_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VTopicCountSpaceRow::class)
+    fun getTopicCountSpaceByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VTopicCountSpaceRow>
+
+
+    @SqlQuery(
+        """
+            select * from ba_v_post_username_rank_by_last_reply_and_dateline where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
+    fun getUserLastReplyTopicByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VUserLastReplyTopicRow>
+
+
+    @SqlQuery(
+        """
+            select * from ba_v_topic_count_group_by_type_space_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VUserLatestCreateTopicRow::class)
+    fun getUserLatestCreateTopicAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VUserLatestCreateTopicRow>
+
+
 }
+

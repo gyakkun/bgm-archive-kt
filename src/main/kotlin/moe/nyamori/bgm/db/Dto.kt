@@ -2,6 +2,7 @@ package moe.nyamori.bgm.db
 
 import moe.nyamori.bgm.model.Like
 
+// For table query
 data class SpaceNameMappingData(val type: Int, val sid: Int, val name: String, val displayName: String)
 
 data class PostRow(val type: Int, val id: Int, val mid: Int, val uid: Int, val dateline: Long, val state: Long)
@@ -18,7 +19,46 @@ data class TopicRow(
 )
 
 typealias LikeRow = Like
+
 data class UserRow(
     val id: Int,
     val username: String
 )
+
+// For view query
+data class VAllPostCountRow(
+    val type: Int,
+    val uid: Int,
+    val username: String,
+    val state: Long,
+    val count: Int
+)
+
+data class VLikesSumRow(
+    val type: Int,
+    val faceKey: Int,
+    val uid: Int,
+    val username: String,
+    val count: Int
+)
+
+data class VUserLatestCreateTopicRow(
+    val type: Int
+)
+
+data class VUserLastReplyTopicRow(
+    val type: Int
+)
+
+data class VPostCountSpaceRow(
+    val type: Int,
+    val uid: Int,
+    val name: String,
+    val displayName: String,
+    val username: String,
+    val state: Long,
+    val count: Int
+)
+
+typealias VAllTopicCountRow = VAllPostCountRow
+typealias VTopicCountSpaceRow = VPostCountSpaceRow
