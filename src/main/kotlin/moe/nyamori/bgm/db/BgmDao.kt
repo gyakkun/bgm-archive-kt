@@ -349,6 +349,9 @@ interface BgmDao : Transactional<BgmDao> {
     @RegisterKotlinMapper(PostRow::class)
     fun getTopicListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<TopicRow>
 
+
+    // View queries
+
     @SqlQuery(
         """
             select * from ba_v_all_post_count_group_by_type_uid_state where type = :t and username in (<l>)
@@ -407,7 +410,7 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select * from ba_v_post_username_rank_by_last_reply_and_dateline where type = :t and username in (<l>)
+            select * from ba_v_post_username_rank_by_reply_asc where type = :t and username in (<l>) and rank_reply_asc = 1
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
@@ -419,7 +422,7 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select * from ba_v_topic_count_group_by_type_space_uid_state where type = :t and username in (<l>)
+            select * from ba_v_topic_username_rank_by_last_reply_and_dateline where type = :t and username in (<l>) and rank_last_reply <= 10
         """
     )
     @RegisterKotlinMapper(VUserLatestCreateTopicRow::class)

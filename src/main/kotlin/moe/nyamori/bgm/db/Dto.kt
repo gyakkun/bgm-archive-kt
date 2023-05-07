@@ -43,11 +43,30 @@ data class VLikesSumRow(
 )
 
 data class VUserLatestCreateTopicRow(
-    val type: Int
+    val type: Int,
+    val id: Int,
+    val uid: Int,
+    val sid: Int,
+    val dateline: Long,
+    val state: Long,
+    val lastPostPid: Int,
+    val title: String?,
+    val lastUpdateTime: Long,
+    val username: String,
+    val rankLastReply: Int,
+    val rankDateline: Int
 )
 
 data class VUserLastReplyTopicRow(
-    val type: Int
+    val type: Int,
+    val id: Int,
+    val mid: Int,
+    val uid: Int,
+    val dateline: Long,
+    val state: Long,
+    val title: String?,
+    val username: String,
+    val rankReplyAsc: Int
 )
 
 data class VPostCountSpaceRow(
