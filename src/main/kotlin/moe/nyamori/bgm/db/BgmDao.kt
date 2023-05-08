@@ -453,12 +453,10 @@ interface BgmDao : Transactional<BgmDao> {
             inner join ba_topic bt on bp.mid = bt.id and bp.type = bt.type and bt.top_post_pid!=bp.id
             inner join ba_user bu on bu.id = bp.uid
             where bp.type = :t
-              and bp.dateline >= ((select unixepoch() - 86400*365*3)
               and bp.uid in (select bu.id
                           from ba_user bu
                           where bu.username in (<l>)))
-              )
-            where rank_reply_asc = 1 
+            where rank_reply_asc = 1 and dateline >= ((select unixepoch() - 86400*365*3))
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
