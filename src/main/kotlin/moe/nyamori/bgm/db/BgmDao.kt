@@ -355,15 +355,21 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select * from ba_v_all_post_count_group_by_type_uid_state where type = :t and username in (<l>)
+            select * from ba_v_all_post_count_group_by_type_uid_state where username in (<l>)
         """
     )
     @RegisterKotlinMapper(VAllPostCountRow::class)
-    fun getAllPostCountByTypeAndUsernameList(
-        @Bind("t") type: Int,
+    fun getAllPostCountByUsernameList(
         @BindList("l") l: Iterable<String>
     ): List<VAllPostCountRow>
 
+    fun getAllPostCountByTypeAndUsernameList(
+        t: Int,
+        l: Iterable<String>
+    ): List<VAllPostCountRow> {
+        return getAllPostCountByUsernameList(l)
+            .filter { it.type == t }
+    }
 
     @SqlQuery(
         """
@@ -378,11 +384,21 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select * from ba_v_likes_sum_by_space_face_key_uid_username where type = :t and username in (<l>)
+            select * from ba_v_likes_sum_by_space_face_key_uid_username where username in (<l>)
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
-    fun getLikesSumByTypeAndUsernameList(@Bind("t") type: Int, @BindList("l") l: Iterable<String>): List<VLikesSumRow>
+    fun getLikesSumByUsernameList(
+        @BindList("l") l: Iterable<String>
+    ): List<VLikesSumRow>
+
+    fun getLikesSumByTypeAndUsernameList(
+        type: Int,
+        l: Iterable<String>
+    ): List<VLikesSumRow> {
+        return getLikesSumByUsernameList(l)
+            .filter { it.type == type }
+    }
 
     @SqlQuery(
         """
@@ -398,19 +414,35 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select * from ba_v_topic_count_group_by_type_space_uid_state where type = :t and username in (<l>)
+            select * from ba_v_topic_count_group_by_type_space_uid_state where username in (<l>)
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    fun getTopicCountSpaceByTypeAndUsernameList(
-        @Bind("t") type: Int,
+    fun getTopicCountSpaceByUsernameList(
         @BindList("l") l: Iterable<String>
     ): List<VTopicCountSpaceRow>
 
+    fun getTopicCountSpaceByTypeAndUsernameList(
+        type: Int,
+        l: Iterable<String>
+    ): List<VTopicCountSpaceRow> {
+        return getTopicCountSpaceByUsernameList(l)
+            .filter { it.type == type }
+    }
 
     @SqlQuery(
         """
-            select * from ba_v_post_username_rank_by_reply_asc where type = :t and username in (<l>) and rank_reply_asc = 1
+            select bp.*,
+                   bt.title,
+                   bu.username,
+                   rank() over (partition by bp.type,bp.mid, bp.uid order by bp.dateline,bp.id desc) rank_reply_asc
+            from ba_post bp
+            inner join ba_topic bt on bp.mid = bt.id and bp.type = bt.type
+            inner join ba_user bu on bu.id = bp.uid
+            where bp.type = :t
+              and bp.uid in (select bu.id
+                          from ba_user bu
+                          where bu.username in (<l>))
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
