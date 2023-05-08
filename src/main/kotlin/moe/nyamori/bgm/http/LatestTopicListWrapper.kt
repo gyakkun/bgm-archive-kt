@@ -37,7 +37,7 @@ object LatestTopicListWrapper : Handler {
         val spaceType = checkAndExtractSpaceTypeInContext(ctx)
         try {
             if (!lock.tryLock(30, TimeUnit.SECONDS)) {
-                ctx.status(HttpStatus.REQUEST_TIMEOUT)
+                ctx.status(HttpStatus.GATEWAY_TIMEOUT)
                 ctx.html("The server is busy. Please wait and refresh later.")
                 return
             }

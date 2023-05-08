@@ -17,7 +17,7 @@ class FileHistory(private val spaceType: SpaceType, private val isHtml: Boolean 
     override fun handle(ctx: Context) {
         try {
             if (!GIT_RELATED_LOCK.tryLock(30, TimeUnit.SECONDS)) {
-                ctx.status(HttpStatus.REQUEST_TIMEOUT)
+                ctx.status(HttpStatus.GATEWAY_TIMEOUT)
                 ctx.html("The server is busy. Please wait and refresh later.")
                 return
             }
