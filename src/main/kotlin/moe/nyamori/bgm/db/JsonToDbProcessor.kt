@@ -107,6 +107,7 @@ object JsonToDbProcessor {
                         if (space is Blog) {
                             // TODO: Remove deleted post
                             TopicJsonHelper.handleBlogTagAndRelatedSubject(topic)
+                            // TODO: Make use of blog author to set type=blog, sid = uid, name = username, displayName = nickname
                         } else if (space is Subject) {
                             if (space.name != null) {
                                 sidNameMappingSet.add(
