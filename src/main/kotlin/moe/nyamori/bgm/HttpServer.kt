@@ -22,7 +22,7 @@ class HttpServer {
                 }*/
             }
                 .get("/after-commit-hook", CommitHook())
-                .post("/forum-enhance/user", ForumEnhanceHandler)
+                .post("/forum-enhance/query", ForumEnhanceHandler)
                 .get("/img/*") { ctx ->
                     ctx.redirect("https://bgm.tv" + ctx.path())
                     return@get
