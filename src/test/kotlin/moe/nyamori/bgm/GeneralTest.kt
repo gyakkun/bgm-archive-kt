@@ -8,7 +8,7 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
-import moe.nyamori.bgm.git.GitHelper.getRevCommitById
+import moe.nyamori.bgm.git.GitHelper.getPrevPersistedJsonCommitRef
 import moe.nyamori.bgm.git.GitHelper.getWalkBetweenCommitInReverseOrder
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
@@ -38,8 +38,12 @@ class GeneralTest {
         fun main(args: Array<String>) {
             val latestCommit = GitHelper.jsonRepoSingleton.getLatestCommitRef()
             val prevPersistedCommit =
-                GitHelper.jsonRepoSingleton.getRevCommitById(Dao.bgmDao().getPrevPersistedCommitId())
-            val walk = GitHelper.jsonRepoSingleton.getWalkBetweenCommitInReverseOrder(latestCommit, prevPersistedCommit)
+                getPrevPersistedJsonCommitRef()
+            val walk = GitHelper.jsonRepoSingleton.getWalkBetweenCommitInReverseOrder(
+                latestCommit,
+                prevPersistedCommit,
+                stepInAdvance = false,
+            )
             var prev = walk.next()
             val sidNameMappingSet = mutableSetOf<SpaceNameMappingData>()
             run breakable@{
@@ -95,29 +99,35 @@ class GeneralTest {
                                 // TODO: Remove deleted post
                                 TopicJsonHelper.handleBlogTagAndRelatedSubject(topic)
                             } else if (space is Subject) {
-                                sidNameMappingSet.add(
-                                    SpaceNameMappingData(
-                                        SpaceType.SUBJECT.id,
-                                        StringHashingHelper.stringHash(space.name!!),
-                                        space.name!!,
-                                        space.displayName!!
+                                if (space.name != null) {
+                                    sidNameMappingSet.add(
+                                        SpaceNameMappingData(
+                                            SpaceType.SUBJECT.id,
+                                            StringHashingHelper.stringHash(space.name!!),
+                                            space.name!!,
+                                            space.displayName!!
+                                        )
                                     )
-                                )
+                                } else {
+                                }
                             } else if (space is Group) {
-                                sidNameMappingSet.add(
-                                    SpaceNameMappingData(
-                                        SpaceType.SUBJECT.id,
-                                        StringHashingHelper.stringHash(space.name!!),
-                                        space.name!!,
-                                        space.displayName!!
+                                if (space.name != null) {
+                                    sidNameMappingSet.add(
+                                        SpaceNameMappingData(
+                                            SpaceType.GROUP.id,
+                                            StringHashingHelper.stringHash(space.name!!),
+                                            space.name!!,
+                                            space.displayName!!
+                                        )
                                     )
-                                )
+                                } else {
+                                }
                             } else {
                                 //
                             }
 
                         }.onFailure {
-                            LOGGER.error("Ex when checking content of $it at commit ${ObjectId.toString(cur)}")
+                            LOGGER.error("Ex when checking content of $path at commit ${ObjectId.toString(cur)}", it)
                             LOGGER.error("Json Str: $jsonStr")
                         }
                     }
