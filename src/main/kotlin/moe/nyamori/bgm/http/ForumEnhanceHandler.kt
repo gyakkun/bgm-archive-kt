@@ -248,7 +248,7 @@ object ForumEnhanceHandler : Handler {
                     if (it.title == null) return@mapNotNull null
                     if (!it.state.isPostNormal()) return@mapNotNull null
                     PostBrief(it.title, it.mid, it.id, it.dateline)
-                }.sortedBy { -it.dateline }.take(10)
+                }.take(10)
             }.toMap()
         val lastCreateTopicMap = vUserLatestCreateTopicRows.groupBy { it.username }
             .map {
@@ -256,7 +256,7 @@ object ForumEnhanceHandler : Handler {
                     if (it.title == null) return@mapNotNull null
                     if (it.state.isTopicDeleted()) return@mapNotNull null
                     TopicBrief(it.title, it.id, it.dateline)
-                }.sortedBy { -it.dateline }.take(10)
+                }.take(10)
             }.toMap()
         val result = run {
             usernameList.associateWith { un ->
