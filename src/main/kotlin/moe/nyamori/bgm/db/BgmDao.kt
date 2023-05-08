@@ -13,7 +13,6 @@ import org.jdbi.v3.sqlobject.transaction.Transaction
 import org.jdbi.v3.sqlobject.transaction.Transactional
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.rmi.server.UID
 
 @JvmDefaultWithCompatibility
 interface BgmDao : Transactional<BgmDao> {
@@ -42,14 +41,14 @@ interface BgmDao : Transactional<BgmDao> {
         select v from meta_data where k = :k
         """
     )
-    fun getMetaData(@Bind("k") k: String): String
+    fun getMetaData(@Bind("k") k: String): String?
 
     fun updatePrevPersistedCommitId(prevPersistRevId: String): Int {
         return upsertMetaData(Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID, prevPersistRevId)
     }
 
     fun getPrevPersistedCommitId(): String {
-        return getMetaData(Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID)
+        return getMetaData(Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID) ?: ""
     }
 
 
@@ -66,16 +65,17 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlBatch(
         """
-        insert into ba_topic (type, id,uid,sid, dateline, state, last_post_pid, title) values (
+        insert into ba_topic (type, id,uid,sid, dateline, state, top_post_pid, last_post_pid, title) values (
             :typeId,
             :t.id,
             :t.uid,
             :t.sid,
             :t.dateline,
             :t.state,
+            :t.topPostPid,
             :t.lastPostPid,
             :t.title
-        ) on conflict(type,id,uid) do update set
+        ) on conflict(type,id) do update set
             sid = :t.sid,
             state = :t.state,
             last_post_pid = :t.lastPostPid,
@@ -94,7 +94,7 @@ interface BgmDao : Transactional<BgmDao> {
             :p.user.id,
             :p.dateline,
             :p.state
-        ) on conflict(type,id,mid,uid) do update set state = :p.state
+        ) on conflict(type,id,mid) do update set state = :p.state
     """
     )
     @Transaction
@@ -170,6 +170,7 @@ interface BgmDao : Transactional<BgmDao> {
     @Transaction
     fun handleNegativeUid() {
         val negativeUidUsers = getNegativeUidUsers()
+        LOGGER.info("Negative uid list: ${negativeUidUsers.map { Pair(it.username, it.id) }}")
         val userList = negativeUidUsers.groupBy { it.username }.map {
             if (it.value.size > 2) {
                 LOGGER.error("${it.key} has more than 2 uids: ${it.value}")
@@ -191,13 +192,13 @@ interface BgmDao : Transactional<BgmDao> {
         }.filterNotNull()
 
         // If having conflict (more than 2 rows actually share the same primary key), first remove the row with neg uid
-        preRemoveConflictTopic(userList)
+        // preRemoveConflictTopic(userList)
         updateNegativeUidInTopic(userList)
-        preRemoveConflictPost(userList)
+        // preRemoveConflictPost(userList)
         updateNegativeUidInPost(userList)
-        preRemoveConflictSidInBlog(userList)
+        // preRemoveConflictSidInBlog(userList)
         updateNegativeSidInBlogTopic(userList)
-        removeNegativeUidUser(userList)
+        // removeNegativeUidUser(userList)
     }
 
 
@@ -393,7 +394,6 @@ interface BgmDao : Transactional<BgmDao> {
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VPostCountSpaceRow>
-
 
 
     @SqlQuery(
