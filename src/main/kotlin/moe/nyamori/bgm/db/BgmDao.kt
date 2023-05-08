@@ -385,25 +385,40 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select * from ba_v_likes_sum_by_space_face_key_uid_username where username in (<l>)
+            with tmp as (select bl.type     as type,
+                                bl.value    as face_key,
+                                bl.total    as face_count,
+                                bp.mid      as mid,
+                                bp.id       as pid,
+                                bu.id       as uid,
+                                bu.username as username
+                         from ba_likes bl
+                                  inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type
+                                  -- inner join ba_topic bt on bp.type = bt.type and bp.mid = bt.id --  and bt.state != 1
+                                  inner join ba_user bu on bp.uid = bu.id
+                         where bu.username in
+                               (<l>) and bl.type = :t)
+            select tmp.type, tmp.face_key, tmp.uid, tmp.username, sum(tmp.face_count) count
+            from tmp
+            group by tmp.type, tmp.face_key, tmp.uid, tmp.username
+            having count > 0;
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
-    fun getLikesSumByUsernameList(
+   fun getLikesSumByTypeAndUsernameList(
+        @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikesSumRow>
 
-    fun getLikesSumByTypeAndUsernameList(
-        type: Int,
-        l: Iterable<String>
-    ): List<VLikesSumRow> {
-        return getLikesSumByUsernameList(l)
-            .filter { it.type == type }
-    }
-
     @SqlQuery(
         """
-            select * from ba_v_post_count_group_by_type_space_uid_state where type = :t and username in (<l>)
+            select bp.type, bp.uid, bsnm.name, bsnm.display_name, bu.username, bp.state, count(1) count
+                from ba_post bp
+                         inner join ba_user bu on bp.uid = bu.id
+                         inner join ba_space_naming_mapping bsnm on bp.type = bsnm.type and bp.sid = bsnm.sid
+                 where bu.username in (<l>) and bp.type=:t
+                group by bp.type, bp.uid, bp.state, bp.sid;
+
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
@@ -457,9 +472,18 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select * from ba_v_topic_username_rank_by_last_reply_and_dateline
-             where type = :t and username in (<l>) and rank_last_reply <= 10
-               and dateline >= ((select unixepoch() - 86400*365*3))
+        select *
+        from (select bt.*,
+                     bp.dateline as                                                                  last_update_time,
+                     bu.username as                                                                  username,
+                     rank() over (partition by bt.type,bt.uid order by bp.dateline desc, bp.id desc) rank_last_reply
+              from ba_topic bt
+                       inner join ba_post bp on bt.last_post_pid = bp.id and bt.type = bp.type
+                       inner join ba_user bu on bu.id = bt.uid
+              where bt.type = :t
+                and bu.username in (<l>)
+                and bt.dateline >= ((select unixepoch() - 86400 * 365 * 3)))
+        where rank_last_reply <= 10
         """
     )
     @RegisterKotlinMapper(VUserLatestCreateTopicRow::class)

@@ -54,7 +54,7 @@ data class VUserLatestCreateTopicRow(
     val lastUpdateTime: Long,
     val username: String,
     val rankLastReply: Int,
-    val rankDateline: Int
+    // val rankDateline: Int
 )
 
 data class VUserLastReplyTopicRow(
