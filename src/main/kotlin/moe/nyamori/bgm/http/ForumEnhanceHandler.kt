@@ -137,7 +137,9 @@ object ForumEnhanceHandler : Handler {
                     val deleted = it.value.filter { it.state.isPostDeleted() }.sumOf { it.count }
                     val adminDeleted = it.value.filter { it.state.isPostAdminDeleted() }.sumOf { it.count }
                     it.key to PostStat(total, deleted, adminDeleted) // boring to (1,2,3)
-                }.toMap() // sai -> { boring: (1,2,3) }
+                }.sortedBy { -(it.second.total) }
+                    .take(5)
+                    .toMap() // sai -> { boring: (1,2,3) }
             }.toMap() // { sai: {boring: (1,2,3)} , trim21: {a:(4,5,6)} }
         val spaceTopicStatMap = vTopicCountSpaceRows.groupBy { it.username }
             .map {
@@ -148,7 +150,9 @@ object ForumEnhanceHandler : Handler {
                     val closed = it.value.filter { it.state.isTopicClosed() }.sumOf { it.count }
                     val reopen = it.value.filter { it.state.isTopicReopen() }.sumOf { it.count }
                     it.key to TopicStat(total, deleted, silent, closed, reopen) // boring to (1,2,3)
-                }.toMap() // sai -> { boring: (1,2,3) }
+                }.sortedBy { -(it.second.total) }
+                    .take(5)
+                    .toMap() // sai -> { boring: (1,2,3) }
             }.toMap() // { sai: {boring: (1,2,3)} , trim21: {a:(4,5,6)} }
         val spaceStatMergedMap = run {
             val userKeys = mutableSetOf<String>().apply {
@@ -172,6 +176,7 @@ object ForumEnhanceHandler : Handler {
                         spaceNameToTopicStatMap[spaceName] ?: TopicStat(),
                     )
                 }.sortedBy { -(it.post.total + it.topic.total) }
+                    .take(5)
             }.toMap()
         }
         val lastReplyTopicMap = vUserLastReplyTopicRows.groupBy { it.username }
@@ -180,7 +185,7 @@ object ForumEnhanceHandler : Handler {
                     if (it.title == null) return@mapNotNull null
                     if (!it.state.isPostNormal()) return@mapNotNull null
                     PostBrief(it.title, it.mid, it.id, it.dateline)
-                }.sortedBy { -it.dateline }
+                }.sortedBy { -it.dateline }.take(10)
             }.toMap()
         val lastCreateTopicMap = vUserLatestCreateTopicRows.groupBy { it.username }
             .map {
@@ -188,7 +193,7 @@ object ForumEnhanceHandler : Handler {
                     if (it.title == null) return@mapNotNull null
                     if (it.state.isTopicDeleted()) return@mapNotNull null
                     TopicBrief(it.title, it.id, it.dateline)
-                }.sortedBy { -it.dateline }
+                }.sortedBy { -it.dateline }.take(10)
             }.toMap()
         val result = run {
             usernameList.associateWith { un ->
