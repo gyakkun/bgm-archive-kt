@@ -5,7 +5,6 @@ import moe.nyamori.bgm.model.*
 import java.util.ArrayList
 
 object TopicJsonHelper {
-    const val TITLE_MAX_LENGTH = 100
     fun getUserListFromPostList(postList: List<Post>) =
         postList.mapNotNull { it.user }.distinct()
 
@@ -32,25 +31,23 @@ object TopicJsonHelper {
     }
 
     fun preProcessTopic(topic: Topic): Topic {
-        if (topic.uid != null) {
-            return topic.copy(title = topic.title?.substring(0, topic.title!!.length.coerceAtMost(TITLE_MAX_LENGTH)))
-        }
+        if (topic.uid != null) return topic
         if (topic.isEmptyTopic()) {
-            return topic.copy(uid = 0, dateline = 0)
+            return topic.copy(dateline = 0)
         }
         val topPostPid = topic.topPostPid!!
-        val topPost = topic.getAllPosts().first { it.id == topPostPid }
+        val topPost = topic.getAllPosts().firstOrNull { it.id == topPostPid }
+            ?: throw IllegalStateException("Topic type=${topic.space!!.type} id=${topic.id} has null top post!")
         var topPostUser = topPost.user
         if (topPostUser == null) {
-            topPostUser = User(id = 0, username = "0", nickname = "0")
+            topPostUser = User(id = null, username = "0", nickname = "0")
         } else {
             if (topPostUser.id == null) {
                 topPostUser = topPostUser.let { it.copy(id = StringHashingHelper.stringHash(it.username)) }
             }
         }
         return topic.copy(
-            uid = topPostUser.id,
-            title = topic.title?.substring(0, topic.title!!.length.coerceAtMost(TITLE_MAX_LENGTH))
+            uid = topPostUser.id
         )
     }
 
@@ -58,7 +55,7 @@ object TopicJsonHelper {
         if (post.user != null && post.user!!.id != null) return post
         var postUser = post.user
         if (postUser == null) {
-            postUser = User(id = 0, username = "0", nickname = "0")
+            postUser = User(id = null, username = "0", nickname = "0")
         } else {
             if (postUser.id == null) {
                 postUser = postUser.let { it.copy(id = StringHashingHelper.stringHash(it.username)) }
@@ -69,7 +66,6 @@ object TopicJsonHelper {
 
     fun isValidTopic(topic: Topic): Boolean {
         return topic.space != null
-        // && (topic.space!!.type == SpaceType.GROUP || topic.space!!.type == SpaceType.SUBJECT)
     }
 
     fun getLikeListFromTopic(topic: Topic): List<Like> {
