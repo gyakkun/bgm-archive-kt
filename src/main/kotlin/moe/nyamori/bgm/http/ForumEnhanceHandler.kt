@@ -21,7 +21,8 @@ object ForumEnhanceHandler : Handler {
 
         val ch = checkValidReq(ctx) ?: return
         val (spaceType, userList) = ch
-        getInfoBySpaceTypeAndUsernameList(spaceType, userList)
+        val res = getInfoBySpaceTypeAndUsernameList(spaceType, userList)
+        ctx.json(res)
     }
 
     fun checkValidReq(ctx: Context): Pair<SpaceType, List<String>>? {
@@ -86,7 +87,7 @@ object ForumEnhanceHandler : Handler {
         val vTopicCountSpaceRows = topicCountSpaceByTypeAndUsernameList.await()
         val vUserLastReplyTopicRows = userLastReplyTopicByTypeAndUsernameList.await()
         val vUserLatestCreateTopicRows = userLatestCreateTopicAndUsernameList.await()
-        aggregateResult(
+        val res = aggregateResult(
             usernameList,
             vAllPostCountRows,
             vAllTopicCountRows,
@@ -96,7 +97,7 @@ object ForumEnhanceHandler : Handler {
             vUserLastReplyTopicRows,
             vUserLatestCreateTopicRows
         )
-        System.err.println("end")
+        return@runBlocking res
     }
 
     private fun aggregateResult(
@@ -108,7 +109,102 @@ object ForumEnhanceHandler : Handler {
         vTopicCountSpaceRows: List<VTopicCountSpaceRow> = emptyList(),
         vUserLastReplyTopicRows: List<VUserLastReplyTopicRow> = emptyList(),
         vUserLatestCreateTopicRows: List<VUserLatestCreateTopicRow> = emptyList()
-    ) {
+    ): Map<String, UserStat> {
+        val postStatMap = vAllPostCountRows.groupBy { it.username } // ->poststat
+            .map {
+                val total = it.value.sumOf { it.count }
+                val deleted = it.value.filter { it.state.isPostDeleted() }.sumOf { it.count }
+                val adminDeleted = it.value.filter { it.state.isPostAdminDeleted() }.sumOf { it.count }
+                it.key to PostStat(total, deleted, adminDeleted)
+            }.toMap()
+        val topicStatMap = vAllTopicCountRows.groupBy { it.username }
+            .map {
+                val total = it.value.sumOf { it.count }
+                val deleted = it.value.filter { it.state.isTopicDeleted() }.sumOf { it.count }
+                val silent = it.value.filter { it.state.isTopicSilent() }.sumOf { it.count }
+                val closed = it.value.filter { it.state.isTopicClosed() }.sumOf { it.count }
+                val reopen = it.value.filter { it.state.isTopicReopen() }.sumOf { it.count }
+                it.key to TopicStat(total, deleted, silent, closed, reopen)
+            }.toMap()
+        val likeStatMap = vLikesSumRows.groupBy { it.username }
+            .map {
+                it.key to it.value.associate { it.faceKey to it.count }
+            }.toMap()
+        val spacePostStatMap = vPostCountSpaceRows.groupBy { it.username }
+            .map {
+                it.key to it.value.groupBy { it.name }.map {
+                    val total = it.value.sumOf { it.count }
+                    val deleted = it.value.filter { it.state.isPostDeleted() }.sumOf { it.count }
+                    val adminDeleted = it.value.filter { it.state.isPostAdminDeleted() }.sumOf { it.count }
+                    it.key to PostStat(total, deleted, adminDeleted) // boring to (1,2,3)
+                }.toMap() // sai -> { boring: (1,2,3) }
+            }.toMap() // { sai: {boring: (1,2,3)} , trim21: {a:(4,5,6)} }
+        val spaceTopicStatMap = vTopicCountSpaceRows.groupBy { it.username }
+            .map {
+                it.key to it.value.groupBy { it.name }.map {
+                    val total = it.value.sumOf { it.count }
+                    val deleted = it.value.filter { it.state.isTopicDeleted() }.sumOf { it.count }
+                    val silent = it.value.filter { it.state.isTopicSilent() }.sumOf { it.count }
+                    val closed = it.value.filter { it.state.isTopicClosed() }.sumOf { it.count }
+                    val reopen = it.value.filter { it.state.isTopicReopen() }.sumOf { it.count }
+                    it.key to TopicStat(total, deleted, silent, closed, reopen) // boring to (1,2,3)
+                }.toMap() // sai -> { boring: (1,2,3) }
+            }.toMap() // { sai: {boring: (1,2,3)} , trim21: {a:(4,5,6)} }
+        val spaceStatMergedMap = run {
+            val userKeys = mutableSetOf<String>().apply {
+                addAll(spacePostStatMap.keys)
+                addAll(spaceTopicStatMap.keys)
+            }
+            val spaceNameDisplayNameMap = mutableMapOf<String, String>().apply {
+                putAll(vTopicCountSpaceRows.map { it.name to it.displayName }.distinct().toMap())
+                putAll(vPostCountSpaceRows.map { it.name to it.displayName }.distinct().toMap())
+            }
+            userKeys.map { username ->
+                val spaceNameToTopicStatMap = spaceTopicStatMap[username] ?: emptyMap()
+                val spaceNameToPostStatMap = spacePostStatMap[username] ?: emptyMap()
+                username to spaceNameDisplayNameMap.keys.mapNotNull { spaceName ->
+                    if (spaceNameToTopicStatMap[spaceName] == null && spaceNameToPostStatMap[spaceName] == null) {
+                        return@mapNotNull null
+                    }
+                    SpaceStat(
+                        spaceName, spaceNameDisplayNameMap[spaceName]!!,
+                        spaceNameToPostStatMap[spaceName] ?: PostStat(),
+                        spaceNameToTopicStatMap[spaceName] ?: TopicStat(),
+                    )
+                }.sortedBy { -(it.post.total + it.topic.total) }
+            }.toMap()
+        }
+        val lastReplyTopicMap = vUserLastReplyTopicRows.groupBy { it.username }
+            .map {
+                it.key to it.value.mapNotNull {
+                    if (it.title == null) return@mapNotNull null
+                    if (!it.state.isPostNormal()) return@mapNotNull null
+                    PostBrief(it.title, it.mid, it.id, it.dateline)
+                }.sortedBy { -it.dateline }
+            }.toMap()
+        val lastCreateTopicMap = vUserLatestCreateTopicRows.groupBy { it.username }
+            .map {
+                it.key to it.value.mapNotNull {
+                    if (it.title == null) return@mapNotNull null
+                    if (it.state.isTopicDeleted()) return@mapNotNull null
+                    TopicBrief(it.title, it.id, it.dateline)
+                }.sortedBy { -it.dateline }
+            }.toMap()
+        val result = run {
+            usernameList.associateWith { un ->
+                UserStat(
+                    postStat = postStatMap[un] ?: PostStat(),
+                    topicStat = topicStatMap[un] ?: TopicStat(),
+                    likeStat = likeStatMap[un] ?: emptyMap(),
+                    spaceStat = spaceStatMergedMap[un] ?: emptyList(),
+                    recentActivities = Recent(
+                        topic = lastCreateTopicMap[un] ?: emptyList(),
+                        post = lastReplyTopicMap[un] ?: emptyList()
+                    )
+                )
+            }
+        }
+        return result
         // user : {
         //    postStat : {
         //      total: 123,
@@ -166,8 +262,6 @@ object ForumEnhanceHandler : Handler {
         //
         // }
 
-
-        vAllPostCountRows.groupBy { it.username }
     }
 
     data class PostStat(val total: Int = 0, val deleted: Int = 0, val adminDeleted: Int = 0)
