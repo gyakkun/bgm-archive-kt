@@ -433,7 +433,8 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select bp.*,
+            select * from
+            (select bp.*,
                    bt.title,
                    bu.username,
                    rank() over (partition by bp.type,bp.mid, bp.uid order by bp.dateline,bp.id desc) rank_reply_asc
@@ -443,7 +444,8 @@ interface BgmDao : Transactional<BgmDao> {
             where bp.type = :t
               and bp.uid in (select bu.id
                           from ba_user bu
-                          where bu.username in (<l>))
+                          where bu.username in (<l>)))
+            where rank_reply_asc = 1 and dateline >= ((select unixepoch() - 86400*365*3))
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
@@ -455,7 +457,9 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select * from ba_v_topic_username_rank_by_last_reply_and_dateline where type = :t and username in (<l>) and rank_last_reply <= 10
+            select * from ba_v_topic_username_rank_by_last_reply_and_dateline
+             where type = :t and username in (<l>) and rank_last_reply <= 10
+               and dateline >= ((select unixepoch() - 86400*365*3))
         """
     )
     @RegisterKotlinMapper(VUserLatestCreateTopicRow::class)
