@@ -92,7 +92,7 @@ class GeneralTest {
 
                             Dao.bgmDao().batchUpsertUser(userListFromFile)
                             Dao.bgmDao().batchUpsertLikes(processedLikeList)
-                            Dao.bgmDao().batchUpsertPost(spaceTypeId, postListFromFile)
+                            Dao.bgmDao().batchUpsertPost(spaceTypeId, topic.getSid(), postListFromFile)
                             Dao.bgmDao().batchUpsertTopic(spaceTypeId, listOf(topic))
 
                             if (space is Blog) {

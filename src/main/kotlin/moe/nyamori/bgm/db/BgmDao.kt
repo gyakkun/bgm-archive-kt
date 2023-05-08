@@ -87,18 +87,19 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlBatch(
         """
-        insert into ba_post (type, id, mid, uid,dateline,state) values (
+        insert into ba_post (type, id, mid, uid,dateline,state,sid) values (
             :typeId,
             :p.id,
             :p.mid,
             :p.user.id,
             :p.dateline,
-            :p.state
+            :p.state,
+            :sid
         ) on conflict(type,id,mid) do update set state = :p.state
     """
     )
     @Transaction
-    fun batchUpsertPost(@Bind("typeId") typeId: Int, @BindBean("p") topicList: Iterable<Post>): IntArray
+    fun batchUpsertPost(@Bind("typeId") typeId: Int, @Bind("sid") sid:Int, @BindBean("p") topicList: Iterable<Post>): IntArray
 
     @SqlBatch(
         """

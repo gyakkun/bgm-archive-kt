@@ -124,7 +124,7 @@ class DbTest {
 
                     Dao.bgmDao().batchUpsertUser(userList)
                     Dao.bgmDao().batchUpsertLikes(likeList)
-                    Dao.bgmDao().batchUpsertPost(topic.space!!.type.id, postList)
+                    Dao.bgmDao().batchUpsertPost(topic.space!!.type.id, topic.getSid(), postList)
                     Dao.bgmDao().batchUpsertTopic(topic.space!!.type.id, listOf(topic))
 
                     if (topic.space!! is Blog) {
