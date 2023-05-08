@@ -88,7 +88,9 @@ data class Topic(
     }
 
     fun isEmptyTopic(): Boolean {
-        return isBlogClub() || isBlogRedirect() || isDeleted() || postList.isNullOrEmpty() || topPostPid == null
+        return isBlogClub() || isBlogRedirect() || isDeleted()
+                || postList.isNullOrEmpty()
+                || topPostPid == null || (topPostPid!! == 0) || (topPostPid!! == -1)
     }
 }
 
