@@ -1,27 +1,87 @@
 package moe.nyamori.bgm.http
 
+import com.github.benmanes.caffeine.cache.CacheLoader
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.db.*
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 
 object ForumEnhanceHandler : Handler {
     private val LOGGER = LoggerFactory.getLogger(ForumEnhanceHandler::class.java)
     private val GSON = Gson()
     private val STRING_OBJECT_TYPE_TOKEN = object : TypeToken<Map<String, Any>>() {}.type
-    override fun handle(ctx: Context) {
+    private val CACHE =
+        Caffeine.newBuilder()
+            .maximumSize(500)
+            .expireAfterWrite(Duration.ofMinutes(120))
+            .build(object : CacheLoader<Pair<SpaceType, String/*username*/>, UserStat> {
 
-        val ch = checkValidReq(ctx) ?: return
-        val (spaceType, userList) = ch
-        val res = getInfoBySpaceTypeAndUsernameList(spaceType, userList)
-        ctx.json(res)
+                override fun load(key: Pair<SpaceType, String>?): UserStat? = runBlocking {
+                    return@runBlocking getInfoBySpaceTypeAndUsernameList(
+                        key!!.first,
+                        listOf(key.second)
+                    ).await()[key.second]!!
+                }
+
+                override fun loadAll(keys: MutableSet<out Pair<SpaceType, String>>?): MutableMap<out Pair<SpaceType, String>, out UserStat> =
+                    runBlocking {
+                        val tmp = keys!!.groupBy { it.first }.map { it.key to it.value.map { it.second } }
+                            .toMap()
+                            .map {
+                                val type = it.key
+                                val usernameList = it.value
+                                val toMerge = getInfoBySpaceTypeAndUsernameList(type, usernameList).await()
+                                    .map { Pair(type, it.key) to it.value }
+                                    .toMap()
+                                return@map toMerge
+                            }
+                        return@runBlocking mutableMapOf<Pair<SpaceType, String>, UserStat>().apply {
+                            tmp.forEach {
+                                putAll(it)
+                            }
+                        }
+                    }
+
+            })
+
+    override fun handle(ctx: Context) = runBlocking {
+        try {
+            if (!HttpHelper.DB_WRITE_LOCK.tryLock(30, TimeUnit.SECONDS) || !HttpHelper.DB_READ_SEMAPHORE.tryAcquire(
+                    30,
+                    TimeUnit.SECONDS
+                )
+            ) {
+                ctx.status(HttpStatus.GATEWAY_TIMEOUT)
+                ctx.result("Server is busy. Please try later.")
+                return@runBlocking
+            }
+            val ch = checkValidReq(ctx) ?: return@runBlocking
+            val (spaceType, userList) = ch
+            // val res = getInfoBySpaceTypeAndUsernameList(spaceType, userList).await()
+            val res = CACHE.getAll(userList.map { spaceType to it }).map { it.key.second to it.value }.toMap()
+            ctx.json(res)
+            HttpHelper.DB_READ_SEMAPHORE.release()
+        } catch (ex: Exception) {
+            LOGGER.error("Ex when handling forum enhance: ", ex)
+        } finally {
+            if (HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread) {
+                HttpHelper.DB_WRITE_LOCK.unlock()
+            }
+        }
+
     }
 
     fun checkValidReq(ctx: Context): Pair<SpaceType, List<String>>? {
@@ -32,8 +92,11 @@ object ForumEnhanceHandler : Handler {
             ctx.result("Users should be a list of string.")
             return null
         }
-        val userList = (bodyMap["users"]!! as List<String>).distinct()
-
+        var userList = (bodyMap["users"]!! as List<String>).distinct()
+        if (userList.size > 200) {
+            LOGGER.warn("User list too large, take the first 200.")
+            userList = userList.take(200)
+        }
         if (bodyMap["type"] == null || bodyMap["type"]!! !in SpaceType.values().map { it.name.lowercase() }) {
             ctx.status(HttpStatus.BAD_REQUEST)
             ctx.result("Space type should be one of group, subject and blog")
@@ -43,7 +106,10 @@ object ForumEnhanceHandler : Handler {
         return Pair(spaceType, userList)
     }
 
-    fun getInfoBySpaceTypeAndUsernameList(spaceType: SpaceType, usernameList: List<String>) = runBlocking {
+    fun getInfoBySpaceTypeAndUsernameList(
+        spaceType: SpaceType,
+        usernameList: List<String>
+    ): Deferred<Map<String, UserStat>> = GlobalScope.async {
         val allPostCountByTypeAndUsernameList = async {
             timingWrapper("getAllPostCountByTypeAndUsernameList") {
                 Dao.bgmDao().getAllPostCountByTypeAndUsernameList(spaceType.id, usernameList)
@@ -96,7 +162,7 @@ object ForumEnhanceHandler : Handler {
             vUserLastReplyTopicRows,
             vUserLatestCreateTopicRows
         )
-        return@runBlocking res
+        return@async res
     }
 
     private fun aggregateResult(
@@ -292,11 +358,13 @@ object ForumEnhanceHandler : Handler {
         val recentActivities: Recent = Recent()
     )
 
-    private inline fun <T, R> T.timingWrapper(funName: String = "", block: T.() -> R): R {
-        if (funName.isNotBlank()) System.err.println("Function $funName start")
+    private fun <T, R> T.timingWrapper(funName: String = "", block: T.() -> R): R {
+        if (funName.isNotBlank()) {
+            LOGGER.info("Function $funName start")
+        }
         val timing = System.currentTimeMillis()
         val res = block()
-        System.err.println("Timing:${funName.ifBlank { "" }} ${System.currentTimeMillis() - timing}ms.")
+        LOGGER.info("Timing:${funName.ifBlank { "" }} ${System.currentTimeMillis() - timing}ms.")
         return res
     }
 
