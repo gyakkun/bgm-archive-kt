@@ -76,8 +76,11 @@ interface BgmDao : Transactional<BgmDao> {
             :t.lastPostPid,
             :t.title
         ) on conflict(type,id) do update set
+            uid = :t.uid,
             sid = :t.sid,
+            dateline = :t.dateline,
             state = :t.state,
+            top_post_pid = :t.topPostPid,
             last_post_pid = :t.lastPostPid,
             title = :t.title
     """
@@ -95,7 +98,8 @@ interface BgmDao : Transactional<BgmDao> {
             :p.dateline,
             :p.state,
             :sid
-        ) on conflict(type,id,mid) do update set state = :p.state
+        ) on conflict(type,id,mid) do update set 
+            state = :p.state
     """
     )
     @Transaction
