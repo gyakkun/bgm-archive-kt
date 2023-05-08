@@ -18,14 +18,15 @@ create table if not exists ba_topic
 (
     type          integer not null,
     id            integer not null,
-    uid           integer not null,
+    uid           integer,
     sid           integer,
     dateline      integer,
     state         integer,
+    top_post_pid  integer,
     last_post_pid integer,
     title         text,
     constraint ba_topic_pk
-        primary key (type, id, uid)
+        primary key (type, id)
 );
 
 create index if not exists ba_topic_type_uid_index
@@ -41,12 +42,12 @@ create table if not exists ba_post
 (
     type     integer not null,
     id       integer not null,
-    mid      integer not null,
-    uid      integer not null,
+    mid      integer,
+    uid      integer,
     dateline integer,
     state    integer,
     constraint ba_post_pk
-        primary key (type, id, mid, uid)
+        primary key (type, id, mid)
 );
 
 create index if not exists ba_post_type_uid_index

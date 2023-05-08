@@ -74,4 +74,7 @@ create index if not exists ba_post_type_uid_state_index
 create index if not exists ba_topic_type_uid_state_index
     on ba_topic (type, uid, state);
 
+create index ba_likes_type_pid_index
+    on ba_likes (type, pid);
+
 
