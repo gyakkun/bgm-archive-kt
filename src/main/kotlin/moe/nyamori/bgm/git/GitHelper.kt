@@ -7,6 +7,7 @@ import com.ibm.icu.text.CharsetDetector
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+import moe.nyamori.bgm.db.Dao
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.diff.DiffEntry.DEV_NULL
 import org.eclipse.jgit.lib.Constants.DOT_GIT
@@ -87,6 +88,24 @@ object GitHelper {
             val revId = repo.resolve(id)
             val revCommit = revWalk.parseCommit(revId)
             return revCommit
+        }
+    }
+
+    fun getPrevPersistedJsonCommitRef(): RevCommit {
+        jsonRepoSingleton.use { jsonRepo ->
+            val revWalk = RevWalk(jsonRepo)
+            val prevPersistedCommitRevIdStr = Dao.bgmDao().getPrevPersistedCommitId()
+            val prevPersistedCommitRevId = if (prevPersistedCommitRevIdStr.isBlank()) {
+                val headObj = jsonRepo.resolve(HEAD)
+                val headCommit = jsonRepo.parseCommit(headObj)
+                val tmpWalk = RevWalk(jsonRepo)
+                tmpWalk.markStart(headCommit)
+                tmpWalk.last().id
+            } else {
+                jsonRepo.resolve(prevPersistedCommitRevIdStr)
+            }
+            val prevPersistedCommit = revWalk.parseCommit(prevPersistedCommitRevId)
+            return prevPersistedCommit
         }
     }
 
