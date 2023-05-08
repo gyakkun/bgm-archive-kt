@@ -7,7 +7,8 @@ import java.util.concurrent.locks.ReentrantLock
 
 object HttpHelper {
     val GIT_RELATED_LOCK = ReentrantLock()
-    val DB_RELATED_SEMAPHORE = Semaphore(5)
+    val DB_WRITE_LOCK = ReentrantLock()
+    val DB_READ_SEMAPHORE = Semaphore(5)
     fun checkAndExtractSpaceTypeInContext(ctx: Context): SpaceType {
         val spaceTypeFromPath = ctx.pathParam("spaceType")
         if (SpaceType.values().none {

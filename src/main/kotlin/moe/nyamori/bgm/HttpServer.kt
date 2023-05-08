@@ -10,7 +10,7 @@ import java.util.concurrent.locks.ReentrantLock
 
 class HttpServer {
     companion object {
-        private val log = LoggerFactory.getLogger(HttpServer.javaClass)
+        private val log = LoggerFactory.getLogger(HttpServer::class.java)
 
         @JvmStatic
         fun main(args: Array<String>) {
@@ -21,7 +21,8 @@ class HttpServer {
 
                 }*/
             }
-                .get("/after-commit-hook", CommitHook())
+                .get("/after-commit-hook", CommitHook)
+                .get("/db-persist-hook", DbPersistHook)
                 .post("/forum-enhance/query", ForumEnhanceHandler)
                 .get("/img/*") { ctx ->
                     ctx.redirect("https://bgm.tv" + ctx.path())

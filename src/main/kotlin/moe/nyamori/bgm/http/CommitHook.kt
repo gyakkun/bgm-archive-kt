@@ -7,7 +7,7 @@ import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
 import java.util.concurrent.TimeUnit
 
-class CommitHook : Handler {
+object CommitHook : Handler {
     override fun handle(ctx: Context) {
         if (Config.BGM_ARCHIVE_DISABLE_HOOK) {
             ctx.status(400)
