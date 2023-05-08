@@ -8,7 +8,6 @@ import io.javalin.http.HttpStatus
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.db.*
-import moe.nyamori.bgm.http.ForumEnhanceHandler.isPostDeleted
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.SpaceType
 import org.slf4j.LoggerFactory
@@ -138,7 +137,6 @@ object ForumEnhanceHandler : Handler {
                     val adminDeleted = it.value.filter { it.state.isPostAdminDeleted() }.sumOf { it.count }
                     it.key to PostStat(total, deleted, adminDeleted) // boring to (1,2,3)
                 }.sortedBy { -(it.second.total) }
-                    .take(5)
                     .toMap() // sai -> { boring: (1,2,3) }
             }.toMap() // { sai: {boring: (1,2,3)} , trim21: {a:(4,5,6)} }
         val spaceTopicStatMap = vTopicCountSpaceRows.groupBy { it.username }
@@ -151,7 +149,6 @@ object ForumEnhanceHandler : Handler {
                     val reopen = it.value.filter { it.state.isTopicReopen() }.sumOf { it.count }
                     it.key to TopicStat(total, deleted, silent, closed, reopen) // boring to (1,2,3)
                 }.sortedBy { -(it.second.total) }
-                    .take(5)
                     .toMap() // sai -> { boring: (1,2,3) }
             }.toMap() // { sai: {boring: (1,2,3)} , trim21: {a:(4,5,6)} }
         val spaceStatMergedMap = run {
