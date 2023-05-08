@@ -8,6 +8,8 @@ import io.javalin.http.HttpStatus
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.db.*
+import moe.nyamori.bgm.http.ForumEnhanceHandler.isPostDeleted
+import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.SpaceType
 import org.slf4j.LoggerFactory
 
@@ -108,22 +110,22 @@ object ForumEnhanceHandler : Handler {
         vUserLatestCreateTopicRows: List<VUserLatestCreateTopicRow> = emptyList()
     ) {
         // user : {
-        //    post : {
+        //    postStat : {
         //      total: 123,
         //      deleted: 12,
         //      adminDeleted: 1
         //    }
-        //    topic : {
+        //    topicStat : {
         //      total: 45,
         //      deleted: 1,
         //      silent: 0,
         //      closed: 1,
         //      reopen: 0
         //    },
-        //    likes : {
+        //    likesStat : {
         //      faceKey1 : faceValue1
         //    }
-        //    space : [
+        //    spaceStat : [
         //       {
         //         displayName: 茶话会,
         //         name: boring,
@@ -141,7 +143,7 @@ object ForumEnhanceHandler : Handler {
         //         },
         //       }
         //    ],
-        //    recent : {
+        //    recentActivities : {
         //        topic : [
         //           {
         //              title: fishing,
@@ -165,17 +167,65 @@ object ForumEnhanceHandler : Handler {
         // }
 
 
-
         vAllPostCountRows.groupBy { it.username }
     }
 
+    data class PostStat(val total: Int = 0, val deleted: Int = 0, val adminDeleted: Int = 0)
+    data class TopicStat(
+        val total: Int = 0,
+        val deleted: Int = 0,
+        val silent: Int = 0,
+        val closed: Int = 0,
+        val reopen: Int = 0
+    )
 
+    data class SpaceStat(
+        val name: String, val displayName: String,
+        val post: PostStat = PostStat(0, 0, 0),
+        val topic: TopicStat = TopicStat(0, 0, 0, 0, 0)
+    )
 
-    inline fun <T, R> T.timingWrapper(funName: String = "", block: T.() -> R): R {
+    data class TopicBrief(val title: String, val id: Int, val dateline: Long)
+    data class PostBrief(val title: String, val mid: Int, val pid: Int, val dateline: Long)
+    data class Recent(val topic: List<TopicBrief> = emptyList(), val post: List<PostBrief> = emptyList())
+    data class UserStat(
+        val postStat: PostStat = PostStat(),
+        val topicStat: TopicStat = TopicStat(),
+        val likeStat: Map<Int, Int> = mapOf(),
+        val spaceStat: List<SpaceStat> = listOf(),
+        val recentActivities: Recent = Recent()
+    )
+
+    private inline fun <T, R> T.timingWrapper(funName: String = "", block: T.() -> R): R {
         if (funName.isNotBlank()) System.err.println("Function $funName start")
         val timing = System.currentTimeMillis()
         val res = block()
         System.err.println("Timing:${funName.ifBlank { "" }} ${System.currentTimeMillis() - timing}ms.")
         return res
+    }
+
+    private fun Long.isPostDeleted(): Boolean {
+        return this and Post.STATE_DELETED == Post.STATE_DELETED
+    }
+
+    private fun Long.isPostAdminDeleted(): Boolean {
+        return this and Post.STATE_ADMIN_DELETED == Post.STATE_ADMIN_DELETED
+    }
+
+    private fun Long.isPostNormal(): Boolean {
+        return this and 1L == 0L
+    }
+
+    private fun Long.isTopicDeleted() = this.isPostDeleted()
+    private fun Long.isTopicSilent(): Boolean {
+        return this and Post.STATE_SILENT == Post.STATE_SILENT
+    }
+
+    private fun Long.isTopicClosed(): Boolean {
+        return this and Post.STATE_CLOSED == Post.STATE_CLOSED
+    }
+
+    private fun Long.isTopicReopen(): Boolean {
+        return this and Post.STATE_REOPEN == Post.STATE_REOPEN
     }
 }
