@@ -452,7 +452,7 @@ interface BgmDao : Transactional<BgmDao> {
             (select bp.*,
                    bt.title,
                    bu.username,
-                   rank() over (partition by bp.type,bp.mid, bp.uid order by bp.dateline,bp.id desc) rank_reply_asc
+                   rank() over (partition by bp.type,bp.mid, bp.uid order by bp.dateline desc,bp.id desc) rank_reply_asc
             from ba_post bp
             inner join ba_topic bt on bp.mid = bt.id and bp.type = bt.type and bt.top_post_pid!=bp.id
             inner join ba_user bu on bu.id = bp.uid
