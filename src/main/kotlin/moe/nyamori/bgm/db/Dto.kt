@@ -37,7 +37,7 @@ data class VAllPostCountRow(
 data class VLikesSumRow(
     val type: Int,
     val faceKey: Int,
-    val uid: Int,
+    // val uid: Int,
     val username: String,
     val count: Int
 )

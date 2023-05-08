@@ -385,22 +385,18 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            with tmp as (select bl.type     as type,
-                                bl.value    as face_key,
-                                bl.total    as face_count,
-                                bp.mid      as mid,
-                                bp.id       as pid,
-                                bu.id       as uid,
-                                bu.username as username
-                         from ba_likes bl
-                                  inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type
-                                  -- inner join ba_topic bt on bp.type = bt.type and bp.mid = bt.id --  and bt.state != 1
-                                  inner join ba_user bu on bp.uid = bu.id
-                         where bu.username in
-                               (<l>) and bl.type = :t)
-            select tmp.type, tmp.face_key, tmp.uid, tmp.username, sum(tmp.face_count) count
-            from tmp
-            group by tmp.type, tmp.face_key, tmp.uid, tmp.username
+            select bl.type     as type,
+                   bl.value    as face_key,
+                   bl.total    as face_count,
+                   bu.username as username,
+                   sum(bl.total)  count
+            from ba_likes bl
+                     inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type
+                     inner join ba_user bu on bp.uid = bu.id
+            where bu.username in
+                  (<l>)
+              and bl.type = :t
+            group by bl.type, face_key, username
             having count > 0;
         """
     )
@@ -457,10 +453,12 @@ interface BgmDao : Transactional<BgmDao> {
             inner join ba_topic bt on bp.mid = bt.id and bp.type = bt.type and bt.top_post_pid!=bp.id
             inner join ba_user bu on bu.id = bp.uid
             where bp.type = :t
+              and bp.dateline >= ((select unixepoch() - 86400*365*3)
               and bp.uid in (select bu.id
                           from ba_user bu
                           where bu.username in (<l>)))
-            where rank_reply_asc = 1 and dateline >= ((select unixepoch() - 86400*365*3))
+              )
+            where rank_reply_asc = 1 
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
