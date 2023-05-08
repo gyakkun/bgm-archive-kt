@@ -4,6 +4,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.db.SpaceNameMappingData
+import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
@@ -44,8 +45,19 @@ class GeneralTest {
                 prevPersistedCommit,
                 stepInAdvance = false,
             )
+            val realPrevPersistedCommitForCheck = getPrevPersistedJsonCommitRef()
             var prev = walk.next()
             val sidNameMappingSet = mutableSetOf<SpaceNameMappingData>()
+            var everFailed = false
+
+            while (prev != null) {
+                if (realPrevPersistedCommitForCheck == prev) {
+                    break
+                }
+                prev = walk.next()
+            }
+
+            LOGGER.info("The previously persisted json repo commit: $prev")
             run breakable@{
                 walk.forEach outer@{ cur ->
                     if (cur == prev) {
@@ -125,10 +137,12 @@ class GeneralTest {
                             } else {
                                 //
                             }
-
+                            Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
+                            sidNameMappingSet.clear()
                         }.onFailure {
                             LOGGER.error("Ex when checking content of $path at commit ${ObjectId.toString(cur)}", it)
                             LOGGER.error("Json Str: $jsonStr")
+                            everFailed = true
                         }
                     }
 
@@ -136,7 +150,10 @@ class GeneralTest {
                     prev = cur
                 }
                 Dao.bgmDao().handleNegativeUid()
-                Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
+            }
+            LOGGER.info("Persisted last commit ${Dao.bgmDao().getPrevPersistedCommitId()}")
+            if (everFailed) {
+                LOGGER.error("Failed at persistence. Please check log!")
             }
         }
 
@@ -153,7 +170,7 @@ class GeneralTest {
 
             val fileLikeKeys = likeListFromFile.groupBy { it.pid to it.value }.keys
             val dbLikeKeys = likeListFromDb.groupBy { it.pid to it.value }.keys
-            val fileLikeKeyCopy = fileLikeKeys.toMutableSet()
+            // val fileLikeKeyCopy = fileLikeKeys.toMutableSet()
             val dbLikeKeysCopy = dbLikeKeys.toMutableSet()
             // If some keys not in file but in db, then update the result to set zero of these types
             dbLikeKeysCopy.removeAll(fileLikeKeys)

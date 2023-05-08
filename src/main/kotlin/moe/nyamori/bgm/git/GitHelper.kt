@@ -62,7 +62,8 @@ object GitHelper {
         return archiveRepoSingleton.getWalkBetweenCommitInReverseOrder(
             latestArchiveCommit,
             prevProcessedArchiveCommit,
-            stepInAdvance = false)
+            stepInAdvance = false
+        )
     }
 
     fun Repository.getWalkBetweenCommitInReverseOrder(
@@ -91,18 +92,29 @@ object GitHelper {
         }
     }
 
+    fun Repository.getFirstCommitId(): String {
+        this.use { repo ->
+            val headObj = this.resolve(HEAD)
+            val headCommit = repo.parseCommit(headObj)
+            val tmpWalk = RevWalk(repo)
+            tmpWalk.markStart(headCommit)
+            return ObjectId.toString(tmpWalk.last().id)
+        }
+    }
+
     fun getPrevPersistedJsonCommitRef(): RevCommit {
         jsonRepoSingleton.use { jsonRepo ->
             val revWalk = RevWalk(jsonRepo)
             val prevPersistedCommitRevIdStr = Dao.bgmDao().getPrevPersistedCommitId()
             val prevPersistedCommitRevId = if (prevPersistedCommitRevIdStr.isBlank()) {
-                val headObj = jsonRepo.resolve(HEAD)
-                val headCommit = jsonRepo.parseCommit(headObj)
-                val tmpWalk = RevWalk(jsonRepo)
-                tmpWalk.markStart(headCommit)
-                tmpWalk.last().id
+                jsonRepo.resolve(jsonRepo.getFirstCommitId())
             } else {
-                jsonRepo.resolve(prevPersistedCommitRevIdStr)
+                runCatching { jsonRepo.resolve(prevPersistedCommitRevIdStr) }
+                    .onFailure {
+                        log.error("Ex when resolving persisted json commit ref $prevPersistedCommitRevIdStr:", it)
+                        log.error("May due to a new json repo is presented. Returning the first commit.")
+                    }
+                    .getOrDefault(jsonRepo.resolve(jsonRepo.getFirstCommitId()))
             }
             val prevPersistedCommit = revWalk.parseCommit(prevPersistedCommitRevId)
             return prevPersistedCommit
