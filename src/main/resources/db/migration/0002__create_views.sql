@@ -77,4 +77,7 @@ create index if not exists ba_topic_type_uid_state_index
 create index if not exists ba_likes_type_pid_index
     on ba_likes (type, pid);
 
+create index if not exists ba_user_username_index
+    on ba_user (username);
+
 
