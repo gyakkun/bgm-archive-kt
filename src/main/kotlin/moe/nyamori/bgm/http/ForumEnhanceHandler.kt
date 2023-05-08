@@ -40,19 +40,35 @@ object ForumEnhanceHandler : Handler {
     }
 
     fun getInfoBySpaceTypeAndUsernameList(spaceType: SpaceType, usernameList: List<String>) {
-        val allPostCountByTypeAndUsernameList =
+        val allPostCountByTypeAndUsernameList = timingWrapper("getAllPostCountByTypeAndUsernameList") {
             Dao.bgmDao().getAllPostCountByTypeAndUsernameList(spaceType.id, usernameList)
-        val allTopicCountByTypeAndUsernameList =
+        }
+        val allTopicCountByTypeAndUsernameList = timingWrapper("getAllTopicCountByTypeAndUsernameList") {
             Dao.bgmDao().getAllTopicCountByTypeAndUsernameList(spaceType.id, usernameList)
-        val likesSumByTypeAndUsernameList = Dao.bgmDao().getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
-        val postCountSpaceByTypeAndUsernameList =
+        }
+        val likesSumByTypeAndUsernameList = timingWrapper("getLikesSumByTypeAndUsernameList") {
+            Dao.bgmDao().getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
+        }
+        val postCountSpaceByTypeAndUsernameList = timingWrapper("getPostCountSpaceByTypeAndUsernameList") {
             Dao.bgmDao().getPostCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
-        val topicCountSpaceByTypeAndUsernameList =
+        }
+        val topicCountSpaceByTypeAndUsernameList = timingWrapper("getTopicCountSpaceByTypeAndUsernameList") {
             Dao.bgmDao().getTopicCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
-        val userLastReplyTopicByTypeAndUsernameList =
+        }
+        val userLastReplyTopicByTypeAndUsernameList = timingWrapper("getUserLastReplyTopicByTypeAndUsernameList") {
             Dao.bgmDao().getUserLastReplyTopicByTypeAndUsernameList(spaceType.id, usernameList)
-        val userLatestCreateTopicAndUsernameList =
+        }
+        val userLatestCreateTopicAndUsernameList = timingWrapper("getUserLatestCreateTopicAndUsernameList") {
             Dao.bgmDao().getUserLatestCreateTopicAndUsernameList(spaceType.id, usernameList)
+        }
         System.err.println("end")
+    }
+
+    inline fun <T, R> T.timingWrapper(funName: String = "", block: T.() -> R): R {
+        if (funName.isNotBlank()) System.err.println("Function $funName start")
+        val timing = System.currentTimeMillis()
+        val res = block()
+        System.err.println("Timing:${funName.ifBlank { "" }} ${System.currentTimeMillis() - timing}ms.")
+        return res
     }
 }
