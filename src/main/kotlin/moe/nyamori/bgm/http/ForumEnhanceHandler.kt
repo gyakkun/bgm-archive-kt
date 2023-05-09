@@ -103,6 +103,7 @@ object ForumEnhanceHandler : Handler {
             return null
         }
         var userList = (bodyMap["users"]!! as List<String>).distinct()
+        userList = Dao.bgmDao().getValidUsernameListFromList(userList)
         if (userList.size > 200) {
             LOGGER.warn("User list too large, take the first 200.")
             userList = userList.take(200)

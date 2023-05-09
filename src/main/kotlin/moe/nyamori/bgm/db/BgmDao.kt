@@ -103,7 +103,11 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun batchUpsertPost(@Bind("typeId") typeId: Int, @Bind("sid") sid:Int, @BindBean("p") topicList: Iterable<Post>): IntArray
+    fun batchUpsertPost(
+        @Bind("typeId") typeId: Int,
+        @Bind("sid") sid: Int,
+        @BindBean("p") topicList: Iterable<Post>
+    ): IntArray
 
     @SqlBatch(
         """
@@ -133,6 +137,13 @@ interface BgmDao : Transactional<BgmDao> {
     @RegisterKotlinMapper(User::class)
     fun getNegativeUidUsers(): List<User>
 
+    @SqlQuery(
+        """
+        select distinct username from ba_user where username in (<l>) and username is not null
+    """
+    )
+    fun getValidUsernameListFromList(@BindList("l") l: List<String>):List<String>
+
     @SqlBatch(
         """
         UPDATE ba_topic
@@ -141,6 +152,7 @@ interface BgmDao : Transactional<BgmDao> {
           uid = :p.second -- negative
     """
     )
+    @Transaction
     fun updateNegativeUidInTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
 
@@ -152,6 +164,7 @@ interface BgmDao : Transactional<BgmDao> {
           uid = :p.second -- negative
     """
     )
+    @Transaction
     fun updateNegativeUidInPost(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
     @SqlBatch(
@@ -163,6 +176,7 @@ interface BgmDao : Transactional<BgmDao> {
           and type = 100 -- \$\{SpaceType.BLOG.id}
     """
     )
+    @Transaction
     fun updateNegativeSidInBlogTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
     @SqlBatch(
@@ -170,6 +184,7 @@ interface BgmDao : Transactional<BgmDao> {
             DELETE FROM ba_user WHERE id = :p.second;
         """
     )
+    @Transaction
     fun removeNegativeUidUser(@BindBean("p") userList: Iterable<Pair<Int, Int>>)
 
     @Transaction
@@ -223,6 +238,7 @@ interface BgmDao : Transactional<BgmDao> {
         delete from ba_topic where type = :t.type and id = :t.id and uid < 0
     """
     )
+    @Transaction
     fun doRemoveConflictTopic(@BindBean("t") t: DeRepetitiveTopicData): Int
 
     fun preRemoveConflictTopic(userList: List<Pair<Int, Int>>) {
@@ -253,6 +269,7 @@ interface BgmDao : Transactional<BgmDao> {
         delete from ba_post where type = :t.type and id = :t.id and mid = :t.mid and uid < 0
     """
     )
+    @Transaction
     fun doRemoveConflictPost(@BindBean("t") t: DeRepetitivePostData): Int
 
     fun preRemoveConflictPost(userList: List<Pair<Int, Int>>) {
@@ -283,6 +300,7 @@ interface BgmDao : Transactional<BgmDao> {
         delete from ba_topic where type = 100 and id = :t.id and sid < 0
     """
     )
+    @Transaction
     fun doRemoveConflictBlogTopic(@BindBean("t") t: DeRepetitiveBlogTopicData): Int
     fun preRemoveConflictSidInBlog(userList: List<Pair<Int, Int>>) {
         for (i in userList) {
@@ -405,7 +423,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
-   fun getLikesSumByTypeAndUsernameList(
+    fun getLikesSumByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikesSumRow>
