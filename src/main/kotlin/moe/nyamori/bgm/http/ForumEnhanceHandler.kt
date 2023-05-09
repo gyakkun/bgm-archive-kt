@@ -297,7 +297,7 @@ object ForumEnhanceHandler : Handler {
         //      closed: 1,
         //      reopen: 0
         //    },
-        //    likesStat : {
+        //    likeStat : {
         //      faceKey1 : faceValue1
         //    }
         //    spaceStat : [
