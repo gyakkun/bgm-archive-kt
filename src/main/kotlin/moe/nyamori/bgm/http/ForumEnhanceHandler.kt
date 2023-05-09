@@ -108,7 +108,7 @@ object ForumEnhanceHandler : Handler {
             LOGGER.warn("User list too large, take the first 200.")
             userList = userList.take(200)
         }
-        if (bodyMap["type"] == null || bodyMap["type"]!! !in SpaceType.values().map { it.name.lowercase() }) {
+        if (bodyMap["type"] == null || bodyMap["type"] !is String || bodyMap["type"]!! !in SpaceType.values().map { it.name.lowercase() }) {
             ctx.status(HttpStatus.BAD_REQUEST)
             ctx.result("Field \"type\" should be one of group, subject and blog")
             return null
