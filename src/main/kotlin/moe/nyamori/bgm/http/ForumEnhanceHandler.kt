@@ -76,6 +76,7 @@ object ForumEnhanceHandler : Handler {
             HttpHelper.DB_READ_SEMAPHORE.release()
         } catch (ex: Exception) {
             LOGGER.error("Ex when handling forum enhance: ", ex)
+            throw ex
         } finally {
             if (HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread) {
                 HttpHelper.DB_WRITE_LOCK.unlock()
@@ -87,9 +88,12 @@ object ForumEnhanceHandler : Handler {
     fun checkValidReq(ctx: Context): Pair<SpaceType, List<String>>? {
         val bodyStr = ctx.body()
         val bodyMap = GSON.fromJson<Map<String, Any>>(bodyStr, STRING_OBJECT_TYPE_TOKEN)
-        if (bodyMap["users"] == null || bodyMap["users"]!! !is List<*>) {
+        if (bodyMap["users"] == null
+            || bodyMap["users"]!! !is List<*>
+            || (bodyMap["users"]!! as List<*>).any { it !is String }
+        ) {
             ctx.status(HttpStatus.BAD_REQUEST)
-            ctx.result("Users should be a list of string.")
+            ctx.result("Field \"users\" should be a list of string.")
             return null
         }
         var userList = (bodyMap["users"]!! as List<String>).distinct()
@@ -99,7 +103,7 @@ object ForumEnhanceHandler : Handler {
         }
         if (bodyMap["type"] == null || bodyMap["type"]!! !in SpaceType.values().map { it.name.lowercase() }) {
             ctx.status(HttpStatus.BAD_REQUEST)
-            ctx.result("Space type should be one of group, subject and blog")
+            ctx.result("Field \"type\" should be one of group, subject and blog")
             return null
         }
         val spaceType = SpaceType.valueOf((bodyMap["type"] as String).uppercase())
