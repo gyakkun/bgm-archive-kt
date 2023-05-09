@@ -17,9 +17,12 @@ class HttpServer {
 
             val app = Javalin.create { config ->
                 config.compression.brotliAndGzip()
-                /*config.plugins.enableCors { cors ->
-
-                }*/
+                config.plugins.enableCors { cors ->
+                    cors.add {
+                        it.allowHost("bgm.tv", "bangumi.tv", "chii.in")
+                        it.allowHost("*.bgm.tv", "*.bangumi.tv", "*.chii.in")
+                    }
+                }
             }
                 .get("/after-commit-hook", CommitHook)
                 .get("/db-persist-hook", DbPersistHook)
