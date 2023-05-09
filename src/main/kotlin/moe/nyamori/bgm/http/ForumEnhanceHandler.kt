@@ -68,15 +68,21 @@ object ForumEnhanceHandler : Handler {
                 ctx.result("Server is busy. Please try later.")
                 return@runBlocking
             }
-            val ch = checkValidReq(ctx) ?: return@runBlocking
-            val (spaceType, userList) = ch
-            // val res = getInfoBySpaceTypeAndUsernameList(spaceType, userList).await()
-            val res = CACHE.getAll(userList.map { spaceType to it }).map { it.key.second to it.value }.toMap()
-            ctx.json(res)
-            HttpHelper.DB_READ_SEMAPHORE.release()
-        } catch (ex: Exception) {
-            LOGGER.error("Ex when handling forum enhance: ", ex)
-            throw ex
+            try {
+                val ch = checkValidReq(ctx) ?: return@runBlocking
+                val (spaceType, userList) = ch
+                // val res = getInfoBySpaceTypeAndUsernameList(spaceType, userList).await()
+                val res = CACHE.getAll(userList.map { spaceType to it }).map { it.key.second to it.value }.toMap()
+                ctx.json(res)
+                HttpHelper.DB_READ_SEMAPHORE.release()
+            } catch (innerEx: Exception) {
+                throw innerEx
+            } finally {
+                HttpHelper.DB_READ_SEMAPHORE.release()
+            }
+        } catch (outerEx: Exception) {
+            LOGGER.error("Ex when handling forum enhance: ", outerEx)
+            throw outerEx
         } finally {
             if (HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread) {
                 HttpHelper.DB_WRITE_LOCK.unlock()
