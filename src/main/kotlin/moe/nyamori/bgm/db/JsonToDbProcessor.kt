@@ -82,13 +82,13 @@ object JsonToDbProcessor {
                         val space = topic.space!!
                         val spaceTypeId = topic.space!!.type.id
                         val topicId = topic.id
-                        val topicListFromDb =
-                            Dao.bgmDao().getTopicListByTypeAndTopicId(spaceTypeId, topicId)
-                        val postListFromDb =
-                            Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
+                        // val topicListFromDb =
+                        //    Dao.bgmDao().getTopicListByTypeAndTopicId(spaceTypeId, topicId)
+                        // val postListFromDb =
+                        //    Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
                         val likeListFromDb = Dao.bgmDao().getLikeListByTypeAndTopicId(spaceTypeId, topicId)
-                        LOGGER.debug("topic {}", topicListFromDb)
-                        LOGGER.debug("post {}", postListFromDb)
+                        // LOGGER.debug("topic {}", topicListFromDb)
+                        // LOGGER.debug("post {}", postListFromDb)
                         LOGGER.debug("like {}", likeListFromDb)
 
                         val postListFromFile = getPostListFromTopic(topic)
