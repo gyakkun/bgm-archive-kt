@@ -94,6 +94,13 @@ object ForumEnhanceHandler : Handler {
     fun checkValidReq(ctx: Context): Pair<SpaceType, List<String>>? {
         val bodyStr = ctx.body()
         val bodyMap = GSON.fromJson<Map<String, Any>>(bodyStr, STRING_OBJECT_TYPE_TOKEN)
+        if (bodyMap["type"] == null || bodyMap["type"] !is String || bodyMap["type"]!! !in SpaceType.values().map { it.name.lowercase() }) {
+            ctx.status(HttpStatus.BAD_REQUEST)
+            ctx.result("Field \"type\" should be one of group, subject and blog")
+            return null
+        }
+        val spaceType = SpaceType.valueOf((bodyMap["type"] as String).uppercase())
+
         if (bodyMap["users"] == null
             || bodyMap["users"]!! !is List<*>
             || (bodyMap["users"]!! as List<*>).any { it !is String }
@@ -108,12 +115,6 @@ object ForumEnhanceHandler : Handler {
             LOGGER.warn("User list too large, take the first 200.")
             userList = userList.take(200)
         }
-        if (bodyMap["type"] == null || bodyMap["type"] !is String || bodyMap["type"]!! !in SpaceType.values().map { it.name.lowercase() }) {
-            ctx.status(HttpStatus.BAD_REQUEST)
-            ctx.result("Field \"type\" should be one of group, subject and blog")
-            return null
-        }
-        val spaceType = SpaceType.valueOf((bodyMap["type"] as String).uppercase())
         return Pair(spaceType, userList)
     }
 
