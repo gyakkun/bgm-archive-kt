@@ -23,13 +23,15 @@ object ForumEnhanceHandler : Handler {
     private val LOGGER = LoggerFactory.getLogger(ForumEnhanceHandler::class.java)
     private val GSON = Gson()
     private val STRING_OBJECT_TYPE_TOKEN = object : TypeToken<Map<String, Any>>() {}.type
+    private val CACHE_DURATION = Duration.ofHours(2)
+    private const val CACHE_SIZE = 600L
     private val CACHE =
         Caffeine.newBuilder()
-            .maximumSize(500)
-            .expireAfterWrite(Duration.ofMinutes(120))
+            .maximumSize(CACHE_SIZE)
+            .expireAfterWrite(CACHE_DURATION)
             .build(object : CacheLoader<Pair<SpaceType, String/*username*/>, UserStat> {
 
-                override fun load(key: Pair<SpaceType, String>?): UserStat? = runBlocking {
+                override fun load(key: Pair<SpaceType, String>?): UserStat = runBlocking {
                     return@runBlocking getInfoBySpaceTypeAndUsernameList(
                         key!!.first,
                         listOf(key.second)
@@ -94,7 +96,9 @@ object ForumEnhanceHandler : Handler {
     fun checkValidReq(ctx: Context): Pair<SpaceType, List<String>>? {
         val bodyStr = ctx.body()
         val bodyMap = GSON.fromJson<Map<String, Any>>(bodyStr, STRING_OBJECT_TYPE_TOKEN)
-        if (bodyMap["type"] == null || bodyMap["type"] !is String || bodyMap["type"]!! !in SpaceType.values().map { it.name.lowercase() }) {
+        if (bodyMap["type"] == null || bodyMap["type"] !is String || bodyMap["type"]!! !in SpaceType.values()
+                .map { it.name.lowercase() }
+        ) {
             ctx.status(HttpStatus.BAD_REQUEST)
             ctx.result("Field \"type\" should be one of group, subject and blog")
             return null
@@ -165,6 +169,7 @@ object ForumEnhanceHandler : Handler {
         val vUserLastReplyTopicRows = userLastReplyTopicByTypeAndUsernameList.await()
         val vUserLatestCreateTopicRows = userLatestCreateTopicAndUsernameList.await()
         val res = aggregateResult(
+            spaceType,
             usernameList,
             vAllPostCountRows,
             vAllTopicCountRows,
@@ -178,6 +183,7 @@ object ForumEnhanceHandler : Handler {
     }
 
     private fun aggregateResult(
+        spaceType: SpaceType,
         usernameList: List<String>,
         vAllPostCountRows: List<VAllPostCountRow> = emptyList(),
         vAllTopicCountRows: List<VAllTopicCountRow> = emptyList(),
@@ -273,6 +279,10 @@ object ForumEnhanceHandler : Handler {
         val result = run {
             usernameList.associateWith { un ->
                 UserStat(
+                    _meta = mutableMapOf(
+                        "expiredAt" to (System.currentTimeMillis() + CACHE_DURATION.toMillis())
+                    ),
+                    type = spaceType.name.lowercase(),
                     postStat = postStatMap[un] ?: PostStat(),
                     topicStat = topicStatMap[un] ?: TopicStat(),
                     likeStat = likeStatMap[un] ?: emptyMap(),
@@ -363,6 +373,8 @@ object ForumEnhanceHandler : Handler {
     data class PostBrief(val title: String, val mid: Int, val pid: Int, val dateline: Long)
     data class Recent(val topic: List<TopicBrief> = emptyList(), val post: List<PostBrief> = emptyList())
     data class UserStat(
+        val _meta: MutableMap<String, Any?> = mutableMapOf(),
+        val type: String,
         val postStat: PostStat = PostStat(),
         val topicStat: TopicStat = TopicStat(),
         val likeStat: Map<Int, Int> = mapOf(),
