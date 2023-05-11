@@ -82,7 +82,7 @@ interface BgmDao : Transactional<BgmDao> {
             state = :t.state,
             top_post_pid = :t.topPostPid,
             last_post_pid = :t.lastPostPid,
-            title = :t.title
+            title = coalesce(:t.title , title)
     """
     )
     @Transaction
