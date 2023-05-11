@@ -3,15 +3,15 @@ package moe.nyamori.bgm.model
 import moe.nyamori.bgm.util.StringHashingHelper
 
 data class Topic(
-    var id: Int,
-    var space: Space? = null,
-    var uid: Int? = null,
-    var title: String? = null,
-    var dateline: Long? = null,
-    var display: Boolean = false,
-    var topPostPid: Int? = null,
-    var state: Long = Post.STATE_NORMAL,
-    var postList: List<Post>? = null
+        var id: Int,
+        var space: Space? = null,
+        var uid: Int? = null,
+        var title: String? = null,
+        var dateline: Long? = null,
+        var display: Boolean = false,
+        var topPostPid: Int? = null,
+        var state: Long = Post.STATE_NORMAL,
+        var postList: List<Post>? = null
 ) {
     fun getSid(): Int {
         if (this.space == null) {
@@ -49,9 +49,9 @@ data class Topic(
         return result
     }
 
-    fun getLastPostPid(): Int {
+    fun getLastPostPid(): Int? {
         val allPosts = getAllPosts()
-        if (allPosts.isEmpty()) return -1
+        if (allPosts.isEmpty()) return null
         return allPosts.maxBy { it.id }.id
     }
 
