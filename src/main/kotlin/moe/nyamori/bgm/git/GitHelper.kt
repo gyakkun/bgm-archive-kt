@@ -23,6 +23,7 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser
 import org.eclipse.jgit.treewalk.TreeWalk
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.lang.IllegalArgumentException
 import java.nio.charset.StandardCharsets
 
 object GitHelper {
@@ -41,8 +42,8 @@ object GitHelper {
         if (Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
         else {
             Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
-                .map { getRepoByPath(it.trim()) }
-                .toList()
+                    .map { getRepoByPath(it.trim()) }
+                    .toList()
         }
     }
 
@@ -50,8 +51,8 @@ object GitHelper {
         if (Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
         else {
             Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
-                .map { getRepoByPath(it.trim()) }
-                .toList()
+                    .map { getRepoByPath(it.trim()) }
+                    .toList()
         }
     }
 
@@ -60,16 +61,16 @@ object GitHelper {
         val prevProcessedArchiveCommit = getPrevProcessedArchiveCommitRef()
         val latestArchiveCommit = getLatestArchiveCommitRef()
         return archiveRepoSingleton.getWalkBetweenCommitInReverseOrder(
-            latestArchiveCommit,
-            prevProcessedArchiveCommit,
-            stepInAdvance = false
+                latestArchiveCommit,
+                prevProcessedArchiveCommit,
+                stepInAdvance = false
         )
     }
 
     fun Repository.getWalkBetweenCommitInReverseOrder(
-        topCommit: RevCommit,
-        bottomCommit: RevCommit,
-        stepInAdvance: Boolean = true
+            topCommit: RevCommit,
+            bottomCommit: RevCommit,
+            stepInAdvance: Boolean = true
     ): RevWalk {
         this.use {
             val walk = RevWalk(it)
@@ -92,7 +93,7 @@ object GitHelper {
         }
     }
 
-    fun Repository.getFirstCommitId(): String {
+    fun Repository.getFirstCommitIdStr(): String {
         this.use { repo ->
             val headObj = this.resolve(HEAD)
             val headCommit = repo.parseCommit(headObj)
@@ -102,41 +103,21 @@ object GitHelper {
         }
     }
 
+    fun Repository.getGivenCommitByIdStrOrFirstCommit(commitIdStr: String): RevCommit {
+        return runCatching {
+            if (commitIdStr.isBlank()) throw IllegalArgumentException("Commit id should not be blank! Repo: $this")
+            this.getRevCommitById(commitIdStr)
+        }.onFailure {
+            log.error("Error when getting commit by id in repo-$this, id-$commitIdStr", it)
+        }.getOrDefault(this.getRevCommitById(this.getFirstCommitIdStr()))
+    }
+
     fun getPrevPersistedJsonCommitRef(): RevCommit {
-        jsonRepoSingleton.use { jsonRepo ->
-            val revWalk = RevWalk(jsonRepo)
-            val prevPersistedCommitRevIdStr = Dao.bgmDao().getPrevPersistedCommitId()
-            val prevPersistedCommitRevId = if (prevPersistedCommitRevIdStr.isBlank()) {
-                jsonRepo.resolve(jsonRepo.getFirstCommitId())
-            } else {
-                runCatching { jsonRepo.resolve(prevPersistedCommitRevIdStr) }
-                    .onFailure {
-                        log.error("Ex when resolving persisted json commit ref $prevPersistedCommitRevIdStr:", it)
-                        log.error("May due to a new json repo is presented. Returning the first commit.")
-                    }
-                    .getOrDefault(jsonRepo.resolve(jsonRepo.getFirstCommitId()))
-            }
-            val prevPersistedCommit = revWalk.parseCommit(prevPersistedCommitRevId)
-            return prevPersistedCommit
-        }
+        return jsonRepoSingleton.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao().getPrevPersistedCommitId())
     }
 
     fun getPrevProcessedArchiveCommitRef(): RevCommit {
-        archiveRepoSingleton.use { archiveRepo ->
-            val revWalk = RevWalk(archiveRepo)
-            val prevProcessedCommitRevIdStr = getPrevProcessedArchiveCommitRevId()
-            val prevProcessedCommitRevId = if (prevProcessedCommitRevIdStr.isBlank()) {
-                val headObj = archiveRepo.resolve(HEAD)
-                val headCommit = archiveRepo.parseCommit(headObj)
-                val tmpWalk = RevWalk(archiveRepo)
-                tmpWalk.markStart(headCommit)
-                tmpWalk.last().id
-            } else {
-                archiveRepo.resolve(prevProcessedCommitRevIdStr)
-            }
-            val prevProcessedCommit = revWalk.parseCommit(prevProcessedCommitRevId)
-            return prevProcessedCommit
-        }
+        return archiveRepoSingleton.getGivenCommitByIdStrOrFirstCommit(getPrevProcessedArchiveCommitRevIdStr())
     }
 
     fun getLatestArchiveCommitRef(): RevCommit {
@@ -152,15 +133,15 @@ object GitHelper {
         }
     }
 
-    fun getPrevProcessedArchiveCommitRevId(): String {
+    fun getPrevProcessedArchiveCommitRevIdStr(): String {
         if (jsonRepoSingleton.isBare) {
             return jsonRepoSingleton.getFileContentAsStringInACommit(
-                jsonRepoSingleton.getLatestCommitRef(),
-                BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+                    jsonRepoSingleton.getLatestCommitRef(),
+                    BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
             ).trim()
         } else {
             val prevProcessedCommitRevIdFile =
-                File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+                    File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
             if (!prevProcessedCommitRevIdFile.exists()) return EMPTY_STRING
             val rawFileStr = FileUtil.getFileContent(prevProcessedCommitRevIdFile)!!
             return rawFileStr.trim()
@@ -174,10 +155,10 @@ object GitHelper {
             repo = repo.resolve(DOT_GIT)
         }
         return FileRepositoryBuilder()
-            .setGitDir(repo)
-            .readEnvironment() // scan environment GIT_* variables
-            .findGitDir() // scan up the file system tree
-            .build()
+                .setGitDir(repo)
+                .readEnvironment() // scan environment GIT_* variables
+                .findGitDir() // scan up the file system tree
+                .build()
     }
 
     private fun getJsonRepo(): Repository {
@@ -221,13 +202,13 @@ object GitHelper {
             newTreeIter.reset(reader, curTree)
             Git(this).use { git ->
                 git.diff()
-                    .setNewTree(newTreeIter)
-                    .setOldTree(oldTreeIter)
-                    .call()
-                    .forEach {
-                        if (it.newPath == DEV_NULL) return@forEach
-                        result.add(it.newPath)
-                    }
+                        .setNewTree(newTreeIter)
+                        .setOldTree(oldTreeIter)
+                        .call()
+                        .forEach {
+                            if (it.newPath == DEV_NULL) return@forEach
+                            result.add(it.newPath)
+                        }
             }
         }
         return result
