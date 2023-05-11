@@ -76,12 +76,12 @@ interface BgmDao : Transactional<BgmDao> {
             :t.lastPostPid,
             :t.title
         ) on conflict(type,id) do update set
-            uid = :t.uid,
-            sid = :t.sid,
-            dateline = :t.dateline,
+            -- uid = coalesce(:t.uid, uid),
+            -- sid = coalesce(:t.sid,sid),
+            -- dateline = coalesce(:t.dateline,dateline),
             state = :t.state,
-            top_post_pid = :t.topPostPid,
-            last_post_pid = :t.lastPostPid,
+            -- top_post_pid = coalesce(:t.topPostPid, top_post_pid),
+            last_post_pid = coalesce(:t.lastPostPid, last_post_pid),
             title = coalesce(:t.title , title)
     """
     )
