@@ -2,9 +2,6 @@ package moe.nyamori.bgm.db
 
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
-import moe.nyamori.bgm.db.Dao
-import moe.nyamori.bgm.db.SpaceNameMappingData
-import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
@@ -22,8 +19,6 @@ import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
 import org.eclipse.jgit.lib.ObjectId
 import org.slf4j.LoggerFactory
-import java.io.IOException
-import java.util.*
 
 object JsonToDbProcessor {
     val LOGGER = LoggerFactory.getLogger(JsonToDbProcessor.javaClass)

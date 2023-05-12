@@ -366,8 +366,8 @@ object ForumEnhanceHandler : Handler {
 
     data class SpaceStat(
             val name: String, val displayName: String,
-            val post: PostStat = PostStat(0, 0, 0),
-            val topic: TopicStat = TopicStat(0, 0, 0, 0, 0)
+            val post: PostStat = PostStat(),
+            val topic: TopicStat = TopicStat()
     )
 
     data class TopicBrief(val title: String, val id: Int, val dateline: Long)
