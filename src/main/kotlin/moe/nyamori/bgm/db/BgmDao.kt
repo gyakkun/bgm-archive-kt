@@ -76,11 +76,11 @@ interface BgmDao : Transactional<BgmDao> {
             :t.lastPostPid,
             :t.title
         ) on conflict(type,id) do update set
-            -- uid = coalesce(:t.uid, uid),
-            -- sid = coalesce(:t.sid,sid, 0),
-            -- dateline = coalesce(:t.dateline,dateline),
+            uid = coalesce(:t.uid, uid),
+            sid = coalesce(:t.sid, sid),
+            dateline = coalesce(:t.dateline,dateline),
             state = :t.state,
-            -- top_post_pid = coalesce(:t.topPostPid, top_post_pid),
+            top_post_pid = coalesce(:t.topPostPid, top_post_pid),
             last_post_pid = coalesce(:t.lastPostPid, last_post_pid, -1),
             title = coalesce(:t.title , title)
     """
@@ -97,7 +97,7 @@ interface BgmDao : Transactional<BgmDao> {
             :p.user.id,
             :p.dateline,
             :p.state,
-            :sid
+            coalesce(:sid, 0)
         ) on conflict(type,id,mid) do update set 
             state = :p.state
     """
@@ -105,8 +105,8 @@ interface BgmDao : Transactional<BgmDao> {
     @Transaction
     fun batchUpsertPost(
         @Bind("typeId") typeId: Int,
-        @Bind("sid") sid: Int,
-        @BindBean("p") topicList: Iterable<Post>
+        @Bind("sid") sid: Int?,
+        @BindBean("p") postList: Iterable<Post>
     ): IntArray
 
     @SqlBatch(

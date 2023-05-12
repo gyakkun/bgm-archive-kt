@@ -33,7 +33,7 @@ object TopicJsonHelper {
     fun preProcessTopic(topic: Topic): Topic {
         if (topic.uid != null) return topic
         if (topic.isEmptyTopic()) {
-            return topic.copy(dateline = 0)
+            return topic
         }
         val topPostPid = topic.topPostPid!!
         val topPost = topic.getAllPosts().firstOrNull { it.id == topPostPid }

@@ -13,11 +13,11 @@ data class Topic(
         var state: Long = Post.STATE_NORMAL,
         var postList: List<Post>? = null
 ) {
-    fun getSid(): Int {
+    fun getSid(): Int? {
         if (this.space == null) {
             throw IllegalStateException("Not able to get sid for null space!")
         }
-        if (this.isEmptyTopic()) return 0
+        if (this.isEmptyTopic()) return null
         return when (space!!) {
             is Subject -> {
                 StringHashingHelper.stringHash((space!! as Subject).name!!)
