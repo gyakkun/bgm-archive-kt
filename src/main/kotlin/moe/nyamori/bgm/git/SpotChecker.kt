@@ -5,11 +5,9 @@ import com.google.gson.ToNumberPolicy
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
-import moe.nyamori.bgm.util.PostToStateHelper.fromPostHtmlToState
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
@@ -17,6 +15,7 @@ import java.io.File
 import java.io.FileWriter
 import java.util.*
 import kotlin.streams.asStream
+import kotlin.streams.toList
 
 object SpotChecker {
     private val LOGGER = LoggerFactory.getLogger(SpotChecker::class.java)
@@ -34,11 +33,11 @@ object SpotChecker {
     @JvmStatic
     fun main(argv: Array<String>) {
         LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
-        // generateTopicMaskFile(SpaceType.GROUP)
-//         System.err.println(randomSelectTopicIds(SpaceType.GROUP))
-        SpaceType.values().forEach {
-            genHiddenTopicMaskFile(it)
-        }
+        genSpotCheckListFile(SpaceType.GROUP)
+        // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
+        // SpaceType.values().forEach {
+        //     genHiddenTopicMaskFile(it)
+        // }
     }
 
     fun genSpotCheckListFile(spaceType: SpaceType) {
@@ -47,11 +46,13 @@ object SpotChecker {
         val scList = randomSelectTopicIds(spaceType)
         val scFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_LIST_FILE_NAME")
+        // if (true) return
         FileWriter(scFile).use { fw ->
             BufferedWriter(fw).use { bw ->
                 scList.forEach {
                     bw.write(it.toString())
-                    bw.newLine()
+                    // bw.newLine()
+                    bw.write("\n")
                 }
                 bw.flush()
             }
@@ -62,6 +63,7 @@ object SpotChecker {
         val result = mutableListOf<Int>()
         val spotCheckedBs = getSpotCheckedTopicMask(spaceType)
         val hiddenBs = getHiddenTopicMask(spaceType)
+        val maxId = getMaxId(spaceType)
 
         spotCheckedBs.or(hiddenBs)
         val remainZeroCount = spotCheckedBs.size() - spotCheckedBs.cardinality()
@@ -80,6 +82,7 @@ object SpotChecker {
             LOGGER.warn("$spaceType remain zero count less than bitset alloc unit 64. Wrap them all to sc.txt")
             var tmpId = 0
             while (spotCheckedBs.nextClearBit(tmpId).also { tmpId = it } < spotCheckedBs.size()) {
+                if (tmpId > maxId) break
                 spotCheckedBs.set(tmpId)
                 result.add(tmpId)
             }
@@ -101,11 +104,12 @@ object SpotChecker {
         repeat(samplingSize) {
             var victim: Int
             do {
-                victim = spotCheckedBs.nextClearBit(r.nextInt(0, spotCheckedBs.size()))
-            } while (victim >= spotCheckedBs.size())
+                victim = spotCheckedBs.nextClearBit(r.nextInt(0, spotCheckedBs.size().coerceAtMost(maxId)))
+            } while (victim >= spotCheckedBs.size() || victim > maxId)
             spotCheckedBs.set(victim)
             result.add(victim)
         }
+        result.sorted()
 
         writeBitsetToFile(
             spotCheckedBs,
@@ -113,7 +117,7 @@ object SpotChecker {
         )
 
         LOGGER.info("Spot check id selected: $spaceType - $result")
-        return result.sorted()
+        return result
     }
 
     private fun getSpotCheckedTopicMask(spaceType: SpaceType): BitSet {
@@ -154,7 +158,7 @@ object SpotChecker {
             if (!file.absolutePath.contains(spaceType.name.lowercase())) return@walkThroughJson false
             if (!file.extension.equals("json", ignoreCase = true)) return@walkThroughJson false
             if ((file.nameWithoutExtension.toIntOrNull() ?: -1) > maxId) return@walkThroughJson false
-            if (file.nameWithoutExtension.hashCode() and 127 == 127) LOGGER.info("$file is processing")
+            if (file.nameWithoutExtension.hashCode() and 255 == 255) LOGGER.info("$file is processing")
             val fileStr = FileUtil.getFileContent(file)!!
             val topic = GSON.fromJson(fileStr, Topic::class.java)
             if (topic.isEmptyTopic()) {
@@ -171,8 +175,20 @@ object SpotChecker {
             LOGGER.info("Old bitset size: ${oldBs.size()}. Cardinality: ${oldBs.cardinality()}. Zero count: ${oldBs.size() - bs.cardinality()}")
             bs.or(oldBs)
             LOGGER.info("After OR op, new bitset size: ${bs.size()}. Cardinality: ${bs.cardinality()}. Zero count: ${bs.size() - bs.cardinality()}")
+            compareOldNewBs(oldBs, bs)
         }
         writeBitsetToFile(bs, hiddenTopicMaskFile)
+    }
+
+    private fun compareOldNewBs(oldBs: BitSet, newBs: BitSet) {
+        val oldBsClone = oldBs.clone() as BitSet
+        val newBsClone = newBs.clone() as BitSet
+        // What's masked in old but not masked in new?
+        oldBsClone.xor(newBsClone)
+        oldBsClone.and(oldBs)
+        oldBsClone.stream().toList().let {
+            LOGGER.info("What's masked in old but not masked in new? $it")
+        }
     }
 
     private fun writeBitsetToFile(bs: BitSet, file: File) {
@@ -182,7 +198,8 @@ object SpotChecker {
             BufferedWriter(fw).use { bw ->
                 longs.forEach { l ->
                     bw.write(l.toString())
-                    bw.newLine()
+                    //bw.newLine()
+                    bw.write("\n")
                 }
                 bw.flush()
             }
@@ -211,7 +228,8 @@ object SpotChecker {
         Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
         LOGGER.info("Json repo folders: $jsonRepoFolders")
 
-        jsonRepoFolders.forEach outer@{
+        jsonRepoFolders.forEach outer@{ it ->
+            LOGGER.info("Start walking through json folder $it.")
             val folder = File(it)
             val fileStream = folder.walkBottomUp().asStream().let { stream ->
                 if (parallel) stream.parallel()
@@ -224,57 +242,8 @@ object SpotChecker {
                     LOGGER.error("Ex: ", th)
                 }
             }
-            LOGGER.info("Finished walking through json folders.")
+            LOGGER.info("Finished walking through json folder $it.")
         }
     }
 
-    // FIXME: Move out of this class
-    fun checkState() {
-        walkThroughJson(parallel = true) { file ->
-            if (file.isDirectory || !file.absolutePath.endsWith("json")) return@walkThroughJson false
-            val fileStr = FileUtil.getFileContent(file)
-            val topic = GSON.fromJson(fileStr, Topic::class.java)
-            if (topic.isEmptyTopic()) return@walkThroughJson false
-            val postList = topic.getAllPosts()
-            var changed = false
-            postList.forEach { post ->
-                if (post.contentHtml == null) return@forEach
-                val correctState = fromPostHtmlToState(post.contentHtml!!)
-                val readoutState = post.state
-                if (!(post.isClosed() || post.isReopen() || post.isSilent()) && correctState != readoutState) {
-                    LOGGER.error("Not correct state ( update ba_post set state = $correctState where state = $readoutState and type = ${topic.space!!.type.id} and mid = ${topic.id} and id = ${post.id} ")
-                    post.state = correctState
-                    changed = true
-                }
-            }
-            val correctTopicState = topic.getAllPosts().map { it.state }.distinct().let {
-                var res = Post.STATE_NORMAL
-                if (it.contains(Post.STATE_SILENT)) {
-                    res = res or Post.STATE_SILENT
-                }
-                if (it.contains(Post.STATE_CLOSED)) {
-                    res = res or Post.STATE_CLOSED
-                }
-                if (it.contains(Post.STATE_REOPEN)) {
-                    res = res or Post.STATE_REOPEN
-                }
-                return@let res
-            }
-            val oldState = topic.state
-            if (oldState != correctTopicState) {
-                topic.state = correctTopicState
-                changed = true
-                LOGGER.error("Not correct state ( update ba_topic set state = $correctTopicState where state = $oldState and type = ${topic.space!!.type.id} and id = ${topic.id} ")
-            }
-            if (false && changed) {
-                FileWriter(file).use { fw ->
-                    BufferedWriter(fw).use { bw ->
-                        bw.write(GitHelper.GSON.toJson(topic))
-                        bw.flush()
-                    }
-                }
-            }
-            return@walkThroughJson true
-        }
-    }
 }
