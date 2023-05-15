@@ -109,7 +109,7 @@ object SpotChecker {
             spotCheckedBs.set(victim)
             result.add(victim)
         }
-        result.sorted()
+        result.sort()
 
         writeBitsetToFile(
             spotCheckedBs,
