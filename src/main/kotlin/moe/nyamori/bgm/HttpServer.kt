@@ -26,6 +26,7 @@ class HttpServer {
             }
                 .get("/after-commit-hook", CommitHook)
                 .get("/db-persist-hook", DbPersistHook)
+                .get("/db-set-persist-id", DbSetPersistIdHandler)
                 .post("/forum-enhance/query", ForumEnhanceHandler)
                 .get("/img/*") { ctx ->
                     ctx.redirect("https://bgm.tv" + ctx.path())
