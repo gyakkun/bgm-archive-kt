@@ -27,37 +27,42 @@ data class Post(
         const val STATE_ADMIN_DELETED: Long = 1 shl 4
         const val STATE_BLOG_REDIRECT: Long = 1 shl 5
         const val STATE_BLOG_CLUB: Long = 1 shl 6
+        const val STATE_VIOLATIVE: Long = 1 shl 7
     }
 
     fun isNormal(): Boolean {
-        return state and 1L == Post.STATE_NORMAL
+        return state and 1L == STATE_NORMAL
     }
 
     fun isDeleted(): Boolean {
-        return state and Post.STATE_DELETED == Post.STATE_DELETED
+        return state and STATE_DELETED == STATE_DELETED
     }
 
     fun isClosed(): Boolean {
-        return state and Post.STATE_CLOSED == Post.STATE_CLOSED
+        return state and STATE_CLOSED == STATE_CLOSED
     }
 
     fun isReopen(): Boolean {
-        return state and Post.STATE_REOPEN == Post.STATE_REOPEN
+        return state and STATE_REOPEN == STATE_REOPEN
     }
 
     fun isSilent(): Boolean {
-        return state and Post.STATE_SILENT == Post.STATE_SILENT
+        return state and STATE_SILENT == STATE_SILENT
     }
 
     fun isAdminDeleted(): Boolean {
-        return state and Post.STATE_ADMIN_DELETED == Post.STATE_ADMIN_DELETED
+        return state and STATE_ADMIN_DELETED == STATE_ADMIN_DELETED
     }
 
     fun isBlogClub(): Boolean {
-        return state and Post.STATE_BLOG_CLUB == Post.STATE_BLOG_CLUB
+        return state and STATE_BLOG_CLUB == STATE_BLOG_CLUB
     }
 
     fun isBlogRedirect(): Boolean {
-        return state and Post.STATE_BLOG_REDIRECT == Post.STATE_BLOG_REDIRECT
+        return state and STATE_BLOG_REDIRECT == STATE_BLOG_REDIRECT
+    }
+
+    fun isViolative(): Boolean {
+        return state and STATE_VIOLATIVE == STATE_VIOLATIVE
     }
 }

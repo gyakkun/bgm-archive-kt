@@ -4,10 +4,13 @@ import moe.nyamori.bgm.model.Post
 
 object PostToStateHelper {
     fun fromPostHtmlToState(postHtml: String): Long {
-        if (!postHtml.startsWith("<span class=\"tip")) return Post.STATE_NORMAL
-        if (postHtml.contains("内容已被用户删除")) return Post.STATE_DELETED
-        if (postHtml.contains("删除了回复")) return Post.STATE_DELETED
-        if (postHtml.contains("因违反")) return Post.STATE_ADMIN_DELETED
+        if (postHtml.startsWith("<span class=\"tip")) {
+            if (postHtml.contains("内容已被用户删除")) return Post.STATE_DELETED
+            if (postHtml.contains("删除了回复")) return Post.STATE_DELETED
+            if (postHtml.contains("因违反") && postHtml.contains("被删除")) return Post.STATE_ADMIN_DELETED
+        } else if (postHtml.startsWith("<span class=\"post_content_collapsed\">")) {
+            if (postHtml.contains("因含有") && postHtml.contains("被折叠")) return Post.STATE_VIOLATIVE
+        }
         return Post.STATE_NORMAL
     }
 }
