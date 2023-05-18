@@ -6,9 +6,11 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.db.JsonToDbProcessor
 import moe.nyamori.bgm.util.HttpHelper
+import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
 
 object DbSetPersistIdHandler : Handler {
+    val LOGGER = LoggerFactory.getLogger(DbSetPersistIdHandler.javaClass)
     override fun handle(ctx: Context) {
         val keyParam = ctx.queryParam("key")
         val commitId = ctx.queryParam("id")
@@ -19,7 +21,8 @@ object DbSetPersistIdHandler : Handler {
         Thread {
             try {
                 if (HttpHelper.DB_WRITE_LOCK.tryLock(10, TimeUnit.SECONDS)) {
-                    Dao.bgmDao().updatePrevPersistedCommitId(commitId)
+                    val result = Dao.bgmDao().updatePrevPersistedCommitId(commitId)
+                    LOGGER.info("Set persist id $commitId result: $result")
                 }
             } catch (ignore: Exception) {
 
