@@ -91,7 +91,7 @@ object JsonToDbProcessor {
                         val userListFromFile = getUserListFromPostList(postListFromFile)
 
                         // DONE : Calculate diff and update zero like,
-                        val processedLikeList = calZeroLike(likeListFromFile, likeListFromDb)
+                        val processedLikeList = calZeroLike(likeListFromFile, likeListFromDb, topic.isEmptyTopic())
 
 
                         Dao.bgmDao().batchUpsertUser(userListFromFile)
@@ -100,9 +100,14 @@ object JsonToDbProcessor {
                         Dao.bgmDao().batchUpsertTopic(spaceTypeId, listOf(topic))
 
                         if (space is Blog) {
-                            // TODO: Remove deleted post
                             TopicJsonHelper.handleBlogTagAndRelatedSubject(topic)
                             // TODO: Make use of blog author to set type=blog, sid = uid, name = username, displayName = nickname
+
+                            // TODO: Remove deleted blog post
+                            val postListFromDb =
+                                Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
+                            val calDeletedBlogPost = calDeletedBlogPostRow(postListFromFile, postListFromDb)
+                            Dao.bgmDao().batchUpsertPostRow(calDeletedBlogPost)
                         } else if (space is Subject) {
                             if (space.name != null) {
                                 sidNameMappingSet.add(
@@ -150,7 +155,23 @@ object JsonToDbProcessor {
         }
     }
 
-    private fun calZeroLike(likeListFromFile: List<Like>, likeListFromDb: List<Like>): List<Like> {
+    private fun calDeletedBlogPostRow(postListFromFile: List<Post>, postListFromDb: List<PostRow>): Iterable<PostRow> {
+        val dbPostSet = postListFromDb.toMutableSet()
+        postListFromFile.forEach { filePost ->
+            dbPostSet.removeIf { dbPost ->
+                dbPost.id == filePost.id || dbPost.id == -dbPost.mid /* top post */
+            }
+        }
+        val result = dbPostSet.map { it.copy(state = Post.STATE_DELETED) }.toList()
+        return result
+    }
+
+    private fun calZeroLike(
+        likeListFromFile: List<Like>,
+        likeListFromDb: List<Like>,
+        isEmptyTopic: Boolean = false
+    ): List<Like> {
+        if (isEmptyTopic) return emptyList()
         if (likeListFromFile.isEmpty() && likeListFromDb.isEmpty()) return emptyList()
         val merged = mutableSetOf<Like>().apply {
             addAll(likeListFromFile)

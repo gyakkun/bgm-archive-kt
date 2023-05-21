@@ -111,6 +111,25 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlBatch(
         """
+        insert into ba_post (type, id, mid, uid,dateline,state,sid) values (
+            :p.type,
+            :p.id,
+            :p.mid,
+            :p.uid,
+            :p.dateline,
+            :p.state,
+            coalesce(:p.sid, 0)
+        ) on conflict(type,id,mid) do update set 
+            state = :p.state
+    """
+    )
+    @Transaction
+    fun batchUpsertPostRow(
+        @BindBean("p") postList: Iterable<PostRow>
+    ): IntArray
+
+    @SqlBatch(
+        """
             insert into ba_likes (type, mid, pid, value, total)
             values (:type,
                     :mid,

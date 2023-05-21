@@ -5,7 +5,15 @@ import moe.nyamori.bgm.model.Like
 // For table query
 data class SpaceNameMappingData(val type: Int, val sid: Int, val name: String, val displayName: String)
 
-data class PostRow(val type: Int, val id: Int, val mid: Int, val uid: Int, val dateline: Long, val state: Long)
+data class PostRow(
+    val type: Int,
+    val id: Int,
+    val mid: Int,
+    val uid: Int,
+    val dateline: Long,
+    val state: Long,
+    val sid: Int
+)
 
 data class TopicRow(
     val type: Int,
