@@ -239,6 +239,7 @@ interface BgmDao : Transactional<BgmDao> {
         // preRemoveConflictSidInBlog(userList)
         updateNegativeSidInBlogTopic(userList)
         // removeNegativeUidUser(userList)
+        // No need to remove Negative Sid In Space Naming Mapping , otherwise it will conflict the unique key constraint
     }
 
 

@@ -101,19 +101,39 @@ object JsonToDbProcessor {
 
                         if (space is Blog) {
                             TopicJsonHelper.handleBlogTagAndRelatedSubject(topic)
-                            // TODO: Make use of blog author to set type=blog, sid = uid, name = username, displayName = nickname
 
-                            // TODO: Remove deleted blog post
                             val postListFromDb =
                                 Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
                             val calDeletedBlogPost = calDeletedBlogPostRow(postListFromFile, postListFromDb)
                             Dao.bgmDao().batchUpsertPostRow(calDeletedBlogPost)
+
+                            // TODO: Make use of blog author to set type=blog, sid = uid, name = username, displayName = nickname
+                            if (!topic.isEmptyTopic()) {
+                                runCatching {
+                                    val topPost = topic.getAllPosts().firstOrNull {
+                                        it.id == topic.topPostPid
+                                    }
+                                    if (topPost == null) return@runCatching
+                                    if (topPost.user == null) return@runCatching
+                                    sidNameMappingSet.add(
+                                        SpaceNameMappingData(
+                                            SpaceType.BLOG.id,
+                                            topic.getSid() ?: topPost.user!!.getId() /* blog */,
+                                            topPost.user!!.username,
+                                            topPost.user!!.nickname ?: ""
+                                        )
+                                    )
+                                }.onFailure {
+                                    LOGGER.error("Ex when extracting blog topic user/sid/name/displayName, ", it)
+                                }
+                            }
+
                         } else if (space is Subject) {
                             if (space.name != null) {
                                 sidNameMappingSet.add(
                                     SpaceNameMappingData(
                                         SpaceType.SUBJECT.id,
-                                        StringHashingHelper.stringHash(space.name!!),
+                                        topic.getSid() ?:StringHashingHelper.stringHash(space.name!!),
                                         space.name!!,
                                         space.displayName!!
                                     )
@@ -125,7 +145,7 @@ object JsonToDbProcessor {
                                 sidNameMappingSet.add(
                                     SpaceNameMappingData(
                                         SpaceType.GROUP.id,
-                                        StringHashingHelper.stringHash(space.name!!),
+                                        topic.getSid() ?:StringHashingHelper.stringHash(space.name!!),
                                         space.name!!,
                                         space.displayName!!
                                     )
