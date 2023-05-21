@@ -19,15 +19,15 @@ data class Post(
     var subFloorList: List<Post>? = null
 ) {
     companion object {
-        const val STATE_NORMAL: Long = 0
-        const val STATE_DELETED: Long = 1 shl 0
-        const val STATE_CLOSED: Long = 1 shl 1
-        const val STATE_SILENT: Long = 1 shl 2
-        const val STATE_REOPEN: Long = 1 shl 3
-        const val STATE_ADMIN_DELETED: Long = 1 shl 4
-        const val STATE_BLOG_REDIRECT: Long = 1 shl 5
-        const val STATE_BLOG_CLUB: Long = 1 shl 6
-        const val STATE_VIOLATIVE: Long = 1 shl 7
+        const val STATE_NORMAL: Long = 0 // 0
+        const val STATE_DELETED: Long = 1 shl 0 // 1
+        const val STATE_CLOSED: Long = 1 shl 1 // 2
+        const val STATE_SILENT: Long = 1 shl 2 // 4
+        const val STATE_REOPEN: Long = 1 shl 3 // 8
+        const val STATE_ADMIN_DELETED: Long = 1 shl 4 // 16
+        const val STATE_BLOG_REDIRECT: Long = 1 shl 5 //32
+        const val STATE_BLOG_CLUB: Long = 1 shl 6 // 64
+        const val STATE_VIOLATIVE: Long = 1 shl 7 // 128
     }
 
     fun isNormal(): Boolean {
