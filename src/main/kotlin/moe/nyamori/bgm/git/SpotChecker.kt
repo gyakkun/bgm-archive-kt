@@ -8,6 +8,7 @@ import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
@@ -16,6 +17,7 @@ import java.io.FileWriter
 import java.util.*
 import kotlin.streams.asStream
 import kotlin.streams.toList
+
 
 object SpotChecker {
     private val LOGGER = LoggerFactory.getLogger(SpotChecker::class.java)
@@ -28,12 +30,15 @@ object SpotChecker {
     const val SPOT_CHECK_BITSET_FILE_NAME = "spot_check_bitset.txt"
     const val SPOT_CHECK_LIST_FILE_NAME = "sc.txt"
     const val MIN_SPOT_CHECK_SIZE = 10
+    const val RANGE_HOLE_INTERVAL_THRESHOLD = 5
+    const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 25
+    const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
 
 
     @JvmStatic
     fun main(argv: Array<String>) {
         LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
-        genSpotCheckListFile(SpaceType.GROUP)
+        genSpotCheckListFile(SpaceType.SUBJECT)
         // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
         // SpaceType.values().forEach {
         //     genHiddenTopicMaskFile(it)
@@ -46,6 +51,7 @@ object SpotChecker {
         val scList = randomSelectTopicIds(spaceType)
         val scFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_LIST_FILE_NAME")
+        val holesInTopicListRange = checkIfHolesInTopicListRange(spaceType, getTopicList(spaceType))
         // if (true) return
         FileWriter(scFile).use { fw ->
             BufferedWriter(fw).use { bw ->
@@ -54,9 +60,46 @@ object SpotChecker {
                     // bw.newLine()
                     bw.write("\n")
                 }
+                holesInTopicListRange.forEach {
+                    bw.write(it.toString())
+                    bw.write("\n")
+                }
                 bw.flush()
             }
         }
+    }
+
+    private fun checkIfHolesInTopicListRange(spaceType: SpaceType, topicList: List<Int>): List<Int> {
+        // val spotCheckBs = getSpotCheckedTopicMask(spaceType)
+        val holes = mutableListOf<Int>()
+        val maxId = topicList.max()
+        val fakeTopicList = mutableListOf<Int>().apply {
+            for (i in (maxId - RANGE_HOLE_DETECT_DATE_BACK_LIMIT + 1)..maxId) {
+                add(i)
+            }
+        }
+        fakeTopicList.removeAll(topicList)
+        val rangeSummary = RangeHelper.summaryRanges(fakeTopicList)
+        rangeSummary.forEach {
+            if (it.size == 1) holes.add(it[0])
+            else if (it.size == 2) {
+                val length = it[1] - it[0] + 1
+                if (length > RANGE_HOLE_INTERVAL_THRESHOLD) return@forEach
+                for (i in it[0]..it[1]) {
+                    holes.add(i)
+                }
+            }
+        }
+        val result = holes
+            // .filter {
+            //     // If already spot checked then skip it
+            //     !spotCheckBs.get(it)
+            // }
+            .takeLast(RANGE_HOLE_DETECT_TAKE_LIMIT)
+        if (holes.isNotEmpty()) {
+            LOGGER.warn("Holes for type $spaceType detected during spot check: $result")
+        }
+        return result
     }
 
     private fun randomSelectTopicIds(spaceType: SpaceType): List<Int> {
@@ -98,7 +141,9 @@ object SpotChecker {
             genHiddenTopicMaskFile(spaceType)
             return result
         }
-        val samplingSize = (fakeTotalCount / (30 * 24 * 4)).coerceAtLeast(MIN_SPOT_CHECK_SIZE)
+        val samplingSize =
+            (fakeTotalCount / (30 * (Config.BGM_ARCHIVE_HOW_MANY_COMMIT_ON_GITHUB_PER_DAY / (2 * (SpaceType.values().size)))))
+                .coerceAtLeast(MIN_SPOT_CHECK_SIZE)
         val r = Random()
 
         repeat(samplingSize) {
@@ -207,13 +252,18 @@ object SpotChecker {
     }
 
     fun getMaxId(spaceType: SpaceType): Int {
+        val result = getTopicList(spaceType).max()
+        LOGGER.info("Max id for $spaceType: $result")
+        return result
+    }
+
+    private fun getTopicList(spaceType: SpaceType): List<Int> {
         val prevProcessed = GitHelper.getPrevProcessedArchiveCommitRef() // archive repo
         val topiclist = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
             prevProcessed,
             "${spaceType.name.lowercase()}/topiclist.txt"
         )
-        val result = topiclist.lines().mapNotNull { it.toIntOrNull() }.max()
-        LOGGER.info("Max id for $spaceType: $result")
+        val result = topiclist.lines().mapNotNull { it.toIntOrNull() }
         return result
     }
 
