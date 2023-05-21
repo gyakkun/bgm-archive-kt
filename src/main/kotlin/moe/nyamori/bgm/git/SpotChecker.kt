@@ -31,14 +31,14 @@ object SpotChecker {
     const val SPOT_CHECK_LIST_FILE_NAME = "sc.txt"
     const val MIN_SPOT_CHECK_SIZE = 10
     const val RANGE_HOLE_INTERVAL_THRESHOLD = 5
-    const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 25
+    const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 100
     const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
-
+    const val HOLE_CHECKED_SET_SIZE_LIMIT = 75
 
     @JvmStatic
     fun main(argv: Array<String>) {
         LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
-        genSpotCheckListFile(SpaceType.SUBJECT)
+        repeat(10) { genSpotCheckListFile(SpaceType.SUBJECT) }
         // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
         // SpaceType.values().forEach {
         //     genHiddenTopicMaskFile(it)
@@ -69,14 +69,17 @@ object SpotChecker {
         }
     }
 
+
+    private val HOLE_CHECKED_SET = HashSet<Pair<SpaceType, Int>>() // Maintain in memory
     private fun checkIfHolesInTopicListRange(spaceType: SpaceType, topicList: List<Int>): List<Int> {
+        if (HOLE_CHECKED_SET.size >= HOLE_CHECKED_SET_SIZE_LIMIT) HOLE_CHECKED_SET.clear()
         // val spotCheckBs = getSpotCheckedTopicMask(spaceType)
         val holes = mutableListOf<Int>()
         val maxId = topicList.max()
         val fakeTopicList = mutableListOf<Int>().apply {
-            for (i in (maxId - RANGE_HOLE_DETECT_DATE_BACK_LIMIT + 1)..maxId) {
-                add(i)
-            }
+            val checkSize = RANGE_HOLE_DETECT_DATE_BACK_LIMIT.coerceAtMost(2 * topicList.size / 3)
+            val lowerBound = maxId - checkSize + 1
+            (lowerBound..maxId).forEach { add(it) }
         }
         fakeTopicList.removeAll(topicList)
         val rangeSummary = RangeHelper.summaryRanges(fakeTopicList)
@@ -91,14 +94,16 @@ object SpotChecker {
             }
         }
         val result = holes
-            // .filter {
-            //     // If already spot checked then skip it
-            //     !spotCheckBs.get(it)
-            // }
+            .filter {
+                // If already spot checked then skip it
+                !HOLE_CHECKED_SET.contains(Pair(spaceType, it))
+            }
             .takeLast((topicList.size / 8).coerceAtMost(RANGE_HOLE_DETECT_TAKE_LIMIT))
-        if (holes.isNotEmpty()) {
+        if (result.isNotEmpty()) {
             LOGGER.warn("Holes for type $spaceType detected during spot check: $result")
         }
+        HOLE_CHECKED_SET.addAll(result.map { Pair(spaceType, it) })
+        LOGGER.info("HOLE_CHECKED_SET size : ${HOLE_CHECKED_SET.size}")
         return result
     }
 
