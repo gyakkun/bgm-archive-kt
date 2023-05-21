@@ -30,7 +30,8 @@ typealias LikeRow = Like
 
 data class UserRow(
     val id: Int,
-    val username: String
+    val username: String,
+    val nickname: String?
 )
 
 // For view query

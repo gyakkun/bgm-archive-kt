@@ -54,10 +54,11 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlBatch(
         """
-        insert into ba_user (id, username) values (
+        insert into ba_user (id, username, nickname) values (
             :id,
-            :username
-        ) on conflict(id) do update set username = :username 
+            :username,
+            :nickname
+        ) on conflict(id) do update set username = :username, nickname = :nickname 
         """
     )
     @Transaction
