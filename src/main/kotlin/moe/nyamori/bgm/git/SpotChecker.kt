@@ -95,7 +95,7 @@ object SpotChecker {
             //     // If already spot checked then skip it
             //     !spotCheckBs.get(it)
             // }
-            .takeLast(RANGE_HOLE_DETECT_TAKE_LIMIT)
+            .takeLast((topicList.size / 8).coerceAtMost(RANGE_HOLE_DETECT_TAKE_LIMIT))
         if (holes.isNotEmpty()) {
             LOGGER.warn("Holes for type $spaceType detected during spot check: $result")
         }
