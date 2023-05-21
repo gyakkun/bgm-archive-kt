@@ -435,7 +435,7 @@ interface BgmDao : Transactional<BgmDao> {
                    sum(bl.total)  count
             from ba_likes bl
                      inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
-                     inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type
+                     inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
                      inner join ba_user bu on bp.uid = bu.id
             where bu.username in
                   (<l>)
