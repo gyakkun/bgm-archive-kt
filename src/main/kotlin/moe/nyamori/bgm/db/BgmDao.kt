@@ -433,7 +433,7 @@ interface BgmDao : Transactional<BgmDao> {
                    bl.total    as face_count,
                    bu.username as username,
                    sum(bl.total)  count
-            from ba_likes bl
+            from ba_likes bl -- So far ba_likes is the smallest table
                      inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
                      inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
                      inner join ba_user bu on bp.uid = bu.id
@@ -453,9 +453,9 @@ interface BgmDao : Transactional<BgmDao> {
     @SqlQuery(
         """
             select bp.type, bp.uid, bsnm.name, bsnm.display_name, bu.username, bp.state, count(1) count
-                from ba_post bp
-                         inner join ba_user bu on bp.uid = bu.id
-                         inner join ba_space_naming_mapping bsnm on bp.type = bsnm.type and bp.sid = bsnm.sid
+                from ba_user bu
+                     inner join ba_post bp on bp.uid = bu.id
+                     inner join ba_space_naming_mapping bsnm on bp.type = bsnm.type and bp.sid = bsnm.sid
                  where bu.username in (<l>) and bp.type=:t
                 group by bp.type, bp.uid, bp.state, bp.sid;
 
@@ -492,6 +492,7 @@ interface BgmDao : Transactional<BgmDao> {
             (select bp.*,
                    bt.title,
                    bu.username,
+                   bt.state as topic_state,
                    rank() over (partition by bp.type,bp.mid, bp.uid order by bp.dateline desc,bp.id desc) rank_reply_asc
             from ba_user bu
             inner join ba_post bp on bu.id = bp.uid
@@ -517,9 +518,9 @@ interface BgmDao : Transactional<BgmDao> {
                      bp.dateline as                                                                  last_update_time,
                      bu.username as                                                                  username,
                      rank() over (partition by bt.type,bt.uid order by bp.dateline desc, bp.id desc) rank_last_reply
-              from ba_topic bt
+              from ba_user bu
+                       inner join ba_topic bt on bu.id = bt.uid
                        inner join ba_post bp on bt.last_post_pid = bp.id and bt.type = bp.type
-                       inner join ba_user bu on bu.id = bt.uid
               where bt.type = :t
                 and bu.username in (<l>)
                 and bt.dateline >= ((select unixepoch() - 86400 * 365 * 3)))

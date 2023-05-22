@@ -268,6 +268,7 @@ object ForumEnhanceHandler : Handler {
                 it.key to it.value.mapNotNull {
                     if (it.title == null) return@mapNotNull null
                     if (!it.state.isPostNormal()) return@mapNotNull null
+                    if (it.topicState.isTopicDeleted()) return@mapNotNull null
                     PostBrief(it.title, it.mid, it.id, it.dateline)
                 }.sortedBy { -it.dateline }.take(10)
             }.toMap()

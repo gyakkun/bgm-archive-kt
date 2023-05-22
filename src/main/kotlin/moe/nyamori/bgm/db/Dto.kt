@@ -75,7 +75,8 @@ data class VUserLastReplyTopicRow(
     val state: Long,
     val title: String?,
     val username: String,
-    val rankReplyAsc: Int
+    val rankReplyAsc: Int,
+    val topicState: Long
 )
 
 data class VPostCountSpaceRow(
