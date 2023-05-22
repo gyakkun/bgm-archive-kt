@@ -38,11 +38,12 @@ object SpotChecker {
     @JvmStatic
     fun main(argv: Array<String>) {
         LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
-        repeat(10) { genSpotCheckListFile(SpaceType.SUBJECT) }
+//        repeat(10) { genSpotCheckListFile(SpaceType.SUBJECT) }
         // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
-        // SpaceType.values().forEach {
-        //     genHiddenTopicMaskFile(it)
-        // }
+        SpaceType.values().forEach {
+            genHiddenTopicMaskFile(it)
+        }
+        // genHiddenTopicMaskFile(SpaceType.BLOG)
     }
 
     fun genSpotCheckListFile(spaceType: SpaceType) {
@@ -202,7 +203,8 @@ object SpotChecker {
     private fun genHiddenTopicMaskFile(spaceType: SpaceType) {
         LOGGER.info("Generating hidden topic mask file for $spaceType.")
         val maxId = getMaxId(spaceType)
-        val bs = BitSet(maxId + 1)
+        var newBs = BitSet(maxId + 2).apply { set(maxId + 1) } // Ensure (words in use) of bs is enough
+        val visited = BitSet(maxId + 1)
         walkThroughJson { file ->
             if (file.isDirectory) return@walkThroughJson false
             if (!file.absolutePath.contains(spaceType.name.lowercase())) return@walkThroughJson false
@@ -211,34 +213,48 @@ object SpotChecker {
             if (file.nameWithoutExtension.hashCode() and 255 == 255) LOGGER.info("$file is processing")
             val fileStr = FileUtil.getFileContent(file)!!
             val topic = GSON.fromJson(fileStr, Topic::class.java)
-            if (topic.isEmptyTopic()) {
-                bs.set(topic.id)
+            visited.set(topic.id)
+            if (topic.isBlogRedirect()/* Possibly reopen */) {
+                newBs.clear(topic.id)
+            } else if (topic.isEmptyTopic()) {
+                newBs.set(topic.id)
+            } else {
+                newBs.clear(topic.id)
             }
             return@walkThroughJson true
         }
-        LOGGER.info("New bitset size: ${bs.size()}. Cardinality: ${bs.cardinality()}. Zero count: ${bs.size() - bs.cardinality()}")
+        LOGGER.info("New bitset size: ${newBs.size()}. Cardinality: ${newBs.cardinality()}. Zero count: ${newBs.size() - newBs.cardinality()}")
         val hiddenTopicMaskFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
         if (hiddenTopicMaskFile.exists()) {
-            LOGGER.warn("Old hidden topic mask file exists. Perform OR bitwise operation to gen a new one.")
+            LOGGER.warn("Old hidden topic mask file exists. Perform bitwise operation to gen a new one.")
             val oldBs = getBitsetFromLongPlaintextFile(hiddenTopicMaskFile)
-            LOGGER.info("Old bitset size: ${oldBs.size()}. Cardinality: ${oldBs.cardinality()}. Zero count: ${oldBs.size() - bs.cardinality()}")
-            bs.or(oldBs)
-            LOGGER.info("After OR op, new bitset size: ${bs.size()}. Cardinality: ${bs.cardinality()}. Zero count: ${bs.size() - bs.cardinality()}")
-            compareOldNewBs(oldBs, bs)
+            LOGGER.info("Old bitset size: ${oldBs.size()}. Cardinality: ${oldBs.cardinality()}. Zero count: ${oldBs.size() - newBs.cardinality()}")
+            val result = mergeOldNewVisited(oldBs, newBs, visited)
+            newBs = result
+            LOGGER.info("After merging op, new bitset size: ${newBs.size()}. Cardinality: ${newBs.cardinality()}. Zero count: ${newBs.size() - newBs.cardinality()}")
         }
-        writeBitsetToFile(bs, hiddenTopicMaskFile)
+        writeBitsetToFile(newBs, hiddenTopicMaskFile)
     }
 
-    private fun compareOldNewBs(oldBs: BitSet, newBs: BitSet) {
-        val oldBsClone = oldBs.clone() as BitSet
-        val newBsClone = newBs.clone() as BitSet
-        // What's masked in old but not masked in new?
-        oldBsClone.xor(newBsClone)
-        oldBsClone.and(oldBs)
-        oldBsClone.stream().toList().let {
+    fun mergeOldNewVisited(oldBs: BitSet, newBs: BitSet, visited: BitSet): BitSet {
+        val notVisited = (visited.clone() as BitSet).apply { flip(0, size()) }
+
+        val visitedAndNew = (newBs.clone() as BitSet).apply { and(visited) }
+        val notVisitedAndOld = (oldBs.clone() as BitSet).apply { and(notVisited) }
+        val result = (visitedAndNew.clone() as BitSet).apply { or(notVisitedAndOld) }
+
+        val diff = (oldBs.clone() as BitSet).apply { xor(result) }
+
+        val maskedInOldButNotInNew = (oldBs.clone() as BitSet).apply { and(diff) }
+        maskedInOldButNotInNew.stream().toList().let {
             LOGGER.info("What's masked in old but not masked in new? $it")
         }
+        val maskedInNewButNotMaskedInOld = (newBs.clone() as BitSet).apply { and(diff) }
+        maskedInNewButNotMaskedInOld.stream().toList().let {
+            LOGGER.info("What's masked in new but not masked in old? $it")
+        }
+        return result
     }
 
     private fun writeBitsetToFile(bs: BitSet, file: File) {

@@ -1,10 +1,9 @@
 package moe.nyamori.bgm.util
 
-import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.git.FileHistoryLookup.getRevCommitList
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.io.FileWriter
