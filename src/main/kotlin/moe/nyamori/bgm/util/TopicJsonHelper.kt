@@ -2,9 +2,11 @@ package moe.nyamori.bgm.util
 
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.model.*
+import org.slf4j.LoggerFactory
 import java.util.ArrayList
 
 object TopicJsonHelper {
+    private val LOGGER = LoggerFactory.getLogger(TopicJsonHelper.javaClass)
     fun getUserListFromPostList(postList: List<Post>) =
         postList.mapNotNull { it.user }.distinct()
 
@@ -70,60 +72,99 @@ object TopicJsonHelper {
 
     fun getLikeListFromTopic(topic: Topic): List<Like> {
         if (!isValidTopic(topic)) return emptyList()
-
         if (topic.space?.meta?.get("data_likes_list") == null) return emptyList()
-        val dataLikesList = topic.space!!.meta!!["data_likes_list"] as Map<String, Any?>
-        return dataLikesList.map {
-            val pid = it.key.toInt()
-            val faces = it.value
-            if (faces is Map<*, *>) {
-                val res = ArrayList<Like>()
-                (faces as Map<String, Any?>).forEach {
-                    val faceId = it.key.toInt()
-                    val m = it.value as Map<String, Any?>
-                    val mid = (m["main_id"] as Double).toInt()
-                    val value = (m["value"] as String).toInt()
-                    val total = run {
-                        if (m["total"] is String) {
-                            (m["total"] as String).toInt()
-                        } else if (m["total"] is Double){
-                            (m["total"] as Double).toInt()
-                        } else if (m["total"] is Long){
-                            (m["total"] as Long).toInt()
-                        } else if (m["total"] is Int){
-                            (m["total"] as Int)
-                        } else {
-                            0 // Fallback
+        return runCatching {
+            val dataLikesList = topic.space!!.meta!!["data_likes_list"] as Map<String, Any?>
+            dataLikesList.map {
+                val pid = it.key.toInt()
+                val faces = it.value
+                if (faces is Map<*, *>) {
+                    val res = ArrayList<Like>()
+                    (faces as Map<String, Any?>).forEach {
+                        val m = it.value as Map<String, Any?>
+                        val mid = (m["main_id"] as Double).toInt()
+                        val value = (m["value"] as String).toInt()
+                        val total = getTotal(m)
+                        res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
+                    }
+                    return@map res
+                } else if (faces is List<*>) {
+                    val res = ArrayList<Like>()
+                    (faces as List<Map<String, Any?>>).forEach {
+                        val m = it
+                        val mid = (m["main_id"] as Double).toInt()
+                        val value = (m["value"] as String).toInt()
+                        val total = getTotal(m)
+                        res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
+                    }
+                    return@map res
+                } else {
+                    return@map emptyList<Like>()
+                }
+            }.flatten().toList()
+        }.onFailure {
+            LOGGER.error("Ex when extracting like list for topic: ${topic.space}, id-${topic.id}", it)
+        }.getOrDefault(emptyList())
+    }
+
+    fun getLikeRevListFromTopic(topic: Topic): List<LikeRevUsername> {
+        if (!isValidTopic(topic)) return emptyList()
+        if (topic.space?.meta?.get("data_likes_list") == null) return emptyList()
+        return runCatching {
+
+            val dataLikesList = topic.space!!.meta!!["data_likes_list"] as Map<String, Any?>
+            dataLikesList.map {
+                val pid = it.key.toInt()
+                val faces = it.value
+                if (faces is Map<*, *>) {
+                    val res = ArrayList<LikeRevUsername>()
+                    (faces as Map<String, Any?>).forEach {
+                        val m = it.value as Map<String, Any?>
+                        val mid = (m["main_id"] as Double).toInt()
+                        val value = (m["value"] as String).toInt()
+                        val users = (m["users"] as List<Map<String, Any?>>)
+                        users.forEach {
+                            if (it["username"] == null) return@forEach
+                            if (it["username"]!! !is String) return@forEach
+                            val username = it["username"]!! as String
+                            val nickname =
+                                if (it["nickname"] != null && it["nickname"] is String) it["nickname"]!! as String else null
+                            res.add(
+                                LikeRevUsername
+                                    (
+                                    type = topic.space!!.type.id,
+                                    mid = mid,
+                                    pid = pid,
+                                    value = value,
+                                    total = 1,
+                                    username = username,
+                                    nickname = nickname
+                                )
+                            )
+
                         }
                     }
-                    res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
+                    return@map res
+                } else {
+                    return@map emptyList<LikeRevUsername>()
                 }
-                return@map res
-            } else if (faces is List<*>) {
-                val res = ArrayList<Like>()
-                (faces as List<Map<String, Any?>>).forEach {
-                    val m = it
-                    val mid = (m["main_id"] as Double).toInt()
-                    val value = (m["value"] as String).toInt()
-                    val total = run {
-                        if (m["total"] is String) {
-                            (m["total"] as String).toInt()
-                        } else if (m["total"] is Double){
-                            (m["total"] as Double).toInt()
-                        } else if (m["total"] is Long){
-                            (m["total"] as Long).toInt()
-                        } else if (m["total"] is Int){
-                            (m["total"] as Int)
-                        } else {
-                            0 // Fallback
-                        }
-                    }
-                    res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
-                }
-                return@map res
-            } else {
-                return@map emptyList<Like>()
-            }
-        }.flatten().toList()
+            }.flatten().toList()
+        }.onFailure {
+            LOGGER.error("Ex when extracting like rev username list for topic: ${topic.space}, id-${topic.id}", it)
+        }.getOrDefault(emptyList())
+    }
+
+    private fun getTotal(likeItemMap: Map<String, Any?>): Int {
+        return if (likeItemMap["total"] is String) {
+            (likeItemMap["total"] as String).toInt()
+        } else if (likeItemMap["total"] is Double) {
+            (likeItemMap["total"] as Double).toInt()
+        } else if (likeItemMap["total"] is Long) {
+            (likeItemMap["total"] as Long).toInt()
+        } else if (likeItemMap["total"] is Int) {
+            (likeItemMap["total"] as Int)
+        } else {
+            0 // Fallback
+        }
     }
 }

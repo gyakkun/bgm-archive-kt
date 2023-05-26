@@ -13,6 +13,7 @@ import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper
 import moe.nyamori.bgm.util.TopicJsonHelper
 import moe.nyamori.bgm.util.TopicJsonHelper.getLikeListFromTopic
+import moe.nyamori.bgm.util.TopicJsonHelper.getLikeRevListFromTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.getPostListFromTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
 import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
@@ -82,79 +83,37 @@ object JsonToDbProcessor {
                         // val postListFromDb =
                         //    Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
                         val likeListFromDb = Dao.bgmDao().getLikeListByTypeAndTopicId(spaceTypeId, topicId)
+                        val likeRevListFromDb = Dao.bgmDao().getLikeRevListByTypeAndTopicId(spaceTypeId, topicId)
                         // LOGGER.debug("topic {}", topicListFromDb)
                         // LOGGER.debug("post {}", postListFromDb)
                         LOGGER.debug("like {}", likeListFromDb)
 
                         val postListFromFile = getPostListFromTopic(topic)
                         val likeListFromFile = getLikeListFromTopic(topic)
+                        val likeRevUsernameFromFile = getLikeRevListFromTopic(topic)
                         val userListFromFile = getUserListFromPostList(postListFromFile)
 
                         // DONE : Calculate diff and update zero like,
                         val processedLikeList = calZeroLike(likeListFromFile, likeListFromDb, topic.isEmptyTopic())
 
+                        // TODO: Calculate uid from username
+                        val processedLikeRevList =
+                            calLikeRev(likeRevUsernameFromFile, likeRevListFromDb, topic.isEmptyTopic())
 
                         Dao.bgmDao().batchUpsertUser(userListFromFile)
                         Dao.bgmDao().batchUpsertLikes(processedLikeList)
+                        Dao.bgmDao().batchUpsertLikesRev(processedLikeRevList)
                         Dao.bgmDao().batchUpsertPost(spaceTypeId, topic.getSid(), postListFromFile)
                         Dao.bgmDao().batchUpsertTopic(spaceTypeId, listOf(topic))
 
-                        if (space is Blog) {
-                            TopicJsonHelper.handleBlogTagAndRelatedSubject(topic)
-
-                            val postListFromDb =
-                                Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
-                            val calDeletedBlogPost = calDeletedBlogPostRow(postListFromFile, postListFromDb)
-                            Dao.bgmDao().batchUpsertPostRow(calDeletedBlogPost)
-
-                            // TODO: Make use of blog author to set type=blog, sid = uid, name = username, displayName = nickname
-                            if (!topic.isEmptyTopic()) {
-                                runCatching {
-                                    val topPost = topic.getAllPosts().firstOrNull {
-                                        it.id == topic.topPostPid
-                                    }
-                                    if (topPost == null) return@runCatching
-                                    if (topPost.user == null) return@runCatching
-                                    sidNameMappingSet.add(
-                                        SpaceNameMappingData(
-                                            SpaceType.BLOG.id,
-                                            topic.getSid() ?: topPost.user!!.getId() /* blog */,
-                                            topPost.user!!.username,
-                                            topPost.user!!.nickname ?: ""
-                                        )
-                                    )
-                                }.onFailure {
-                                    LOGGER.error("Ex when extracting blog topic user/sid/name/displayName, ", it)
-                                }
-                            }
-
-                        } else if (space is Subject) {
-                            if (space.name != null) {
-                                sidNameMappingSet.add(
-                                    SpaceNameMappingData(
-                                        SpaceType.SUBJECT.id,
-                                        topic.getSid() ?:StringHashingHelper.stringHash(space.name!!),
-                                        space.name!!,
-                                        space.displayName!!
-                                    )
-                                )
-                            } else {
-                            }
-                        } else if (space is Group) {
-                            if (space.name != null) {
-                                sidNameMappingSet.add(
-                                    SpaceNameMappingData(
-                                        SpaceType.GROUP.id,
-                                        topic.getSid() ?:StringHashingHelper.stringHash(space.name!!),
-                                        space.name!!,
-                                        space.displayName!!
-                                    )
-                                )
-                            } else {
-                            }
-                        } else {
-                            //
-                        }
+                        specialHandlingForSpaceNameMapping(
+                            space,
+                            topic,
+                            spaceTypeId,
+                            topicId,
+                            postListFromFile,
+                            sidNameMappingSet
+                        )
                         Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
                         sidNameMappingSet.clear()
                     }.onFailure {
@@ -175,6 +134,72 @@ object JsonToDbProcessor {
         }
     }
 
+
+    private fun specialHandlingForSpaceNameMapping(
+        space: Space,
+        topic: Topic,
+        spaceTypeId: Int,
+        topicId: Int,
+        postListFromFile: List<Post>,
+        sidNameMappingSet: MutableSet<SpaceNameMappingData>
+    ) {
+        if (space is Blog) {
+            TopicJsonHelper.handleBlogTagAndRelatedSubject(topic)
+
+            val postListFromDb =
+                Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
+            val calDeletedBlogPost = calDeletedBlogPostRow(postListFromFile, postListFromDb)
+            Dao.bgmDao().batchUpsertPostRow(calDeletedBlogPost)
+
+            if (!topic.isEmptyTopic()) {
+                runCatching {
+                    val topPost = topic.getAllPosts().firstOrNull {
+                        it.id == topic.topPostPid
+                    }
+                    if (topPost == null) return@runCatching
+                    if (topPost.user == null) return@runCatching
+                    sidNameMappingSet.add(
+                        SpaceNameMappingData(
+                            SpaceType.BLOG.id,
+                            topic.getSid() ?: topPost.user!!.getId() /* blog */,
+                            topPost.user!!.username,
+                            topPost.user!!.nickname ?: ""
+                        )
+                    )
+                }.onFailure {
+                    LOGGER.error("Ex when extracting blog topic user/sid/name/displayName, ", it)
+                }
+            }
+
+        } else if (space is Subject) {
+            if (space.name != null) {
+                sidNameMappingSet.add(
+                    SpaceNameMappingData(
+                        SpaceType.SUBJECT.id,
+                        topic.getSid() ?: StringHashingHelper.stringHash(space.name!!),
+                        space.name!!,
+                        space.displayName!!
+                    )
+                )
+            } else {
+            }
+        } else if (space is Group) {
+            if (space.name != null) {
+                sidNameMappingSet.add(
+                    SpaceNameMappingData(
+                        SpaceType.GROUP.id,
+                        topic.getSid() ?: StringHashingHelper.stringHash(space.name!!),
+                        space.name!!,
+                        space.displayName!!
+                    )
+                )
+            } else {
+            }
+        } else {
+            //
+        }
+    }
+
     private fun calDeletedBlogPostRow(postListFromFile: List<Post>, postListFromDb: List<PostRow>): Iterable<PostRow> {
         val dbPostSet = postListFromDb.toMutableSet()
         postListFromFile.forEach { filePost ->
@@ -184,6 +209,101 @@ object JsonToDbProcessor {
         }
         val result = dbPostSet.map { it.copy(state = Post.STATE_DELETED) }.toList()
         return result
+    }
+
+    private fun calLikeRev(
+        likeRevUsernameFromFile: List<LikeRevUsername>,
+        likeRevListFromDb: List<LikeRevRow>,
+        isEmptyTopic: Boolean
+    ): List<LikeRev> {
+        if (isEmptyTopic) return emptyList()
+        if (likeRevUsernameFromFile.isEmpty() && likeRevListFromDb.isEmpty()) return emptyList()
+
+        val constructedUserList = constructUserList(likeRevUsernameFromFile)
+        val mapByUsername = constructedUserList.associateBy { it.username }
+        val likeRevListFromFile = likeRevUsernameFromFile.mapNotNull {
+            if (it.username !in mapByUsername) {
+                LOGGER.error("No mapped uid for username ${it.username}")
+                return@mapNotNull null
+            }
+            LikeRev(
+                type = it.type,
+                mid = it.mid,
+                pid = it.pid,
+                value = it.value,
+                total = it.total,
+                uid = mapByUsername[it.username]!!.id!!
+            )
+        }
+
+        val merged = mutableSetOf<LikeRev>().apply {
+            addAll(likeRevListFromDb)
+            addAll(likeRevListFromFile)
+        }
+        val typeId = merged.first().type
+        val mid = merged.first().mid
+        val result = mutableSetOf<LikeRev>().apply { addAll(likeRevListFromFile) }
+
+
+        val fileLikes = likeRevListFromFile.groupBy { Triple(it.pid , it.value, it.uid) }
+        val fileLikeKeys = fileLikes.keys
+        val dbLikes = likeRevListFromDb.groupBy { Triple(it.pid , it.value, it.uid) }
+        val dbLikeKeys = dbLikes.keys
+        // val fileLikeKeyCopy = fileLikeKeys.toMutableSet()
+        val dbLikeKeysCopy = dbLikeKeys.toMutableSet()
+        // If some keys not in file but in db, then update the result to set zero of these types
+        dbLikeKeysCopy.removeAll(fileLikeKeys)
+        if (dbLikeKeysCopy.isNotEmpty()) {
+            LOGGER.info("Some keys not in file but in ba_likes_rev table. Updating them to zero.")
+            dbLikeKeysCopy.forEach {
+                if ((dbLikes[it]?.size ?: 0) > 0 &&
+                    (dbLikes[it]?.firstOrNull()?.total ?: 0) > 0
+                ) {
+                    LOGGER.info("Zero for type-$typeId, mid-$mid, pid-${it.first}, value-${it.second}")
+                }
+                result.add(
+                    LikeRev(
+                        type = typeId,
+                        mid = mid,
+                        pid = it.first,
+                        value = it.second,
+                        total = 0,
+                        uid = it.third
+                    )
+                )
+            }
+        }
+        return result.toList()
+    }
+
+    private fun constructUserList(likeRevUsernameFromFile: List<LikeRevUsername>): List<User> {
+        val constructedUsers = mutableListOf<User>()
+        val userWithoutIdList =
+            likeRevUsernameFromFile.map { User(id = null, username = it.username, nickname = it.nickname) }.distinct()
+
+        val userRowFromDb = Dao.bgmDao().getUserRowByUsernameList(userWithoutIdList.map { it.username }.distinct())
+        val groupByUsername = userRowFromDb.groupBy { it.username }
+        userWithoutIdList.forEach {
+            if (it.username !in groupByUsername) {
+                constructedUsers.add(
+                    it.copy(id = it.id)
+                )
+            } else if (groupByUsername[it.username]!!.size > 1) {
+                val withNegativeId = groupByUsername[it.username]!!
+                if (withNegativeId.none { it.id > 0 }) {
+                    LOGGER.error("No positive uid found for username ${it.username}")
+                    return@forEach
+                }
+                constructedUsers.add(
+                    it.copy(id = withNegativeId.first { it.id > 0 }.id)
+                )
+            } else {
+                constructedUsers.add(
+                    it.copy(id = groupByUsername[it.username]!!.first().id)
+                )
+            }
+        }
+        return constructedUsers
     }
 
     private fun calZeroLike(
@@ -202,16 +322,22 @@ object JsonToDbProcessor {
         val result = mutableSetOf<Like>().apply { addAll(likeListFromFile) }
 
 
-        val fileLikeKeys = likeListFromFile.groupBy { it.pid to it.value }.keys
-        val dbLikeKeys = likeListFromDb.groupBy { it.pid to it.value }.keys
+        val fileLikes = likeListFromFile.groupBy { it.pid to it.value }
+        val fileLikeKeys = fileLikes.keys
+        val dbLikes = likeListFromDb.groupBy { it.pid to it.value }
+        val dbLikeKeys = dbLikes.keys
         // val fileLikeKeyCopy = fileLikeKeys.toMutableSet()
         val dbLikeKeysCopy = dbLikeKeys.toMutableSet()
         // If some keys not in file but in db, then update the result to set zero of these types
         dbLikeKeysCopy.removeAll(fileLikeKeys)
         if (dbLikeKeysCopy.isNotEmpty()) {
-            LOGGER.info("Some keys not in file but in db. Updating them to zero.")
+            LOGGER.info("Some keys not in file but in ba_likes table. Updating them to zero.")
             dbLikeKeysCopy.forEach {
-                LOGGER.info("Zero for type-$typeId, mid-$mid, pid-${it.first}, value-${it.second}")
+                if ((dbLikes[it]?.size ?: 0) > 0 &&
+                    (dbLikes[it]?.firstOrNull()?.total ?: 0) > 0
+                ) {
+                    LOGGER.info("Zero for type-$typeId, mid-$mid, pid-${it.first}, value-${it.second}")
+                }
                 result.add(
                     Like(
                         type = typeId,

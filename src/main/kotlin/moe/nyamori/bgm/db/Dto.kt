@@ -1,6 +1,7 @@
 package moe.nyamori.bgm.db
 
 import moe.nyamori.bgm.model.Like
+import moe.nyamori.bgm.model.LikeRev
 
 // For table query
 data class SpaceNameMappingData(val type: Int, val sid: Int, val name: String, val displayName: String)
@@ -27,6 +28,7 @@ data class TopicRow(
 )
 
 typealias LikeRow = Like
+typealias LikeRevRow = LikeRev
 
 data class UserRow(
     val id: Int,

@@ -534,5 +534,38 @@ interface BgmDao : Transactional<BgmDao> {
     ): List<VUserLatestCreateTopicRow>
 
 
+    // Like rev
+    @SqlQuery(
+        """
+            select * from ba_user where username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(UserRow::class)
+    fun getUserRowByUsernameList(
+        @BindList("l") l: Iterable<String>
+    ): List<UserRow>
+
+    @SqlQuery(
+        """
+        select * from ba_likes_rev where type = :type and mid = :topicId
+    """
+    )
+    @RegisterKotlinMapper(PostRow::class)
+    fun getLikeRevListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRevRow>
+    @SqlBatch(
+        """
+            insert into ba_likes_rev (type, mid, pid, value, uid, total)
+            values (:type,
+                    :mid,
+                    :pid,
+                    :value,
+                    :uid,
+                    :total
+            ) on conflict(type,mid,pid,value,uid) do update set total = :total
+        """
+    )
+    @Transaction
+    fun batchUpsertLikesRev(@BindBean likeList: Iterable<LikeRevRow>): IntArray
+
 }
 
