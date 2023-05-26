@@ -93,7 +93,19 @@ object TopicJsonHelper {
                     val m = it
                     val mid = (m["main_id"] as Double).toInt()
                     val value = (m["value"] as String).toInt()
-                    val total = (m["total"] as String).toInt()
+                    val total = run {
+                        if (m["total"] is String) {
+                            (m["total"] as String).toInt()
+                        } else if (m["total"] is Double){
+                            (m["total"] as Double).toInt()
+                        } else if (m["total"] is Long){
+                            (m["total"] as Long).toInt()
+                        } else if (m["total"] is Int){
+                            (m["total"] as Int)
+                        } else {
+                            0 // Fallback
+                        }
+                    }
                     res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
                 }
                 return@map res
