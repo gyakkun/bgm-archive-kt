@@ -250,13 +250,13 @@ interface BgmDao : Transactional<BgmDao> {
     }
 
     @SqlBatch("""
-            update ba_likes_rev set uid = t.first -- positive 
+            update ba_likes_rev set uid = :t.first -- positive 
             where 1 = 1
-                and type  = t.third.type
-                and mid   = t.third.mid
-                and pid   = t.third.pid
-                and value = t.third.value
-                and uid   = t.second -- negative
+                and type  = :t.third.type
+                and mid   = :t.third.mid
+                and pid   = :t.third.pid
+                and value = :t.third.value
+                and uid   = :t.second -- negative
         """
     )
     @Transaction
