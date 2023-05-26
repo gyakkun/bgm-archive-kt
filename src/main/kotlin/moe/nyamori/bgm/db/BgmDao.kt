@@ -651,5 +651,30 @@ interface BgmDao : Transactional<BgmDao> {
     @Transaction
     fun batchUpsertLikesRev(@BindBean likeList: Iterable<LikeRevRow>): IntArray
 
+
+    @SqlQuery(
+        """
+            select bl.type     as type,
+                   bl.value    as face_key,
+                   bl.total    as face_count,
+                   bu.username as username,
+                   sum(bl.total)  count
+            from  ba_user bu 
+                     inner join ba_likes_rev bl on bl.uid = bu.id  -- bl_r will be larger and larger
+                     inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
+                     inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
+            where bu.username in
+                  (<l>)
+              and bl.type = :t
+            group by bl.type, face_key, username
+            having count > 0;
+        """
+    )
+    @RegisterKotlinMapper(VLikesSumRow::class)
+    fun getLikeRevSumByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VLikesSumRow>
+
 }
 

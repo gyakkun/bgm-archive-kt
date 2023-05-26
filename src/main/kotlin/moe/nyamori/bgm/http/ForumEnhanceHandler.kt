@@ -142,6 +142,11 @@ object ForumEnhanceHandler : Handler {
                 Dao.bgmDao().getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
+        val likeRevSumByTypeAndUsernameList = async {
+            timingWrapper("getLikeRevSumByTypeAndUsernameList") {
+                Dao.bgmDao().getLikeRevSumByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
         val postCountSpaceByTypeAndUsernameList = async {
             timingWrapper("getPostCountSpaceByTypeAndUsernameList") {
                 Dao.bgmDao().getPostCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
@@ -165,6 +170,7 @@ object ForumEnhanceHandler : Handler {
         val vAllPostCountRows = allPostCountByTypeAndUsernameList.await()
         val vAllTopicCountRows = allTopicCountByTypeAndUsernameList.await()
         val vLikesSumRows = likesSumByTypeAndUsernameList.await()
+        val vLikeRevSumRows = likeRevSumByTypeAndUsernameList.await()
         val vPostCountSpaceRows = postCountSpaceByTypeAndUsernameList.await()
         val vTopicCountSpaceRows = topicCountSpaceByTypeAndUsernameList.await()
         val vUserLastReplyTopicRows = userLastReplyTopicByTypeAndUsernameList.await()
@@ -175,6 +181,7 @@ object ForumEnhanceHandler : Handler {
             vAllPostCountRows,
             vAllTopicCountRows,
             vLikesSumRows,
+            vLikeRevSumRows,
             vPostCountSpaceRows,
             vTopicCountSpaceRows,
             vUserLastReplyTopicRows,
@@ -189,6 +196,7 @@ object ForumEnhanceHandler : Handler {
         vAllPostCountRows: List<VAllPostCountRow> = emptyList(),
         vAllTopicCountRows: List<VAllTopicCountRow> = emptyList(),
         vLikesSumRows: List<VLikesSumRow> = emptyList(),
+        vLikeRevSumRows: List<VLikesSumRow> = emptyList(),
         vPostCountSpaceRows: List<VPostCountSpaceRow> = emptyList(),
         vTopicCountSpaceRows: List<VTopicCountSpaceRow> = emptyList(),
         vUserLastReplyTopicRows: List<VUserLastReplyTopicRow> = emptyList(),
@@ -212,6 +220,10 @@ object ForumEnhanceHandler : Handler {
                 it.key to TopicStat(total, deleted, silent, closed, reopen)
             }.toMap()
         val likeStatMap = vLikesSumRows.groupBy { it.username }
+            .map {
+                it.key to it.value.associate { it.faceKey to it.count }
+            }.toMap()
+        val likeRevStatMap = vLikeRevSumRows.groupBy { it.username }
             .map {
                 it.key to it.value.associate { it.faceKey to it.count }
             }.toMap()
@@ -290,6 +302,7 @@ object ForumEnhanceHandler : Handler {
                     postStat = postStatMap[un] ?: PostStat(),
                     topicStat = topicStatMap[un] ?: TopicStat(),
                     likeStat = likeStatMap[un] ?: emptyMap(),
+                    likeRevStat = likeRevStatMap[un] ?: emptyMap(),
                     spaceStat = spaceStatMergedMap[un] ?: emptyList(),
                     recentActivities = Recent(
                         topic = lastCreateTopicMap[un] ?: emptyList(),
@@ -390,6 +403,7 @@ object ForumEnhanceHandler : Handler {
         val postStat: PostStat = PostStat(),
         val topicStat: TopicStat = TopicStat(),
         val likeStat: Map<Int, Int> = mapOf(),
+        val likeRevStat: Map<Int, Int> = mapOf(),
         val spaceStat: List<SpaceStat> = listOf(),
         val recentActivities: Recent = Recent()
     )
