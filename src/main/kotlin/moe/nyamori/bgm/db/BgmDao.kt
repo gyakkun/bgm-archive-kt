@@ -162,7 +162,7 @@ interface BgmDao : Transactional<BgmDao> {
         select distinct username from ba_user where username in (<l>) and username is not null
     """
     )
-    fun getValidUsernameListFromList(@BindList("l") l: List<String>):List<String>
+    fun getValidUsernameListFromList(@BindList("l") l: List<String>): List<String>
 
     @SqlBatch(
         """
@@ -208,7 +208,7 @@ interface BgmDao : Transactional<BgmDao> {
     fun removeNegativeUidUser(@BindBean("p") userList: Iterable<Pair<Int, Int>>)
 
     @Transaction
-    fun handleNegativeUid() {
+    fun handleNegativeUid(): List<Pair<Int/*TYPE*/, Int /*Mid*/>> {
         val negativeUidUsers = getNegativeUidUsers()
         LOGGER.info("Negative uid list: ${negativeUidUsers.map { Pair(it.username, it.id) }}")
         val userList = negativeUidUsers.groupBy { it.username }.map {
@@ -240,7 +240,90 @@ interface BgmDao : Transactional<BgmDao> {
         updateNegativeSidInBlogTopic(userList)
         // removeNegativeUidUser(userList)
         // No need to remove Negative Sid In Space Naming Mapping , otherwise it will conflict the unique key constraint
+
+
+        val canUpdate = preRemoveConflictSidInLikesRev(userList)
+        updateNegativeUidInLikesRev(canUpdate)
+
+        return emptyList()
+
     }
+
+    @SqlBatch("""
+            update ba_likes_rev set uid = t.first -- positive 
+            where 1 = 1
+                and type  = t.third.type
+                and mid   = t.third.mid
+                and pid   = t.third.pid
+                and value = t.third.value
+                and uid   = t.second -- negative
+        """
+    )
+    @Transaction
+    fun updateNegativeUidInLikesRev(@BindBean("t") l: List<Triple<Int, Int, DeReplicaLikeRev>>)
+
+    @SqlQuery(
+        """
+        select * from ba_likes_rev where uid = :t.first or uid = :t.second
+    """
+    )
+    @RegisterKotlinMapper(LikeRevRow::class)
+    fun selectLikeRevByUidPair(@BindBean("t") t: Pair<Int, Int>): List<LikeRevRow>
+
+    @SqlUpdate(
+        """
+        delete from ba_likes_rev where 1=1
+         and type = :t.type 
+         and mid = :t.mid 
+         and pid = :t.pid 
+         and value = :t.value 
+         and uid < 0
+    """
+    )
+    @Transaction
+    fun doRemoveConflictInLikesRev(@BindBean("t") t: DeReplicaLikeRev): Int
+
+    data class DeReplicaLikeRev(
+        val type: Int,
+        val mid: Int,
+        val pid: Int,
+        val value: Int
+    )
+
+    fun preRemoveConflictSidInLikesRev(uidPairList: List<Pair<Int/*pos*/, Int/*neg*/>>): List<Triple<Int, Int, DeReplicaLikeRev>> {
+        return uidPairList.mapNotNull { i ->
+            val deReplicaLikeRev = selectLikeRevByUidPair(i)
+                .groupBy {
+                    DeReplicaLikeRev(
+                        it.type,
+                        it.mid,
+                        it.pid,
+                        it.value
+                    )
+                }
+            if (deReplicaLikeRev.isEmpty()) return@mapNotNull null
+            val canRemove = deReplicaLikeRev.filter {
+                it.value.isNotEmpty()
+                        && it.value.size == 2
+                        && it.value.map { it.total }.distinct().size == 1
+            }.keys
+            val canUpdate = deReplicaLikeRev.filter {
+                it.value.isNotEmpty()
+                        && it.value.size == 1
+                        && it.value[0].uid < 0
+            }.map {
+                Triple(i.first, i.second, it.key)
+            }
+            canRemove.forEach { j ->
+                val res = doRemoveConflictInLikesRev(j)
+                LOGGER.info("$res rows removed from ba_likes_rev by key $j")
+            }
+            return@mapNotNull canUpdate
+        }.flatten()
+    }
+
+
+
 
 
     @SqlQuery(
@@ -552,6 +635,7 @@ interface BgmDao : Transactional<BgmDao> {
     )
     @RegisterKotlinMapper(PostRow::class)
     fun getLikeRevListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRevRow>
+
     @SqlBatch(
         """
             insert into ba_likes_rev (type, mid, pid, value, uid, total)
