@@ -122,7 +122,7 @@ object TopicJsonHelper {
                         val m = it.value as Map<String, Any?>
                         val mid = (m["main_id"] as Double).toInt()
                         val value = (m["value"] as String).toInt()
-                        val users = (m["users"] as List<Map<String, Any?>>)
+                        val users = (m["users"] as List<Map<String, Any?>>?) ?: return@forEach
                         users.forEach {
                             if (it["username"] == null) return@forEach
                             if (it["username"]!! !is String) return@forEach

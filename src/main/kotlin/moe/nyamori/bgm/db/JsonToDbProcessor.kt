@@ -226,13 +226,17 @@ object JsonToDbProcessor {
                 LOGGER.error("No mapped uid for username ${it.username}")
                 return@mapNotNull null
             }
+            if(mapByUsername[it.username]!!.id==null){
+                LOGGER.error("This one has null id ${it.username}")
+                System.err.println("")
+            }
             LikeRev(
                 type = it.type,
                 mid = it.mid,
                 pid = it.pid,
                 value = it.value,
                 total = it.total,
-                uid = mapByUsername[it.username]!!.id!!
+                uid = mapByUsername[it.username]!!.getId()
             )
         }
 
@@ -281,12 +285,14 @@ object JsonToDbProcessor {
         val userWithoutIdList =
             likeRevUsernameFromFile.map { User(id = null, username = it.username, nickname = it.nickname) }.distinct()
 
+        if(userWithoutIdList.isEmpty()) return emptyList()
+
         val userRowFromDb = Dao.bgmDao().getUserRowByUsernameList(userWithoutIdList.map { it.username }.distinct())
         val groupByUsername = userRowFromDb.groupBy { it.username }
         userWithoutIdList.forEach {
             if (it.username !in groupByUsername) {
                 constructedUsers.add(
-                    it.copy(id = it.id)
+                    it.copy(id = it.getId())
                 )
             } else if (groupByUsername[it.username]!!.size > 1) {
                 val withNegativeId = groupByUsername[it.username]!!
