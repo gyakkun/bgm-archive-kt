@@ -58,7 +58,7 @@ interface BgmDao : Transactional<BgmDao> {
             :id,
             :username,
             :nickname
-        ) on conflict(id) do update set username = :username, nickname = :nickname 
+        ) on conflict(id) do update set username = :username, nickname = coalesce(:nickname, nickname) 
         """
     )
     @Transaction

@@ -97,10 +97,11 @@ object JsonToDbProcessor {
                         val processedLikeList = calZeroLike(likeListFromFile, likeListFromDb, topic.isEmptyTopic())
 
                         // TODO: Calculate uid from username
-                        val processedLikeRevList =
+                        val (processedLikeRevList, constructedUser) =
                             calLikeRev(likeRevUsernameFromFile, likeRevListFromDb, topic.isEmptyTopic())
 
                         Dao.bgmDao().batchUpsertUser(userListFromFile)
+                        Dao.bgmDao().batchUpsertUser(constructedUser)
                         Dao.bgmDao().batchUpsertLikes(processedLikeList)
                         Dao.bgmDao().batchUpsertLikesRev(processedLikeRevList)
                         Dao.bgmDao().batchUpsertPost(spaceTypeId, topic.getSid(), postListFromFile)
@@ -215,9 +216,9 @@ object JsonToDbProcessor {
         likeRevUsernameFromFile: List<LikeRevUsername>,
         likeRevListFromDb: List<LikeRevRow>,
         isEmptyTopic: Boolean
-    ): List<LikeRev> {
-        if (isEmptyTopic) return emptyList()
-        if (likeRevUsernameFromFile.isEmpty() && likeRevListFromDb.isEmpty()) return emptyList()
+    ): Pair<List<LikeRev>, List<User>> {
+        if (isEmptyTopic) return Pair(emptyList(), emptyList())
+        if (likeRevUsernameFromFile.isEmpty() && likeRevListFromDb.isEmpty()) return Pair(emptyList(), emptyList())
 
         val constructedUserList = constructUserList(likeRevUsernameFromFile)
         val mapByUsername = constructedUserList.associateBy { it.username }
@@ -226,7 +227,7 @@ object JsonToDbProcessor {
                 LOGGER.error("No mapped uid for username ${it.username}")
                 return@mapNotNull null
             }
-            if(mapByUsername[it.username]!!.id==null){
+            if (mapByUsername[it.username]!!.id == null) {
                 LOGGER.error("This one has null id ${it.username}")
                 System.err.println("")
             }
@@ -249,9 +250,9 @@ object JsonToDbProcessor {
         val result = mutableSetOf<LikeRev>().apply { addAll(likeRevListFromFile) }
 
 
-        val fileLikes = likeRevListFromFile.groupBy { Triple(it.pid , it.value, it.uid) }
+        val fileLikes = likeRevListFromFile.groupBy { Triple(it.pid, it.value, it.uid) }
         val fileLikeKeys = fileLikes.keys
-        val dbLikes = likeRevListFromDb.groupBy { Triple(it.pid , it.value, it.uid) }
+        val dbLikes = likeRevListFromDb.groupBy { Triple(it.pid, it.value, it.uid) }
         val dbLikeKeys = dbLikes.keys
         // val fileLikeKeyCopy = fileLikeKeys.toMutableSet()
         val dbLikeKeysCopy = dbLikeKeys.toMutableSet()
@@ -277,7 +278,7 @@ object JsonToDbProcessor {
                 )
             }
         }
-        return result.toList()
+        return result.toList() to constructedUserList
     }
 
     private fun constructUserList(likeRevUsernameFromFile: List<LikeRevUsername>): List<User> {
@@ -285,7 +286,7 @@ object JsonToDbProcessor {
         val userWithoutIdList =
             likeRevUsernameFromFile.map { User(id = null, username = it.username, nickname = it.nickname) }.distinct()
 
-        if(userWithoutIdList.isEmpty()) return emptyList()
+        if (userWithoutIdList.isEmpty()) return emptyList()
 
         val userRowFromDb = Dao.bgmDao().getUserRowByUsernameList(userWithoutIdList.map { it.username }.distinct())
         val groupByUsername = userRowFromDb.groupBy { it.username }
