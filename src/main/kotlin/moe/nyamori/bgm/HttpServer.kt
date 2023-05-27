@@ -28,6 +28,7 @@ class HttpServer {
                 .get("/db-persist-hook", DbPersistHook)
                 .get("/db-set-persist-id", DbSetPersistIdHandler)
                 .post("/forum-enhance/query", ForumEnhanceHandler)
+                .get("/forum-enhance/deleted_post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
                 .get("/img/*") { ctx ->
                     ctx.redirect("https://bgm.tv" + ctx.path())
                     return@get

@@ -22,7 +22,7 @@ object FileHistoryLookup {
 
     private val repoPathToRevCommitCache: LoadingCache<Pair<Repository, String>, Map<Long, RevCommit>> =
         Caffeine.newBuilder()
-            .maximumSize(6)
+            .maximumSize(10)
             .expireAfterWrite(Duration.ofMinutes(30))
             .build { key ->
                 getTimestampCommitMapFromRevCommitList(key.first.getRevCommitList(key.second))
