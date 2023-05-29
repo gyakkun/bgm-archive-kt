@@ -102,12 +102,12 @@ data class VLikeRevCountSpaceRow(
     val count: Int
 )
 
-data class VLatestLikeRevRow(
+data class VUserLatestLikeRevRow(
     val type: Int,
     val mid: Int,
     val pid: Int,
     val username: String,
     val faceKey: Int,
-    val title: String,
-    val dateline: Int
+    val title: String?,
+    val dateline: Long
 )

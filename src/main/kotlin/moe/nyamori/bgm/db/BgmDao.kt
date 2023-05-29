@@ -695,7 +695,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @RegisterKotlinMapper(VLikeRevCountSpaceRow::class)
-    fun getLikeRevStatBySpaceAndUsernameList(
+    fun getLikeRevStatForSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikeRevCountSpaceRow>
@@ -726,11 +726,11 @@ interface BgmDao : Transactional<BgmDao> {
           and dateline >= ((select unixepoch() - 86400 * 365 * 3))
     """
     )
-    @RegisterKotlinMapper(VLatestLikeRevRow::class)
-    fun getLatestLikeRevByTypeAndUsernameList(
+    @RegisterKotlinMapper(VUserLatestLikeRevRow::class)
+    fun getUserLatestLikeRevByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
-    ): List<VLatestLikeRevRow>
+    ): List<VUserLatestLikeRevRow>
 
 }
 
