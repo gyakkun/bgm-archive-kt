@@ -102,6 +102,8 @@ data class VLikeRevCountSpaceRow(
     val count: Int
 )
 
+typealias VLikeCountSpaceRow = VLikeRevCountSpaceRow
+
 data class VUserLatestLikeRevRow(
     val type: Int,
     val mid: Int,

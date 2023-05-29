@@ -172,6 +172,11 @@ object ForumEnhanceHandler : Handler {
                 Dao.bgmDao().getLikeRevStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
+        val likeCountForSpaceByTypeAndUsernameList = async {
+            timingWrapper("getLikeStatForSpaceByTypeAndUsernameList") {
+                Dao.bgmDao().getLikeStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
         val userLatestLikeRevByTypeAndUsernameList = async {
             timingWrapper("getUserLatestLikeRevByTypeAndUsernameList") {
                 Dao.bgmDao().getUserLatestLikeRevByTypeAndUsernameList(spaceType.id, usernameList)
@@ -186,6 +191,7 @@ object ForumEnhanceHandler : Handler {
         val vUserLastReplyTopicRows = userLastReplyTopicByTypeAndUsernameList.await()
         val vUserLatestCreateTopicRows = userLatestCreateTopicAndUsernameList.await()
         val vLikeRevCountSpaceRows = likeRevCountForSpaceByTypeAndUsernameList.await()
+        val vLikeCountSpaceRows = likeCountForSpaceByTypeAndUsernameList.await()
         val vUserLatestLikeRevRows = userLatestLikeRevByTypeAndUsernameList.await()
         val res = aggregateResult(
             spaceType,
@@ -199,6 +205,7 @@ object ForumEnhanceHandler : Handler {
             vUserLastReplyTopicRows,
             vUserLatestCreateTopicRows,
             vLikeRevCountSpaceRows,
+            vLikeCountSpaceRows,
             vUserLatestLikeRevRows
         )
         return@async res
@@ -216,6 +223,7 @@ object ForumEnhanceHandler : Handler {
         vUserLastReplyTopicRows: List<VUserLastReplyTopicRow> = emptyList(),
         vUserLatestCreateTopicRows: List<VUserLatestCreateTopicRow> = emptyList(),
         vLikeRevCountSpaceRows: List<VLikeRevCountSpaceRow>,
+        vLikeCountSpaceRows: List<VLikeCountSpaceRow>,
         vUserLatestLikeRevRows: List<VUserLatestLikeRevRow>
     ): Map<String, UserStat> {
         val postStatMap = vAllPostCountRows.groupBy { it.username } // ->poststat
@@ -269,7 +277,14 @@ object ForumEnhanceHandler : Handler {
         val spaceLikeRevStatMap = vLikeRevCountSpaceRows.groupBy { it.username }
             .map {
                 it.key /*username*/ to it.value.groupBy { it.spaceName }.map {
-                    it.key /*spaceName*/ to LikeRevStat(it.value.sumOf { it.count })// no need for sum of actually because it should be 1 ele
+                    it.key /*spaceName*/ to LikeRevStatForSpace(it.value.sumOf { it.count })// no need for sum of actually because it should be 1 ele
+                }.sortedBy { -(it.second.total) }
+                    .toMap()
+            }.toMap()
+        val spaceLikeStatMap = vLikeCountSpaceRows.groupBy { it.username }
+            .map {
+                it.key /*username*/ to it.value.groupBy { it.spaceName }.map {
+                    it.key /*spaceName*/ to LikeStatForSpace(it.value.sumOf { it.count })// no need for sum of actually because it should be 1 ele
                 }.sortedBy { -(it.second.total) }
                     .toMap()
             }.toMap()
@@ -278,16 +293,19 @@ object ForumEnhanceHandler : Handler {
                 addAll(spacePostStatMap.keys)
                 addAll(spaceTopicStatMap.keys)
                 addAll(spaceLikeRevStatMap.keys)
+                addAll(spaceLikeStatMap.keys)
             }
             val spaceNameDisplayNameMap = mutableMapOf<String, String>().apply {
                 putAll(vTopicCountSpaceRows.map { it.name to it.displayName }.distinct().toMap())
                 putAll(vPostCountSpaceRows.map { it.name to it.displayName }.distinct().toMap())
                 putAll(vLikeRevCountSpaceRows.map { it.spaceName to it.spaceDisplayName }.distinct().toMap())
+                putAll(vLikeCountSpaceRows.map { it.spaceName to it.spaceDisplayName }.distinct().toMap())
             }
             userKeys.map { username ->
                 val spaceNameToTopicStatMap = spaceTopicStatMap[username] ?: emptyMap()
                 val spaceNameToPostStatMap = spacePostStatMap[username] ?: emptyMap()
                 val spaceNameToLikeRevStatMap = spaceLikeRevStatMap[username] ?: emptyMap()
+                val spaceNameToLikeStatMap = spaceLikeStatMap[username] ?: emptyMap()
                 username to spaceNameDisplayNameMap.keys.mapNotNull { spaceName ->
                     if (spaceNameToTopicStatMap[spaceName] == null && spaceNameToPostStatMap[spaceName] == null) {
                         return@mapNotNull null
@@ -296,7 +314,8 @@ object ForumEnhanceHandler : Handler {
                         spaceName, spaceNameDisplayNameMap[spaceName]!!,
                         spaceNameToPostStatMap[spaceName] ?: PostStat(),
                         spaceNameToTopicStatMap[spaceName] ?: TopicStat(),
-                        spaceNameToLikeRevStatMap[spaceName] ?: LikeRevStat(),
+                        spaceNameToLikeRevStatMap[spaceName] ?: LikeRevStatForSpace(),
+                        spaceNameToLikeStatMap[spaceName] ?: LikeStatForSpace(),
                     )
                 }.sortedBy { -(it.post.total + it.likeRev.total) }
                     .take(5)
@@ -433,7 +452,11 @@ object ForumEnhanceHandler : Handler {
         val reopen: Int = 0
     )
 
-    data class LikeRevStat(
+    data class LikeRevStatForSpace(
+        val total: Int = 0
+    )
+
+    data class LikeStatForSpace(
         val total: Int = 0
     )
 
@@ -441,7 +464,8 @@ object ForumEnhanceHandler : Handler {
         val name: String, val displayName: String,
         val post: PostStat = PostStat(),
         val topic: TopicStat = TopicStat(),
-        val likeRev: LikeRevStat = LikeRevStat()
+        val likeRev: LikeRevStatForSpace = LikeRevStatForSpace(),
+        val like: LikeStatForSpace = LikeStatForSpace()
     )
 
     data class TopicBrief(val title: String, val id: Int, val dateline: Long)
