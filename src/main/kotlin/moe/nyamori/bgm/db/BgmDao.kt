@@ -743,6 +743,7 @@ interface BgmDao : Transactional<BgmDao> {
                        inner join ba_post bp on blr.type = bp.type and blr.mid = bp.mid and blr.pid = bp.id
                        inner join ba_topic bt on bp.type = bt.type and bp.mid = bt.id
               where blr.type = :t
+                and blr.total != 0
                 and bp.state!=1 and bp.state!=16
                 and bt.state!=1
                 and blr.uid in (select bu.id
