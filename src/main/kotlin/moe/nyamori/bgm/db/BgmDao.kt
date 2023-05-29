@@ -249,7 +249,8 @@ interface BgmDao : Transactional<BgmDao> {
 
     }
 
-    @SqlBatch("""
+    @SqlBatch(
+        """
             update ba_likes_rev set uid = :t.first -- positive 
             where 1 = 1
                 and type  = :t.third.type
@@ -321,9 +322,6 @@ interface BgmDao : Transactional<BgmDao> {
             return@mapNotNull canUpdate
         }.flatten()
     }
-
-
-
 
 
     @SqlQuery(
@@ -675,6 +673,64 @@ interface BgmDao : Transactional<BgmDao> {
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikesSumRow>
+
+
+    @SqlQuery(
+        """
+        select bl.type           as type,
+               bu.username       as username,
+               bsnm.name         as space_name,
+               bsnm.display_name as space_display_name,
+               sum(bl.total)        count
+        from ba_likes_rev bl -- So far ba_likes is the smallest table
+                 inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
+                 inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+                 -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
+                 inner join ba_user bu on bl.uid = bu.id
+        where bu.username in
+              (<l>)
+          and bl.type = :t
+        group by bl.type, username
+        having count > 0;
+    """
+    )
+    @RegisterKotlinMapper(VLikeRevCountSpaceRow::class)
+    fun getLikeRevStatBySpaceAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VLikeRevCountSpaceRow>
+
+    @SqlQuery(
+        """
+        select *
+        from (select bp.type,
+                     bp.mid,
+                     bp.id       as  pid,
+                     bu.username,
+                     blr.value   as  face_key,
+                     bt.title    as  title,
+                     bp.dateline as  dateline,
+                     rank() over (partition by bp.type,bp.mid, blr.uid order by bp.dateline desc,bp.id desc) rank_like_rev_asc
+              from ba_user bu
+                       inner join ba_likes_rev blr on blr.uid = bu.id
+                       inner join ba_post bp on blr.type = bp.type and blr.mid = bp.mid and blr.pid = bp.id
+                       inner join ba_topic bt on bp.type = bt.type and bp.mid = bt.id
+              where blr.type = :t
+                and bp.state!=1 and bp.state!=16
+                and bt.state!=1
+                and blr.uid in (select bu.id
+                                from ba_user bu
+                                where bu.username in (<l>)))
+        where 1 = 1
+          and rank_like_rev_asc <=5
+          and dateline >= ((select unixepoch() - 86400 * 365 * 3))
+    """
+    )
+    @RegisterKotlinMapper(VLatestLikeRevRow::class)
+    fun getLatestLikeRevByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VLatestLikeRevRow>
 
 }
 

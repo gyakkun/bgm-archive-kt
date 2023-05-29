@@ -93,3 +93,21 @@ data class VPostCountSpaceRow(
 
 typealias VAllTopicCountRow = VAllPostCountRow
 typealias VTopicCountSpaceRow = VPostCountSpaceRow
+
+data class VLikeRevCountSpaceRow(
+    val type: Int,
+    val username: String,
+    val spaceName: String,
+    val spaceDisplayName: String,
+    val count: Int
+)
+
+data class VLatestLikeRevRow(
+    val type: Int,
+    val mid: Int,
+    val pid: Int,
+    val username: String,
+    val faceKey: Int,
+    val title: String,
+    val dateline: Int
+)
