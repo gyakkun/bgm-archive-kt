@@ -9,9 +9,11 @@ import io.javalin.http.util.NaiveRateLimit
 import io.javalin.http.util.RateLimitUtil
 import io.javalin.http.util.RateLimiter
 import moe.nyamori.bgm.git.FileHistoryLookup
+import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.util.BinarySearchHelper
 import moe.nyamori.bgm.util.FilePathHelper
 import moe.nyamori.bgm.util.HttpHelper
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
@@ -59,38 +61,85 @@ object FehDeletedPostHandler : Handler {
             ctx.status(HttpStatus.NOT_FOUND)
             return
         }
-        val latestTimestamp = timestampList.max()
-        val latestJsonString = FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
-            latestTimestamp,
-            jsonPath
-        )
-        val latestTopic = GSON.fromJson(latestJsonString, Topic::class.java)
-        val thePost = latestTopic.getAllPosts().firstOrNull { it.id == postId } ?: run {
+        val cache = HashMap<Long, Topic>()
+        val topicAtTs = fun(ts: Long): Topic {
+            return cache.computeIfAbsent(ts) {
+                GSON.fromJson(
+                    FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
+                        ts,
+                        jsonPath
+                    ), Topic::class.java
+                )
+            }
+        }
+
+        val bsFunMinExistPostGen =
+            BinarySearchHelper.binarySearchFunctionGenerator<Long>(BinarySearchHelper.BSType.FLOOR)
+        val earliestTsWithWantedPost = bsFunMinExistPostGen(timestampList) { ts ->
+            val topic = topicAtTs(ts)
+            topic.getAllPosts().any { it.id == postId }
+        } ?: run {
             LOGGER.info("Empty for post : $type - $topicId")
             ctx.status(HttpStatus.NOT_FOUND)
             return
         }
-        if (!thePost.isDeleted() && !thePost.isAdminDeleted()) {
-            LOGGER.warn("The post $type - $topicId - $postId is not deleted yet. May be malicious request. IP: ${ctx.header("X-Forwarded-For")?.split(",")?.get(0) ?: ctx.ip()}")
+
+        val bsFunMaxPostGen = BinarySearchHelper.binarySearchFunctionGenerator<Long>(BinarySearchHelper.BSType.CEILING)
+        val filteredTsList =timestampList.filter { it >= earliestTsWithWantedPost }
+        val theWantedPostTs = bsFunMaxPostGen(filteredTsList) { ts ->
+            val topic = topicAtTs(ts)
+            val post = topic.getAllPosts().first { it.id == postId }
+            !post.isDeleted() && !post.isAdminDeleted()
+        } ?: run {
+            LOGGER.info("All iterated but still not found : $type - $topicId - $postId")
+            ctx.status(HttpStatus.NOT_FOUND)
+            return
         }
-        val postTimestamp = thePost.dateline * 1000
-        timestampList.sortedDescending().forEach { ts ->
-            if (ts <= postTimestamp) return@forEach
-            val jsonStr = FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
-                ts,
-                jsonPath
-            )
-            val topicAtTs = GSON.fromJson(jsonStr, Topic::class.java)
-            val postAtTs = topicAtTs.getAllPosts().firstOrNull { it.id == postId } ?: return@forEach
-            if (!postAtTs.isDeleted() && !postAtTs.isAdminDeleted()) {
-                ctx.status(HttpStatus.OK)
-                ctx.html(postAtTs.contentHtml ?: "(bgm-archive 未收录)")
-                return
-            }
-        }
-        LOGGER.info("All iterated but still not found : $type - $topicId - $postId")
-        ctx.status(HttpStatus.NOT_FOUND)
+
+        val thePost = topicAtTs(theWantedPostTs).getAllPosts().first { it.id == postId }
+        ctx.html(thePost.contentHtml ?: "(bgm-archive 未收录)")
+        ctx.status(if (thePost.contentHtml != null) HttpStatus.OK else HttpStatus.NOT_FOUND)
         return
+        /*
+                val latestTimestamp = timestampList.max()
+                val latestJsonString = FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
+                    latestTimestamp,
+                    jsonPath
+                )
+                val latestTopic = GSON.fromJson(latestJsonString, Topic::class.java)
+                val thePost = latestTopic.getAllPosts().firstOrNull { it.id == postId } ?: run {
+                    LOGGER.info("Empty for post : $type - $topicId")
+                    ctx.status(HttpStatus.NOT_FOUND)
+                    return
+                }
+                if (!thePost.isDeleted() && !thePost.isAdminDeleted()) {
+                    LOGGER.warn(
+                        "The post $type - $topicId - $postId is not deleted yet. May be malicious request. IP: ${
+                            ctx.header(
+                                "X-Forwarded-For"
+                            )?.split(",")?.get(0) ?: ctx.ip()
+                        }"
+                    )
+                }
+                val postTimestamp = thePost.dateline * 1000
+                timestampList.sortedDescending().forEach { ts ->
+                    if (ts <= postTimestamp) return@forEach
+                    val jsonStr = FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
+                        ts,
+                        jsonPath
+                    )
+                    val topicAtTs = GSON.fromJson(jsonStr, Topic::class.java)
+                    val postAtTs = topicAtTs.getAllPosts().firstOrNull { it.id == postId } ?: return@forEach
+                    if (!postAtTs.isDeleted() && !postAtTs.isAdminDeleted()) {
+                        ctx.status(HttpStatus.OK)
+                        ctx.html(postAtTs.contentHtml ?: "(bgm-archive 未收录)")
+                        return
+                    }
+                }
+                LOGGER.info("All iterated but still not found : $type - $topicId - $postId")
+                ctx.status(HttpStatus.NOT_FOUND)
+                return
+         */
     }
 
 }
