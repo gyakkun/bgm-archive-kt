@@ -85,7 +85,7 @@ object FehDeletedPostHandler : Handler {
         }
 
         val bsFunMaxPostGen = BinarySearchHelper.binarySearchFunctionGenerator<Long>(BinarySearchHelper.BSType.CEILING)
-        val filteredTsList =timestampList.filter { it >= earliestTsWithWantedPost }
+        val filteredTsList = timestampList.filter { it >= earliestTsWithWantedPost }
         val theWantedPostTs = bsFunMaxPostGen(filteredTsList) { ts ->
             val topic = topicAtTs(ts)
             val post = topic.getAllPosts().first { it.id == postId }
@@ -98,48 +98,8 @@ object FehDeletedPostHandler : Handler {
 
         val thePost = topicAtTs(theWantedPostTs).getAllPosts().first { it.id == postId }
         ctx.html(thePost.contentHtml ?: "(bgm-archive 未收录)")
-        ctx.status(if (thePost.contentHtml != null) HttpStatus.OK else HttpStatus.NOT_FOUND)
+        ctx.status(thePost.contentHtml?.let { HttpStatus.OK } ?:  HttpStatus.NOT_FOUND)
         return
-        /*
-                val latestTimestamp = timestampList.max()
-                val latestJsonString = FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
-                    latestTimestamp,
-                    jsonPath
-                )
-                val latestTopic = GSON.fromJson(latestJsonString, Topic::class.java)
-                val thePost = latestTopic.getAllPosts().firstOrNull { it.id == postId } ?: run {
-                    LOGGER.info("Empty for post : $type - $topicId")
-                    ctx.status(HttpStatus.NOT_FOUND)
-                    return
-                }
-                if (!thePost.isDeleted() && !thePost.isAdminDeleted()) {
-                    LOGGER.warn(
-                        "The post $type - $topicId - $postId is not deleted yet. May be malicious request. IP: ${
-                            ctx.header(
-                                "X-Forwarded-For"
-                            )?.split(",")?.get(0) ?: ctx.ip()
-                        }"
-                    )
-                }
-                val postTimestamp = thePost.dateline * 1000
-                timestampList.sortedDescending().forEach { ts ->
-                    if (ts <= postTimestamp) return@forEach
-                    val jsonStr = FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
-                        ts,
-                        jsonPath
-                    )
-                    val topicAtTs = GSON.fromJson(jsonStr, Topic::class.java)
-                    val postAtTs = topicAtTs.getAllPosts().firstOrNull { it.id == postId } ?: return@forEach
-                    if (!postAtTs.isDeleted() && !postAtTs.isAdminDeleted()) {
-                        ctx.status(HttpStatus.OK)
-                        ctx.html(postAtTs.contentHtml ?: "(bgm-archive 未收录)")
-                        return
-                    }
-                }
-                LOGGER.info("All iterated but still not found : $type - $topicId - $postId")
-                ctx.status(HttpStatus.NOT_FOUND)
-                return
-         */
     }
 
 }
