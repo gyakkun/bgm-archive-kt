@@ -79,7 +79,7 @@ object FehDeletedPostHandler : Handler {
             val topic = topicAtTs(ts)
             topic.getAllPosts().any { it.id == postId }
         } ?: run {
-            LOGGER.info("Empty for post : $type - $topicId")
+            LOGGER.info("Empty for post : $type - $topicId - $postId")
             ctx.status(HttpStatus.NOT_FOUND)
             return
         }
@@ -98,7 +98,7 @@ object FehDeletedPostHandler : Handler {
 
         val thePost = topicAtTs(theWantedPostTs).getAllPosts().first { it.id == postId }
         ctx.html(thePost.contentHtml ?: "(bgm-archive 未收录)")
-        ctx.status(thePost.contentHtml?.let { HttpStatus.OK } ?:  HttpStatus.NOT_FOUND)
+        ctx.status(thePost.contentHtml?.let { HttpStatus.OK } ?: HttpStatus.NOT_FOUND)
         return
     }
 
