@@ -229,7 +229,7 @@ object SpotChecker {
         if (hiddenTopicMaskFile.exists()) {
             LOGGER.warn("Old hidden topic mask file exists. Perform bitwise operation to gen a new one.")
             val oldBs = getBitsetFromLongPlaintextFile(hiddenTopicMaskFile)
-            LOGGER.info("Old bitset size: ${oldBs.size()}. Cardinality: ${oldBs.cardinality()}. Zero count: ${oldBs.size() - newBs.cardinality()}")
+            LOGGER.info("Old bitset size: ${oldBs.size()}. Cardinality: ${oldBs.cardinality()}. Zero count: ${oldBs.size() - oldBs.cardinality()}")
             val result = mergeOldNewVisited(oldBs, newBs, visited)
             newBs = result
             LOGGER.info("After merging op, new bitset size: ${newBs.size()}. Cardinality: ${newBs.cardinality()}. Zero count: ${newBs.size() - newBs.cardinality()}")
