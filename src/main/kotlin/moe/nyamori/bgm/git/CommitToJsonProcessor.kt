@@ -264,7 +264,7 @@ object CommitToJsonProcessor {
         InputStreamReader(this.inputStream).use { isr ->
             BufferedReader(isr).use { reader ->
                 var line: String?
-                reader.readLine()
+                // reader.readLine()
                 while (reader.readLine().also { line = it } != null) {
                     System.err.println(line)
                     result.add(line)
