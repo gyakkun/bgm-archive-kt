@@ -34,6 +34,11 @@ object SpotChecker {
     const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 100
     const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
     const val HOLE_CHECKED_SET_SIZE_LIMIT = 75
+    private val TYPE_MAX_ID_MAP = run {
+        val result = mutableMapOf<SpaceType, Int>()
+        SpaceType.values().forEach { result[it] = -1 }
+        result
+    }
 
     @JvmStatic
     fun main(argv: Array<String>) {
@@ -273,7 +278,8 @@ object SpotChecker {
     }
 
     fun getMaxId(spaceType: SpaceType): Int {
-        val result = getTopicList(spaceType).max()
+        val result = getTopicList(spaceType).max().coerceAtLeast(TYPE_MAX_ID_MAP[spaceType]!!)
+        TYPE_MAX_ID_MAP[spaceType] = result
         LOGGER.info("Max id for $spaceType: $result")
         return result
     }
