@@ -28,6 +28,7 @@ data class Post(
         const val STATE_BLOG_REDIRECT: Long = 1 shl 5 //32
         const val STATE_BLOG_CLUB: Long = 1 shl 6 // 64
         const val STATE_VIOLATIVE: Long = 1 shl 7 // 128
+        const val STATE_COLLAPSED: Long = 1 shl 8 // 256
     }
 
     fun isNormal(): Boolean {
