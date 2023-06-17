@@ -232,7 +232,8 @@ object ForumEnhanceHandler : Handler {
                 val deleted = it.value.filter { it.state.isPostDeleted() }.sumOf { it.count }
                 val adminDeleted = it.value.filter { it.state.isPostAdminDeleted() }.sumOf { it.count }
                 val violative = it.value.filter { it.state.isViolative() }.sumOf { it.count }
-                it.key to PostStat(total, deleted, adminDeleted, violative)
+                val collapsed = it.value.filter { it.state.isCollapsed() }.sumOf { it.count }
+                it.key to PostStat(total, deleted, adminDeleted, violative, collapsed)
             }.toMap()
         val topicStatMap = vAllTopicCountRows.groupBy { it.username }
             .map {
@@ -258,7 +259,8 @@ object ForumEnhanceHandler : Handler {
                     val deleted = it.value.filter { it.state.isPostDeleted() }.sumOf { it.count }
                     val adminDeleted = it.value.filter { it.state.isPostAdminDeleted() }.sumOf { it.count }
                     val violative = it.value.filter { it.state.isViolative() }.sumOf { it.count }
-                    it.key to PostStat(total, deleted, adminDeleted, violative) // boring to (1,2,3,0)
+                    val collapsed = it.value.filter { it.state.isCollapsed() }.sumOf { it.count }
+                    it.key to PostStat(total, deleted, adminDeleted, violative, collapsed) // boring to (1,2,3,0)
                 }.sortedBy { -(it.second.total) }
                     .toMap() // sai -> { boring: (1,2,3) }
             }.toMap() // { sai: {boring: (1,2,3)} , trim21: {a:(4,5,6)} }
@@ -441,7 +443,8 @@ object ForumEnhanceHandler : Handler {
         val total: Int = 0,
         val deleted: Int = 0,
         val adminDeleted: Int = 0,
-        val violative: Int = 0
+        val violative: Int = 0,
+        val collapsed: Int = 0,
     )
 
     data class TopicStat(
@@ -518,6 +521,7 @@ object ForumEnhanceHandler : Handler {
     }
 
     private fun Long.isViolative() = this and Post.STATE_VIOLATIVE == Post.STATE_VIOLATIVE
+    private fun Long.isCollapsed() = this and Post.STATE_COLLAPSED == Post.STATE_COLLAPSED
 
     private fun Long.isPostNormal(): Boolean {
         return this and 1L == 0L
