@@ -27,4 +27,20 @@ class PostToStateHelperTest {
         val state = PostToStateHelper.fromPostHtmlToState(post)
         assertEquals(state, Post.STATE_VIOLATIVE)
     }
+
+    @Test
+    fun r427GeneralCollapsePost() {
+        val post =
+            "<span class=\"post_content_collapsed\"><span class=\"tip_collapsed\">回复被折叠</span></span>\n<div class=\"content\">\n 阅。\n</div>"
+        val state = PostToStateHelper.fromPostHtmlToState(post)
+        assertEquals(state, Post.STATE_COLLAPSED)
+    }
+
+    @Test
+    fun r427AdminDeletedPost() {
+        val post =
+            "<span class=\"tip_collapsed\">回复违反「<a href=\"/about/guideline\" class=\"l\">社区指导原则</a>」被删除</span>"
+        val state = PostToStateHelper.fromPostHtmlToState(post)
+        assertEquals(state, Post.STATE_ADMIN_DELETED)
+    }
 }
