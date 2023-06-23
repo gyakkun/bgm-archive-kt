@@ -690,7 +690,7 @@ interface BgmDao : Transactional<BgmDao> {
         where bu.username in
               (<l>)
           and bl.type = :t
-        group by bl.type, username
+        group by bl.type, username, bsnm.name
         having count > 0;
     """
     )
@@ -716,7 +716,7 @@ interface BgmDao : Transactional<BgmDao> {
             where bu.username in
                   (<l>)
               and bl.type = :t
-            group by bl.type, username
+            group by bl.type, username, bsnm.name
             having count > 0;
         """
     )
