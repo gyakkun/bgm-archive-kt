@@ -2,6 +2,7 @@ package moe.nyamori.bgm.util
 
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.parser.ep.EpTopicParserR416
 import org.slf4j.LoggerFactory
 import java.util.ArrayList
 
@@ -14,7 +15,12 @@ object TopicJsonHelper {
         if (!isValidTopic(topic)) {
             emptyList<Post>()
         }
-        return topic.getAllPosts().map { processPostWithEmptyUid(it) }
+        return topic.getAllPosts()
+            .filter {
+                ((it.user?.id ?: Int.MAX_VALUE) != EpTopicParserR416.PSEUDO_TOPIC_AUTHOR_UID &&
+                        (it.user?.username ?: "_INVALID_") != EpTopicParserR416.PSEUDO_TOPIC_AUTHOR_USERNAME)
+            }
+            .map { processPostWithEmptyUid(it) }
     }
 
     fun handleBlogTagAndRelatedSubject(topic: Topic) {
