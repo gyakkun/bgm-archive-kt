@@ -16,9 +16,9 @@ import java.util.*
 object EpTopicParserR416 : Parser {
     private val LOGGER: Logger = LoggerFactory.getLogger(EpTopicParserR416::class.java)
 
-    private const val PSEUDO_TOPIC_AUTHOR_UID = 0
-    private const val PSEUDO_TOPIC_AUTHOR_USERNAME = "_pseudo_writer"
-    private val PSEUDO_TOPIC_AUTHOR = User(
+    const val PSEUDO_TOPIC_AUTHOR_UID = 0
+    const val PSEUDO_TOPIC_AUTHOR_USERNAME = "_pseudo_writer"
+    val PSEUDO_TOPIC_AUTHOR = User(
         id = PSEUDO_TOPIC_AUTHOR_UID,
         username = PSEUDO_TOPIC_AUTHOR_USERNAME,
         nickname = PSEUDO_TOPIC_AUTHOR_USERNAME
@@ -182,15 +182,15 @@ object EpTopicParserR416 : Parser {
     }
 
     private fun guessUid(postDiv: Element, username: String): Int? {
-        val uidFromReplyAction = postDiv.select("div.post_actions.re_info > div:nth-child(2) > a").first().let outer@{
-            if (it == null) return@outer null
-            val onclickJsFun = it.attr("onclick")
-            val uidStr = onclickJsFun.split(",").let inner@{ splitArr ->
-                if (splitArr.size < 2) return@inner null
-                return@inner splitArr[splitArr.size - 2].trim()
-            }
-            return@outer uidStr?.toIntOrNull()
-        }
+        // val uidFromReplyAction = postDiv.select("div.post_actions.re_info > div:nth-child(2) > a").first().let outer@{
+        //     if (it == null) return@outer null
+        //     val onclickJsFun = it.attr("onclick")
+        //     val uidStr = onclickJsFun.split(",").let inner@{ splitArr ->
+        //         if (splitArr.size < 2) return@inner null
+        //         return@inner splitArr[splitArr.size - 2].trim()
+        //     }
+        //     return@outer uidStr?.toIntOrNull()
+        // }
         val uidFromAvatarBg = postDiv.select("a.avatar > span").first().let outer@{
             if (it == null) return@outer null
             val style = it.attr("style")
@@ -204,7 +204,7 @@ object EpTopicParserR416 : Parser {
             }
             return@outer uidStr?.toIntOrNull()
         }
-        if (uidFromReplyAction != null) return uidFromReplyAction
+        // if (uidFromReplyAction != null) return uidFromReplyAction
         if (uidFromAvatarBg != null) return uidFromAvatarBg
         return ParserHelper.guessUidFromUsername(username)
     }
