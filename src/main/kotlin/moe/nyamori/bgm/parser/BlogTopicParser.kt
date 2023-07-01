@@ -16,7 +16,7 @@ object BlogTopicParser : Parser {
             if (res.second) return res
         }
 
-        for (i in RevToParserTreeMap.values) {
+        for (i in RevToParserTreeMap.values.reversed()) {
             val res = i.parseTopic(htmlFileString, topicId, spaceType)
             if (res.second) {
                 return res
