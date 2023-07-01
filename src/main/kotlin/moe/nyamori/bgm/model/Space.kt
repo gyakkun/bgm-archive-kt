@@ -28,6 +28,13 @@ class Blog(
     var relatedSubjectIds: List<Int>? = null
 ) : Space(type, meta)
 
+class Ep(
+    type: SpaceType = SpaceType.EP,
+    meta: Map<String, Any>? = null,
+    var name: String? = null,
+    var displayName: String? = null,
+) : Space(type, meta)
+
 class Reserved(
     type: SpaceType
 ) : Space(type, null)
@@ -35,5 +42,6 @@ class Reserved(
 enum class SpaceType(val id: Int) {
     GROUP(8),
     SUBJECT(10),
-    BLOG(100) // TBC
+    BLOG(100), // TBC
+    EP(11)
 }
