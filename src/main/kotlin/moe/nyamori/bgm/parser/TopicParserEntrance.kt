@@ -11,6 +11,10 @@ object TopicParserEntrance : Parser {
             SpaceType.GROUP -> GroupTopicParser.parseTopic(htmlFileString, topicId, spaceType)
             SpaceType.SUBJECT -> SubjectTopicParser.parseTopic(htmlFileString, topicId, spaceType)
             SpaceType.BLOG -> BlogTopicParser.parseTopic(htmlFileString, topicId, spaceType)
+            SpaceType.EP -> EpTopicParser.parseTopic(htmlFileString, topicId, spaceType)
+            else -> {
+                throw IllegalArgumentException("${spaceType.name} not supported for now!")
+            }
         }
     }
 
