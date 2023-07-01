@@ -59,12 +59,16 @@ object CommitToJsonProcessor {
                         return@forEachIndexed // continue
                     }
 
-                    val commitSpaceType = if (curCommit.fullMessage.startsWith("SUBJECT")) {
-                        SpaceType.SUBJECT
-                    } else if (curCommit.fullMessage.startsWith("GROUP")) {
-                        SpaceType.GROUP
-                    } else if (curCommit.fullMessage.startsWith("BLOG")) {
-                        SpaceType.BLOG
+                    val commitMsgSplitArr = curCommit.fullMessage.split(" ")
+                    val commitSpaceType = if (commitMsgSplitArr.isNotEmpty()) {
+                        when (commitMsgSplitArr[0]) {
+                            in SpaceType.values().map { it.toString().uppercase() } -> SpaceType.valueOf(
+                                commitMsgSplitArr[0]
+                            )
+                            else -> {
+                                throw IllegalStateException("Not a group or subject topic!")
+                            }
+                        }
                     } else {
                         throw IllegalStateException("Not a group or subject topic!")
                     }
@@ -76,17 +80,20 @@ object CommitToJsonProcessor {
                         try {
                             if (!path.endsWith("html")) continue
                             log.warn("Cur commit: $curCommit, path: $path")
-                            val htmlSpaceType: SpaceType =
-                                if (path.startsWith("group") && curCommit.fullMessage.startsWith("GROUP")) {
-                                    SpaceType.GROUP
-                                } else if (path.startsWith("subject") && curCommit.fullMessage.startsWith("SUBJECT")) {
-                                    SpaceType.SUBJECT
-                                } else if (path.startsWith("blog") && curCommit.fullMessage.startsWith("BLOG")) {
-                                    SpaceType.BLOG
-                                } else {
-                                    log.error("Not a subject, group or blog topic! Path: $path, commit full msg: ${curCommit.fullMessage}")
-                                    SpaceType.valueOf(path.split("/").first().uppercase())
+                            val pathSplitArr = path.split("/")
+                            val htmlSpaceType = if (pathSplitArr.isNotEmpty()) {
+                                when (pathSplitArr[0]) {
+                                    in SpaceType.values().map { it.toString().lowercase() } ->
+                                        SpaceType.valueOf(
+                                            pathSplitArr.first().uppercase()
+                                        )
+                                    else -> {
+                                        throw IllegalStateException("unknown path prefix: ${pathSplitArr[0]}")
+                                    }
                                 }
+                            } else {
+                                throw IllegalStateException("unknown path format: $path")
+                            }
 
                             if (htmlSpaceType != commitSpaceType) {
                                 log.error("Html space type not consistent with commit space type! htmlSpaceType=$htmlSpaceType, commitSpaceType=$commitSpaceType")
@@ -117,7 +124,6 @@ object CommitToJsonProcessor {
                                 writeJsonFile(path, json)
                             } else {
                                 log.error("Parsing $htmlSpaceType-$topicId failed")
-                                // noGoodIdTreeSet.add(topicId)
                             }
                         } catch (ex: Exception) {
                             log.error("Exception occurs when handling $path", ex)
