@@ -6,14 +6,21 @@ import moe.nyamori.bgm.parser.blog.BlogTopicParserR398
 import moe.nyamori.bgm.parser.blog.BlogTopicParserR400
 import moe.nyamori.bgm.parser.ep.EpTopicParserR416
 import moe.nyamori.bgm.util.ParserHelper
+import org.slf4j.LoggerFactory
 import java.util.*
 
 object EpTopicParser : Parser {
+    private val LOGGER = LoggerFactory.getLogger(EpTopicParser::class.java)
     override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         val rev = ParserHelper.getStyleRevNumberFromHtmlString(htmlFileString)
         val parser: Parser? = RevToParserTreeMap.floorEntry(rev)?.value
         if (parser != null) {
-            val res = parser.parseTopic(htmlFileString, topicId, spaceType)
+            val res = runCatching { parser.parseTopic(htmlFileString, topicId, spaceType) }
+                .onFailure {
+                    LOGGER.error("Ex when using ${parser.javaClass.simpleName} : ", it)
+                    Pair(null, false)
+                }
+                .getOrDefault(Pair(null, false))
             if (res.second) return res
         }
 
