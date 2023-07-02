@@ -43,6 +43,7 @@ object EpTopicParserR416 : Parser {
             )
         }
         val subjectTitleAnchor = document.select("#headerSubject > h1 > a").first()
+            ?: return Pair(null, false) // 500 or other empty html
         val episodeTitleH2 = document.select("#columnEpA > h2").first()
         val realEpisodeIdAnchor = episodeTitleH2?.select("small > a")?.first()
         val episodeDescDiv = document.select("#columnEpA > div.epDesc").first()
