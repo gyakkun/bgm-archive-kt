@@ -69,8 +69,9 @@ object JsonToDbProcessor {
                 changedFilePathList.forEach inner@{ path ->
                     if (!path.endsWith("json")) return@inner
                     LOGGER.info("Path $path")
-                    val jsonStr = GitHelper.jsonRepoSingleton.getFileContentAsStringInACommit(cur, path)
+                    var jsonStr = "NOT READY YET"
                     runCatching {
+                        jsonStr = GitHelper.jsonRepoSingleton.getFileContentAsStringInACommit(cur, path)
                         val topicUnmod = GSON.fromJson(jsonStr, Topic::class.java)
 
                         if (!isValidTopic(topicUnmod)) return@inner
