@@ -76,6 +76,7 @@ object Config {
                         val folder = dbFile.parentFile
                         if (folder.exists()) folder.mkdirs()
                         val keyfile = folder.resolve("db-persist-key")
+                        if (!keyfile.exists()) keyfile.createNewFile()
                         FileWriter(keyfile).use { fw ->
                             fw.write(key)
                             fw.flush()
