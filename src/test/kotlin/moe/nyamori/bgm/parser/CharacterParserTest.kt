@@ -7,7 +7,7 @@ import org.junit.jupiter.api.Test
 
 class CharacterParserTest {
     @Test
-    fun testEpMisc() {
+    fun testCharacterMisc() {
         for (i in listOf(
             "character_1",
             "not_found",
