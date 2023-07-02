@@ -74,7 +74,7 @@ object CharacterTopicParserR430: Parser {
         return Pair(
             Topic(
                 id = characterIdInt,
-                space = Ep(
+                space = Character(
                     meta = meta.ifEmpty { null },
                     name = spaceName,
                     displayName = spaceDisplayName,
