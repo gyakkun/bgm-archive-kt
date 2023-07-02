@@ -182,7 +182,9 @@ object GitHelper {
                 val charsetName: String = if (cm == null) {
                     StandardCharsets.UTF_8.name()
                 } else {
-                    log.warn("Select charset ${cm.name} for $path at commit ${commit.shortMessage}")
+                    if (cm.name != StandardCharsets.UTF_8.name()) {
+                        log.warn("Select charset ${cm.name} for $path at commit ${commit.shortMessage}")
+                    }
                     cm.name
                 }
                 val selectedCharset = charset(charsetName)

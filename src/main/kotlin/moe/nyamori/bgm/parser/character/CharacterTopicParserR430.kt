@@ -48,12 +48,12 @@ object CharacterTopicParserR430: Parser {
         val commentListDiv = document.select("#comment_list").first()
         val meta = mutableMapOf<String, Any>()
 
-        val characterIdInt = extractCharacterId(characterNameAnchor)
-        val spaceName = characterIdInt!!.toString()
+        val characterId = extractCharacterId(characterNameAnchor)
+        val spaceName = characterId!!.toString()
         val characterName = extractCharacterName(characterNameAnchor)
         val spaceDisplayName = characterName!!
         val characterDescHtmlPost = extractCharacterDescHtmlToPost(characterDescDiv)
-        val commentPostList = extractCommentPostList(commentListDiv, characterIdInt)
+        val commentPostList = extractCommentPostList(commentListDiv, characterId)
         val dataLikesList = extractDataLikeList(htmlFileString) // may be introduced in the future, keep it for now
 
         if (dataLikesList != null) {
@@ -64,8 +64,8 @@ object CharacterTopicParserR430: Parser {
         postList.add(
             characterDescHtmlPost.copy(
                 dateline = 0L,
-                id = -characterIdInt,
-                mid = characterIdInt
+                id = -characterId,
+                mid = characterId
             )
         )
         postList.addAll(commentPostList)
@@ -73,7 +73,7 @@ object CharacterTopicParserR430: Parser {
 
         return Pair(
             Topic(
-                id = characterIdInt,
+                id = characterId,
                 space = Character(
                     meta = meta.ifEmpty { null },
                     name = spaceName,
@@ -83,7 +83,7 @@ object CharacterTopicParserR430: Parser {
                 dateline = null,
                 title = characterName,
                 display = true,
-                topPostPid = -characterIdInt,
+                topPostPid = -characterId,
                 state = Post.STATE_NORMAL,
                 postList = postList
             ),
@@ -99,16 +99,16 @@ object CharacterTopicParserR430: Parser {
             ?.substringBeforeLast(";")
     }
 
-    private fun extractCommentPostList(commentListDiv: Element?, epId: Int): List<Post> {
+    private fun extractCommentPostList(commentListDiv: Element?, characterId: Int): List<Post> {
         if (commentListDiv == null) return emptyList()
         return commentListDiv.children().mapNotNull {
-            extractCommentPostRecursively(it, epId)
+            extractCommentPostRecursively(it, characterId)
         }.toList()
     }
 
     private fun extractCommentPostRecursively(
         postDiv: Element?,
-        epId: Int,
+        characterId: Int,
         isSubReply: Boolean = false,
         mainPostPid: Int? = null
     ): Post? {
@@ -147,7 +147,7 @@ object CharacterTopicParserR430: Parser {
         val subReplyPostList =
             if (!isSubReply && subReplies != null) {
                 subReplies.mapNotNull {
-                    extractCommentPostRecursively(it, epId, isSubReply = true, mainPostPid = postId)
+                    extractCommentPostRecursively(it, characterId, isSubReply = true, mainPostPid = postId)
                 }.toList()
             } else null
 
@@ -155,7 +155,7 @@ object CharacterTopicParserR430: Parser {
             id = postId,
             floorNum = floorNum,
             subFloorNum = subFloorNum,
-            mid = epId,
+            mid = characterId,
             dateline = dateline,
             contentHtml = contentHtml,
             subFloorList = subReplyPostList,

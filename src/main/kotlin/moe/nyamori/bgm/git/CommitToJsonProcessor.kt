@@ -65,6 +65,7 @@ object CommitToJsonProcessor {
                             in SpaceType.values().map { it.toString().uppercase() } -> SpaceType.valueOf(
                                 commitMsgSplitArr[0]
                             )
+
                             else -> {
                                 throw IllegalStateException("Not a group or subject topic!")
                             }
@@ -79,7 +80,11 @@ object CommitToJsonProcessor {
                         val path = changedFilePathList[pathIdx]
                         try {
                             if (!path.endsWith("html")) continue
-                            log.warn("Cur commit: $curCommit, path: $path")
+                            log.warn(
+                                "Cur commit id: ${
+                                    curCommit.name().substring(0, 8)
+                                }, path: $path , message:  ${curCommit.shortMessage}"
+                            )
                             val pathSplitArr = path.split("/")
                             val htmlSpaceType = if (pathSplitArr.isNotEmpty()) {
                                 when (pathSplitArr[0]) {
@@ -87,6 +92,7 @@ object CommitToJsonProcessor {
                                         SpaceType.valueOf(
                                             pathSplitArr.first().uppercase()
                                         )
+
                                     else -> {
                                         throw IllegalStateException("unknown path prefix: ${pathSplitArr[0]}")
                                     }
