@@ -30,6 +30,7 @@ object SpotChecker {
     const val SPOT_CHECK_BITSET_FILE_NAME = "spot_check_bitset.txt"
     const val SPOT_CHECK_LIST_FILE_NAME = "sc.txt"
     const val MIN_SPOT_CHECK_SIZE = 10
+    const val MAX_SPOT_CHECK_SIZE = 50
     const val RANGE_HOLE_INTERVAL_THRESHOLD = 5
     const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 100
     const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
@@ -159,7 +160,7 @@ object SpotChecker {
         }
         val samplingSize =
             (fakeTotalCount / (30 * (Config.BGM_ARCHIVE_HOW_MANY_COMMIT_ON_GITHUB_PER_DAY / (2 * (SpaceType.values().size)))))
-                .coerceAtLeast(MIN_SPOT_CHECK_SIZE)
+                .coerceAtLeast(MIN_SPOT_CHECK_SIZE).coerceAtMost(MAX_SPOT_CHECK_SIZE)
         val r = Random()
 
         repeat(samplingSize) {
