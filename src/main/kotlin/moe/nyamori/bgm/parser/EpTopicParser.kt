@@ -25,10 +25,13 @@ object EpTopicParser : Parser {
         }
 
         for (i in RevToParserTreeMap.values.reversed()) {
-            val res = i.parseTopic(htmlFileString, topicId, spaceType)
-            if (res.second) {
-                return res
-            }
+            val res = runCatching { i.parseTopic(htmlFileString, topicId, spaceType) }
+                .onFailure {
+                    LOGGER.error("Ex when using ${i.javaClass.simpleName} : ", it)
+                    Pair(null, false)
+                }
+                .getOrDefault(Pair(null, false))
+            if (res.second) return res
         }
         throw IllegalStateException("No parser support: $spaceType-$topicId")
     }
