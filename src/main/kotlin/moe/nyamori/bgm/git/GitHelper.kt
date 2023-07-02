@@ -42,8 +42,8 @@ object GitHelper {
         if (Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
         else {
             Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
-                    .map { getRepoByPath(it.trim()) }
-                    .toList()
+                .map { getRepoByPath(it.trim()) }
+                .toList()
         }
     }
 
@@ -51,8 +51,8 @@ object GitHelper {
         if (Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
         else {
             Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
-                    .map { getRepoByPath(it.trim()) }
-                    .toList()
+                .map { getRepoByPath(it.trim()) }
+                .toList()
         }
     }
 
@@ -61,16 +61,16 @@ object GitHelper {
         val prevProcessedArchiveCommit = getPrevProcessedArchiveCommitRef()
         val latestArchiveCommit = getLatestArchiveCommitRef()
         return archiveRepoSingleton.getWalkBetweenCommitInReverseOrder(
-                latestArchiveCommit,
-                prevProcessedArchiveCommit,
-                stepInAdvance = false
+            latestArchiveCommit,
+            prevProcessedArchiveCommit,
+            stepInAdvance = false
         )
     }
 
     fun Repository.getWalkBetweenCommitInReverseOrder(
-            topCommit: RevCommit,
-            bottomCommit: RevCommit,
-            stepInAdvance: Boolean = true
+        topCommit: RevCommit,
+        bottomCommit: RevCommit,
+        stepInAdvance: Boolean = true
     ): RevWalk {
         this.use {
             val walk = RevWalk(it)
@@ -136,12 +136,12 @@ object GitHelper {
     fun getPrevProcessedArchiveCommitRevIdStr(): String {
         if (jsonRepoSingleton.isBare) {
             return jsonRepoSingleton.getFileContentAsStringInACommit(
-                    jsonRepoSingleton.getLatestCommitRef(),
-                    BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+                jsonRepoSingleton.getLatestCommitRef(),
+                BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
             ).trim()
         } else {
             val prevProcessedCommitRevIdFile =
-                    File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+                File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
             if (!prevProcessedCommitRevIdFile.exists()) return EMPTY_STRING
             val rawFileStr = FileUtil.getFileContent(prevProcessedCommitRevIdFile)!!
             return rawFileStr.trim()
@@ -155,10 +155,10 @@ object GitHelper {
             repo = repo.resolve(DOT_GIT)
         }
         return FileRepositoryBuilder()
-                .setGitDir(repo)
-                .readEnvironment() // scan environment GIT_* variables
-                .findGitDir() // scan up the file system tree
-                .build()
+            .setGitDir(repo)
+            .readEnvironment() // scan environment GIT_* variables
+            .findGitDir() // scan up the file system tree
+            .build()
     }
 
     private fun getJsonRepo(): Repository {
@@ -182,9 +182,9 @@ object GitHelper {
                 val charsetName: String = if (cm == null) {
                     StandardCharsets.UTF_8.name()
                 } else {
+                    log.info("Select charset ${cm.name} for $path at commit ${commit.fullMessage}")
                     cm.name
                 }
-                log.info("Select charset $charsetName for $path at commit ${commit.fullMessage}")
                 val selectedCharset = charset(charsetName)
                 return String(bytes, selectedCharset)
             }
@@ -202,13 +202,13 @@ object GitHelper {
             newTreeIter.reset(reader, curTree)
             Git(this).use { git ->
                 git.diff()
-                        .setNewTree(newTreeIter)
-                        .setOldTree(oldTreeIter)
-                        .call()
-                        .forEach {
-                            if (it.newPath == DEV_NULL) return@forEach
-                            result.add(it.newPath)
-                        }
+                    .setNewTree(newTreeIter)
+                    .setOldTree(oldTreeIter)
+                    .call()
+                    .forEach {
+                        if (it.newPath == DEV_NULL) return@forEach
+                        result.add(it.newPath)
+                    }
             }
         }
         return result
