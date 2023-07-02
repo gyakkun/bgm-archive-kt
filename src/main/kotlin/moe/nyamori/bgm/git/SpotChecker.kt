@@ -5,6 +5,7 @@ import com.google.gson.ToNumberPolicy
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
+import moe.nyamori.bgm.model.Ep
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
@@ -78,6 +79,7 @@ object SpotChecker {
 
     private val HOLE_CHECKED_SET = HashSet<Pair<SpaceType, Int>>() // Maintain in memory
     private fun checkIfHolesInTopicListRange(spaceType: SpaceType, topicList: List<Int>): List<Int> {
+        if (spaceType in listOf(SpaceType.EP, SpaceType.CHARACTER, SpaceType.PERSON)) return emptyList()
         if (HOLE_CHECKED_SET.size >= HOLE_CHECKED_SET_SIZE_LIMIT) HOLE_CHECKED_SET.clear()
         // val spotCheckBs = getSpotCheckedTopicMask(spaceType)
         val holes = mutableListOf<Int>()
