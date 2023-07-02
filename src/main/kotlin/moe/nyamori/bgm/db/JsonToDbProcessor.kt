@@ -221,6 +221,18 @@ object JsonToDbProcessor {
                 )
             } else {
             }
+        } else if (space is Person) {
+            if (space.name != null) {
+                sidNameMappingSet.add(
+                    SpaceNameMappingData(
+                        SpaceType.PERSON.id,
+                        topic.getSid() ?: StringHashingHelper.stringHash(space.name!!),
+                        space.name!!,
+                        space.displayName!!
+                    )
+                )
+            } else {
+            }
         } else {
             //
         }

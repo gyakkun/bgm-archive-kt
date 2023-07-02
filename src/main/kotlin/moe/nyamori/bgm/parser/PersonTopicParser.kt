@@ -3,12 +3,13 @@ package moe.nyamori.bgm.parser
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.parser.mono.CharacterTopicParserR430
+import moe.nyamori.bgm.parser.mono.PersonTopicParserR430
 import moe.nyamori.bgm.util.ParserHelper
 import org.slf4j.LoggerFactory
 import java.util.*
 
-object CharacterTopicParser : Parser {
-    private val LOGGER = LoggerFactory.getLogger(CharacterTopicParser::class.java)
+object PersonTopicParser : Parser {
+    private val LOGGER = LoggerFactory.getLogger(PersonTopicParser::class.java)
     override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         val rev = ParserHelper.getStyleRevNumberFromHtmlString(htmlFileString)
         val parser: Parser? = RevToParserTreeMap.floorEntry(rev)?.value
@@ -36,7 +37,7 @@ object CharacterTopicParser : Parser {
 
     val RevToParserTreeMap: TreeMap<Int, Parser> = run {
         val treeMap = TreeMap<Int, Parser>()
-        treeMap[430] = CharacterTopicParserR430
+        treeMap[430] = PersonTopicParserR430
         return@run treeMap
     }
 }

@@ -42,6 +42,13 @@ class Character(
     var displayName: String? = null,
 ) : Space(type, meta)
 
+class Person(
+    type: SpaceType = SpaceType.PERSON,
+    meta: Map<String, Any>? = null,
+    var name: String? = null,
+    var displayName: String? = null,
+) : Space(type, meta)
+
 class Reserved(
     type: SpaceType
 ) : Space(type, null)

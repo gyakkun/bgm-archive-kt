@@ -1,4 +1,4 @@
-package moe.nyamori.bgm.parser.character
+package moe.nyamori.bgm.parser.mono
 
 import com.google.gson.JsonObject
 import moe.nyamori.bgm.git.GitHelper
@@ -10,14 +10,22 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import java.lang.IllegalArgumentException
 import java.text.SimpleDateFormat
 import java.util.*
 
-object CharacterTopicParserR430: Parser {
-    private val LOGGER: Logger = LoggerFactory.getLogger(CharacterTopicParserR430::class.java)
+class MonoTopicParserR430(
+    val monoSpaceType: SpaceType
+) : Parser {
+    private val LOGGER: Logger = LoggerFactory.getLogger(MonoTopicParserR430::class.java)
+    init {
+        require(monoSpaceType in listOf(SpaceType.PERSON, SpaceType.CHARACTER)) {
+            "$monoSpaceType should be one of PERSON and CHARACTER"
+        }
+    }
 
-    const val PSEUDO_TOPIC_AUTHOR_UID = 0
-    const val PSEUDO_TOPIC_AUTHOR_USERNAME = "_pseudo_writer"
+    val PSEUDO_TOPIC_AUTHOR_UID = 0
+    val PSEUDO_TOPIC_AUTHOR_USERNAME = "_pseudo_writer"
     val PSEUDO_TOPIC_AUTHOR = User(
         id = PSEUDO_TOPIC_AUTHOR_UID,
         username = PSEUDO_TOPIC_AUTHOR_USERNAME,
@@ -28,9 +36,6 @@ object CharacterTopicParserR430: Parser {
         SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA).apply { timeZone = TimeZone.getTimeZone("GMT+08:00") }
 
     override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
-        require(spaceType == SpaceType.CHARACTER) {
-            "${spaceType.name} not supported by this parser!"
-        }
 
         val document = Jsoup.parse(htmlFileString)
         val notFound = document.select("#colunmNotice > div > p.text").first() != null
@@ -74,11 +79,21 @@ object CharacterTopicParserR430: Parser {
         return Pair(
             Topic(
                 id = characterId,
-                space = Character(
-                    meta = meta.ifEmpty { null },
-                    name = spaceName,
-                    displayName = spaceDisplayName,
-                ),
+                space = when (monoSpaceType) {
+                    SpaceType.CHARACTER -> Character(
+                        meta = meta.ifEmpty { null },
+                        name = spaceName,
+                        displayName = spaceDisplayName,
+                    )
+
+                    SpaceType.PERSON -> Person(
+                        meta = meta.ifEmpty { null },
+                        name = spaceName,
+                        displayName = spaceDisplayName,
+                    )
+
+                    else -> throw IllegalStateException("$monoSpaceType not supported for mono parser!")
+                },
                 uid = PSEUDO_TOPIC_AUTHOR_UID,
                 dateline = null,
                 title = characterName,
@@ -93,7 +108,8 @@ object CharacterTopicParserR430: Parser {
     }
 
     private fun extractDataLikeList(htmlFileString: String): String? {
-        return htmlFileString.lineSequence().filter { it.startsWith("var data_likes_list = {") && it.endsWith("};") }
+        return htmlFileString.lineSequence()
+            .filter { it.startsWith("var data_likes_list = {") && it.endsWith("};") }
             .firstOrNull()
             ?.substringAfter("=")
             ?.substringBeforeLast(";")
@@ -138,12 +154,14 @@ object CharacterTopicParserR430: Parser {
             }
 
         val dateline = postDiv.select("div.post_actions.re_info > div:nth-child(1) > small").text().let {
-            val datelineStr = it.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
+            val datelineStr =
+                it.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
             return@let SDF_YYYY_M_D_HH_MM.parse(datelineStr).time / 1000
         }
         val state = PostToStateHelper.fromPostHtmlToState(contentHtml ?: "")
 
-        val subReplies = postDiv.select("div.inner > div.reply_content > div.topic_sub_reply").first()?.children()
+        val subReplies =
+            postDiv.select("div.inner > div.reply_content > div.topic_sub_reply").first()?.children()
         val subReplyPostList =
             if (!isSubReply && subReplies != null) {
                 subReplies.mapNotNull {

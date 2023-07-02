@@ -40,6 +40,10 @@ data class Topic(
                 StringHashingHelper.stringHash((space!! as Character).name!!)
             }
 
+            is Person -> {
+                StringHashingHelper.stringHash((space!! as Person).name!!)
+            }
+
             is Reserved -> {
                 throw IllegalStateException("Not able to get sid for reserved space!")
             }
