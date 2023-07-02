@@ -35,6 +35,13 @@ class Ep(
     var displayName: String? = null,
 ) : Space(type, meta)
 
+class Character(
+    type: SpaceType = SpaceType.CHARACTER,
+    meta: Map<String, Any>? = null,
+    var name: String? = null,
+    var displayName: String? = null,
+) : Space(type, meta)
+
 class Reserved(
     type: SpaceType
 ) : Space(type, null)

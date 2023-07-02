@@ -209,6 +209,18 @@ object JsonToDbProcessor {
                 )
             } else {
             }
+        } else if (space is Character) {
+            if (space.name != null) {
+                sidNameMappingSet.add(
+                    SpaceNameMappingData(
+                        SpaceType.CHARACTER.id,
+                        topic.getSid() ?: StringHashingHelper.stringHash(space.name!!),
+                        space.name!!,
+                        space.displayName!!
+                    )
+                )
+            } else {
+            }
         } else {
             //
         }

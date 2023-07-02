@@ -1,9 +1,7 @@
 package moe.nyamori.bgm.parser
 
-import moe.nyamori.bgm.model.*
-import moe.nyamori.bgm.parser.group.GroupTopicParserR398
-import moe.nyamori.bgm.parser.subject.SubjectTopicParserR398
-import java.lang.IllegalArgumentException
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Topic
 
 object TopicParserEntrance : Parser {
     override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
@@ -12,6 +10,7 @@ object TopicParserEntrance : Parser {
             SpaceType.SUBJECT -> SubjectTopicParser.parseTopic(htmlFileString, topicId, spaceType)
             SpaceType.BLOG -> BlogTopicParser.parseTopic(htmlFileString, topicId, spaceType)
             SpaceType.EP -> EpTopicParser.parseTopic(htmlFileString, topicId, spaceType)
+            SpaceType.CHARACTER -> CharacterTopicParser.parseTopic(htmlFileString, topicId, spaceType)
             else -> {
                 throw IllegalArgumentException("${spaceType.name} not supported for now!")
             }
