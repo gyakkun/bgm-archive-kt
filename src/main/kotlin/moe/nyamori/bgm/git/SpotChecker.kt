@@ -5,7 +5,6 @@ import com.google.gson.ToNumberPolicy
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.model.Ep
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
@@ -58,6 +57,10 @@ object SpotChecker {
         val scList = randomSelectTopicIds(spaceType)
         val scFile =
             File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_LIST_FILE_NAME")
+        if (!scFile.exists()) {
+            LOGGER.error("Spot check list file for $spaceType not found! Creating one.")
+            scFile.createNewFile()
+        }
         val holesInTopicListRange = checkIfHolesInTopicListRange(spaceType, getTopicList(spaceType))
         // if (true) return
         FileWriter(scFile).use { fw ->
@@ -299,17 +302,17 @@ object SpotChecker {
 
     private fun walkThroughJson(parallel: Boolean = false, handler: (File) -> Boolean) {
         LOGGER.info("Walking through json repo folders.")
-        val jsonRepoFolders = ArrayList<String>()
+        val jsonRepoFolderList = mutableListOf<String>()
         Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
             .map {
-                jsonRepoFolders.add(it.trim())
+                if (it.isNotBlank()) jsonRepoFolderList.add(it.trim())
             }
-        Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
-        LOGGER.info("Json repo folders: $jsonRepoFolders")
+        Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolderList.add(it) }
+        LOGGER.info("Json repo folders: $jsonRepoFolderList")
 
-        jsonRepoFolders.forEach outer@{ it ->
-            LOGGER.info("Start walking through json folder $it.")
-            val folder = File(it)
+        jsonRepoFolderList.forEach outer@{ jsonRepoFolder ->
+            LOGGER.info("Start walking through json folder $jsonRepoFolder.")
+            val folder = File(jsonRepoFolder)
             val fileStream = folder.walkBottomUp().asStream().let { stream ->
                 if (parallel) stream.parallel()
                 stream
@@ -318,10 +321,10 @@ object SpotChecker {
                 runCatching {
                     handler(file)
                 }.onFailure { th ->
-                    LOGGER.error("Ex: ", th)
+                    LOGGER.error("Ex when walking through $jsonRepoFolder - ${file.absolutePath}: ", th)
                 }
             }
-            LOGGER.info("Finished walking through json folder $it.")
+            LOGGER.info("Finished walking through json folder $jsonRepoFolder.")
         }
     }
 
