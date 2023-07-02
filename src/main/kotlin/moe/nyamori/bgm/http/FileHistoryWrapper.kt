@@ -10,7 +10,10 @@ object FileHistoryWrapper : Handler {
     private val fileHistoryJsonHandlerMap = mapOf<SpaceType, Handler>(
         SpaceType.GROUP to FileHistory(SpaceType.GROUP),
         SpaceType.SUBJECT to FileHistory(SpaceType.SUBJECT),
-        SpaceType.BLOG to FileHistory(SpaceType.BLOG)
+        SpaceType.BLOG to FileHistory(SpaceType.BLOG),
+        SpaceType.EP to FileHistory(SpaceType.EP),
+        SpaceType.PERSON to FileHistory(SpaceType.PERSON),
+        SpaceType.CHARACTER to FileHistory(SpaceType.CHARACTER),
     )
 
     override fun handle(ctx: Context) {
