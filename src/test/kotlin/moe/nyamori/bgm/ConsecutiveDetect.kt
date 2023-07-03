@@ -3,6 +3,7 @@ package moe.nyamori.bgm
 import com.vladsch.flexmark.util.misc.FileUtil
 import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.FilePathHelper
 import org.slf4j.LoggerFactory
@@ -41,14 +42,14 @@ object ConsecutiveDetect {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val jsonRepoDirFile = File(Config.BGM_ARCHIVE_GIT_REPO_DIR)
+        val spaceType = SpaceType.EP
+        val repoDir = File(Config.BGM_ARCHIVE_GIT_REPO_DIR)
         val ngOrLostList = Vector<Int>()
         // val total = SpotChecker.getMaxId(SpaceType.GROUP)
-        val total = 8999
         val numThread = 6
         val latchArr = Array(numThread) { CountDownLatch(1) }
+        val total = SpotChecker.getMaxIdByVisitingAllFiles(spaceType)
         val part = (total / numThread) as Int
-        val topicType = SpaceType.CHARACTER
         val ngType = NGType.LOST
         for (t in 1..numThread) {
             val start = t
@@ -56,9 +57,9 @@ object ConsecutiveDetect {
             Thread {
                 while (i <= total) {
                     try {
-                        if (i and 255 == 0) LOGGER.info("Processing $i")
+                        if (i and 1023 == 1023) LOGGER.info("Processing $i")
                         val topicFile =
-                            jsonRepoDirFile.resolve("${topicType.name.lowercase()}/${FilePathHelper.numberToPath(i)}.html")
+                            repoDir.resolve("${spaceType.name.lowercase()}/${FilePathHelper.numberToPath(i)}.html")
                         if (!topicFile.exists()) {
                             if (ngType == NGType.LOST) {
                                 ngOrLostList.add(i)
@@ -85,9 +86,9 @@ object ConsecutiveDetect {
         ngOrLostList.sort()
         val rangeSummary = summaryRanges(ngOrLostList)
         val noGoodFilePath =
-            Config.BGM_ARCHIVE_GIT_REPO_DIR + "/${topicType.name.lowercase()}/${ngType.name.lowercase()}_ng.txt"
+            Config.BGM_ARCHIVE_GIT_REPO_DIR + "/${spaceType.name.lowercase()}/${ngType.name.lowercase()}_ng.txt"
         val noGoodFile = File(noGoodFilePath)
-        FileWriter(noGoodFile, true).use { fw ->
+        FileWriter(noGoodFile).use { fw ->
             BufferedWriter(fw).use { bfw ->
                 for(i in ngOrLostList){
                     bfw.write(i.toString())

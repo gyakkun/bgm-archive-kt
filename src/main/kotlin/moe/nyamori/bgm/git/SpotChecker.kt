@@ -15,6 +15,7 @@ import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.streams.asStream
 import kotlin.streams.toList
 
@@ -41,16 +42,6 @@ object SpotChecker {
         result
     }
 
-    @JvmStatic
-    fun main(argv: Array<String>) {
-        LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
-//        repeat(10) { genSpotCheckListFile(SpaceType.SUBJECT) }
-        // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
-        SpaceType.values().forEach {
-            genHiddenTopicMaskFile(it)
-        }
-        // genHiddenTopicMaskFile(SpaceType.BLOG)
-    }
 
     fun genSpotCheckListFile(spaceType: SpaceType) {
         if (Config.BGM_ARCHIVE_DISABLE_SPOT_CHECK) return
@@ -333,4 +324,83 @@ object SpotChecker {
         }
     }
 
+
+    @JvmStatic
+    fun main(argv: Array<String>) {
+        // LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
+        // repeat(10) { genSpotCheckListFile(SpaceType.SUBJECT) }
+        // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
+//        SpaceType.values().forEach {
+//            genHiddenTopicMaskFile(it)
+//        }
+        genEmptyTopicMaskFile(SpaceType.EP)
+    }
+
+    private fun genEmptyTopicMaskFile(spaceType: SpaceType) {
+        val timing = System.currentTimeMillis()
+        val maxId = getMaxIdByVisitingAllFiles(spaceType)
+        LOGGER.info("max id for $spaceType: $maxId")
+        val bs = BitSet(maxId + 2).apply { set(maxId + 1) }
+        val emptyTopicSet = ConcurrentHashMap.newKeySet<Int>()
+        walkThroughJson(parallel = true) { file ->
+            if (file.isDirectory) return@walkThroughJson false
+            if (!file.absolutePath.contains(spaceType.name.lowercase())) return@walkThroughJson false
+            if (!file.extension.equals("json", ignoreCase = true)) return@walkThroughJson false
+            if ((file.nameWithoutExtension.toIntOrNull() ?: -1) > maxId) return@walkThroughJson false
+            if (file.nameWithoutExtension.hashCode() and 255 == 255) LOGGER.info("$file is processing")
+            val fileStr = FileUtil.getFileContent(file)!!
+            val topic = GSON.fromJson(fileStr, Topic::class.java)
+            if (topic.isEmptyTopic()) {
+                emptyTopicSet.add(topic.id)
+                return@walkThroughJson true
+            }
+            if ((topic.postList?.size ?: 0) <= 1) {
+                emptyTopicSet.add(topic.id)
+                return@walkThroughJson true
+            }
+            return@walkThroughJson true
+        }
+        emptyTopicSet.forEach {
+            bs.set(it)
+        }
+        writeBitsetToFile(
+            bs, File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve(spaceType.name.lowercase())
+                .resolve("empty_topic_has_masked_bs.txt")
+        )
+        LOGGER.info("Timing ${System.currentTimeMillis() - timing} ms")
+        checkEmptyTopicMaskBitsetFile(spaceType)
+    }
+
+    private fun checkEmptyTopicMaskBitsetFile(spaceType: SpaceType) {
+        val bs = getBitsetFromLongPlaintextFile(
+            File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve(spaceType.name.lowercase())
+                .resolve("empty_topic_has_masked_bs.txt")
+        )
+        val bsSize = bs.size()
+        val bsCar = bs.cardinality()
+        val bsZero = bsSize - bsCar
+        LOGGER.info("bssize - $bsSize, bscar - $bsCar , bszero - $bsZero")
+    }
+
+    fun getMaxIdByVisitingAllFiles(spaceType: SpaceType): Int {
+        var maxId = -1
+        val lock = Any()
+        walkThroughJson(parallel = true) { file ->
+            if (file.isDirectory) return@walkThroughJson false
+            if (!file.absolutePath.contains(spaceType.name.lowercase())) return@walkThroughJson false
+            if (!file.extension.equals("json", ignoreCase = true)) return@walkThroughJson false
+            if ((file.nameWithoutExtension.toIntOrNull() ?: -1) < maxId) return@walkThroughJson false
+            if (file.nameWithoutExtension.hashCode() and 255 == 255) LOGGER.info("$file is processing")
+            val fileStr = FileUtil.getFileContent(file)!!
+            val topic = GSON.fromJson(fileStr, Topic::class.java)
+            if (topic.isEmptyTopic()) return@walkThroughJson false
+            if (topic.id < maxId) return@walkThroughJson true
+            synchronized(lock) {
+                maxId = topic.id.coerceAtLeast(maxId)
+            }
+
+            return@walkThroughJson true
+        }
+        return maxId
+    }
 }
