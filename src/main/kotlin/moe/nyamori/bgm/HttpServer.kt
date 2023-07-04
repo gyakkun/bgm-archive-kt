@@ -56,18 +56,22 @@ class HttpServer {
                                 }.associate { Pair(it[0].trim(), it[1].trim()) }
                             },
                             "otherRepoStatus" to run {
-                                Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
-                                    .filter { it.isNotBlank() }
-                                    .map { it.trim() }
-                                    .map { File(it) }.associate {
-                                        it.path.split("/").last() to run {
-                                            val gitProcess = Runtime.getRuntime()
-                                                .exec("git count-objects -vH", null, it)
-                                            gitProcess.blockAndPrintProcessResults().map {
-                                                it.split(":")
-                                            }.associate { Pair(it[0].trim(), it[1].trim()) }
-                                        }
+                                mutableListOf<String>().apply {
+                                    addAll(Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
+                                        .filter { it.isNotBlank() }
+                                        .map { it.trim() })
+                                    addAll(Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
+                                        .filter { it.isNotBlank() }
+                                        .map { it.trim() })
+                                }.map { File(it) }.associate {
+                                    it.path.split("/").last() to run {
+                                        val gitProcess = Runtime.getRuntime()
+                                            .exec("git count-objects -vH", null, it)
+                                        gitProcess.blockAndPrintProcessResults().map {
+                                            it.split(":")
+                                        }.associate { Pair(it[0].trim(), it[1].trim()) }
                                     }
+                                }
                             }
                         )
                     )
