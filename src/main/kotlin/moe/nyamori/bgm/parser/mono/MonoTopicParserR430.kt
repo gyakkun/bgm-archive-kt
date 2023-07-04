@@ -18,6 +18,7 @@ class MonoTopicParserR430(
     val monoSpaceType: SpaceType
 ) : Parser {
     private val LOGGER: Logger = LoggerFactory.getLogger(MonoTopicParserR430::class.java)
+
     init {
         require(monoSpaceType in listOf(SpaceType.PERSON, SpaceType.CHARACTER)) {
             "$monoSpaceType should be one of PERSON and CHARACTER"
@@ -133,6 +134,7 @@ class MonoTopicParserR430(
         if (!postDiv.attr("id").startsWith("post_")) return null; // comment folded
         val postId = postDiv.attr("id").substring("post_".length).trim().toInt()
         val username = postDiv.attr("data-item-user")
+        if (username.isBlank()) return null // Bad empty user
         val floorNum = postDiv.attr("name").substring("floor-".length)
             .split("-")[0].trim().toInt()
         val subFloorNum = if (!isSubReply) null else postDiv.attr("name").substring("floor-".length)
