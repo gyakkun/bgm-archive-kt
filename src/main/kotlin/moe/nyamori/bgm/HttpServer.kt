@@ -6,7 +6,6 @@ import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
 import moe.nyamori.bgm.http.*
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.util.concurrent.locks.ReentrantLock
 
 class HttpServer {
     companion object {
@@ -41,37 +40,25 @@ class HttpServer {
                 .get("/history/status") { ctx ->
                     ctx.json(
                         mapOf(
-                            "jsonRepoStatus" to run {
-                                val gitProcess = Runtime.getRuntime()
-                                    .exec("git count-objects -vH", null, File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR))
-                                gitProcess.blockAndPrintProcessResults().map {
-                                    it.split(":")
-                                }.associate { Pair(it[0].trim(), it[1].trim()) }
-                            },
-                            "archiveRepoStatus" to run {
-                                val gitProcess = Runtime.getRuntime()
-                                    .exec("git count-objects -vH", null, File(Config.BGM_ARCHIVE_GIT_REPO_DIR))
-                                gitProcess.blockAndPrintProcessResults().map {
-                                    it.split(":")
-                                }.associate { Pair(it[0].trim(), it[1].trim()) }
-                            },
-                            "otherRepoStatus" to run {
+                            "gitRepositories" to run {
                                 mutableListOf<String>().apply {
-                                    addAll(Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
-                                        .filter { it.isNotBlank() }
-                                        .map { it.trim() })
-                                    addAll(Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
-                                        .filter { it.isNotBlank() }
-                                        .map { it.trim() })
-                                }.map { File(it) }.associate {
-                                    it.path.split("/").last() to run {
-                                        val gitProcess = Runtime.getRuntime()
-                                            .exec("git count-objects -vH", null, it)
-                                        gitProcess.blockAndPrintProcessResults().map {
-                                            it.split(":")
-                                        }.associate { Pair(it[0].trim(), it[1].trim()) }
-                                    }
+                                    add(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
+                                    add(Config.BGM_ARCHIVE_GIT_REPO_DIR)
+                                    addAll(Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(","))
+                                    addAll(Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(","))
                                 }
+                                    .filter { it.isNotBlank() }
+                                    .map { it.trim() }
+                                    .map { File(it) }
+                                    .associate {
+                                        it.path.split(File.separator).last() to run {
+                                            val gitProcess = Runtime.getRuntime()
+                                                .exec("git count-objects -vH", null, it)
+                                            gitProcess.blockAndPrintProcessResults().map {
+                                                it.split(":")
+                                            }.associate { Pair(it[0].trim(), it[1].trim()) }
+                                        }
+                                    }
                             }
                         )
                     )
