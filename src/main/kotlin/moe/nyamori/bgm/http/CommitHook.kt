@@ -2,6 +2,7 @@ package moe.nyamori.bgm.http
 
 import io.javalin.http.Context
 import io.javalin.http.Handler
+import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
@@ -10,13 +11,15 @@ import java.util.concurrent.TimeUnit
 object CommitHook : Handler {
     override fun handle(ctx: Context) {
         if (Config.BGM_ARCHIVE_DISABLE_HOOK) {
-            ctx.status(400)
+            ctx.status(HttpStatus.BAD_REQUEST)
             return
         }
+        val isAll = "all" == ctx.queryParam("idx")
+        val idx = ctx.queryParam("idx")?.toIntOrNull() ?: 0
         Thread {
             try {
                 if (GIT_RELATED_LOCK.tryLock(10, TimeUnit.SECONDS)) {
-                    CommitToJsonProcessor.job()
+                    CommitToJsonProcessor.job(isAll, idx)
                 }
             } catch (ignore: Exception) {
 
@@ -26,6 +29,6 @@ object CommitHook : Handler {
                 }
             }
         }.start()
-        ctx.status(200)
+        ctx.status(HttpStatus.OK)
     }
 }
