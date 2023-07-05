@@ -207,7 +207,12 @@ object SpotChecker {
 
     private fun genHiddenTopicMaskFile(archiveRepo: Repository, spaceType: SpaceType) {
         LOGGER.info("Generating hidden topic mask file for $spaceType.")
-        val maxId = getMaxId(archiveRepo, spaceType)
+        val maxId = if (spaceType in listOf(SpaceType.EP, SpaceType.PERSON, SpaceType.CHARACTER)) {
+            getMaxIdByVisitingAllFiles(spaceType).coerceAtLeast(getMaxId(archiveRepo, spaceType))
+        } else {
+            getMaxId(archiveRepo, spaceType)
+        }
+
         var newBs = BitSet(maxId + 2).apply { set(maxId + 1) } // Ensure (words in use) of bs is enough
         val visited = BitSet(maxId + 1)
         walkThroughJson { file ->
