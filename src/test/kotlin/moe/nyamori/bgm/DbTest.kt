@@ -136,7 +136,10 @@ class DbTest {
             }
         }
         Dao.bgmDao().handleNegativeUid()
-        Dao.bgmDao().updatePrevPersistedCommitId(ObjectId.toString(GitHelper.defaultJsonRepoSingleton.getLatestCommitRef()))
+        Dao.bgmDao().updatePrevPersistedCommitId(
+            GitHelper.defaultJsonRepoSingleton,
+            ObjectId.toString(GitHelper.defaultJsonRepoSingleton.getLatestCommitRef())
+        )
     }
 
 
