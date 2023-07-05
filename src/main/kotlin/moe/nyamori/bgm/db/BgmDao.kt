@@ -260,12 +260,13 @@ interface BgmDao : Transactional<BgmDao> {
         updateNegativeUidInPost(userList)
         // preRemoveConflictSidInBlog(userList)
         updateNegativeSidInBlogTopic(userList)
-        // removeNegativeUidUser(userList)
         // No need to remove Negative Sid In Space Naming Mapping , otherwise it will conflict the unique key constraint
 
 
         val canUpdate = preRemoveConflictSidInLikesRev(userList)
         updateNegativeUidInLikesRev(canUpdate)
+
+        removeNegativeUidUser(userList)
 
         return emptyList()
 
