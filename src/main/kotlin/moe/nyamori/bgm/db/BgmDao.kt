@@ -1,7 +1,10 @@
 package moe.nyamori.bgm.db
 
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.util.StringHashingHelper
+import org.eclipse.jgit.lib.Repository
 import org.jdbi.v3.sqlobject.customizer.Bind
 import org.jdbi.v3.sqlobject.customizer.BindBean
 import org.jdbi.v3.sqlobject.customizer.BindList
@@ -43,12 +46,31 @@ interface BgmDao : Transactional<BgmDao> {
     )
     fun getMetaData(@Bind("k") k: String): String?
 
-    fun updatePrevPersistedCommitId(prevPersistRevId: String): Int {
-        return upsertMetaData(Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID, prevPersistRevId)
+    @SqlQuery(
+        """
+        select k, v from meta_data
+        """
+    )
+    @RegisterKotlinMapper(MetaRow::class)
+    fun getAllMetaData(): List<MetaRow>
+
+    data class MetaRow(val k: String, val v: String)
+
+    fun updatePrevPersistedCommitId(
+        repo: Repository,
+        prevPersistRevId: String
+    ): Int {
+        return upsertMetaData(
+            Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID
+                    + StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit()), prevPersistRevId
+        )
     }
 
-    fun getPrevPersistedCommitId(): String {
-        return getMetaData(Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID) ?: ""
+    fun getPrevPersistedCommitId(repo: Repository): String {
+        return getMetaData(
+            Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID
+                    + StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
+        ) ?: ""
     }
 
 

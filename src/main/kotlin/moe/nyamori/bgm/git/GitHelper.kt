@@ -128,8 +128,8 @@ object GitHelper {
         }.getOrDefault(this.getRevCommitById(this.getFirstCommitIdStr()))
     }
 
-    fun getPrevPersistedJsonCommitRef(): RevCommit {
-        return jsonRepoSingleton.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao().getPrevPersistedCommitId())
+    fun getPrevPersistedJsonCommitRef(jsonRepo: Repository): RevCommit {
+        return jsonRepo.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao().getPrevPersistedCommitId(jsonRepo))
     }
 
     fun Repository.getPrevProcessedArchiveCommitRef(): RevCommit {

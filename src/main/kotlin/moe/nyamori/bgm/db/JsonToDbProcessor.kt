@@ -2,12 +2,15 @@ package moe.nyamori.bgm.db
 
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
-import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
+import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.git.GitHelper.getPrevPersistedJsonCommitRef
 import moe.nyamori.bgm.git.GitHelper.getWalkBetweenCommitInReverseOrder
+import moe.nyamori.bgm.git.GitHelper.hasCouplingArchiveRepo
+import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper
@@ -19,6 +22,7 @@ import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
 import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
 import org.eclipse.jgit.lib.ObjectId
+import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 
 object JsonToDbProcessor {
@@ -29,110 +33,131 @@ object JsonToDbProcessor {
             SealedTypeAdapterFactory.of(Space::class)
         ).create()
 
-    fun job() {
-        val latestCommit = GitHelper.jsonRepoSingleton.getLatestCommitRef()
-        val prevPersistedCommit =
-            getPrevPersistedJsonCommitRef()
-        val walk = GitHelper.jsonRepoSingleton.getWalkBetweenCommitInReverseOrder(
-            latestCommit,
-            prevPersistedCommit,
-            stepInAdvance = false,
-        )
-        val realPrevPersistedCommitForCheck = getPrevPersistedJsonCommitRef()
-        var prev = walk.next()
-        val sidNameMappingSet = mutableSetOf<SpaceNameMappingData>()
-        var everFailed = false
+    init {
+        // ensure they have different hash
+        check(allJsonRepoListSingleton.map { it.absolutePathWithoutDotGit() }
+            .distinct().size == allJsonRepoListSingleton.size)
+    }
 
-        while (prev != null) {
-            if (realPrevPersistedCommitForCheck == prev) {
-                break
+    fun job(isAll: Boolean = false, idx: Int = 0) {
+        val reposToProcess = mutableListOf<Repository>()
+        if (isAll) {
+            allJsonRepoListSingleton
+                .filter { it.hasCouplingArchiveRepo() }
+                .map { reposToProcess.add(it) }
+        } else {
+            if (idx in allJsonRepoListSingleton.indices
+                && allJsonRepoListSingleton[idx].hasCouplingArchiveRepo()
+            ) {
+                reposToProcess.add(allJsonRepoListSingleton[idx])
             }
-            prev = walk.next()
         }
+        reposToProcess.forEach { jsonRepo ->
 
-        LOGGER.info("The previously persisted json repo commit: $prev")
-        run breakable@{
-            walk.forEach outer@{ cur ->
-                if (cur == prev) {
-                    LOGGER.warn("Commit $cur has been iterated twice!")
-                    return@breakable
+            val latestCommit = jsonRepo.getLatestCommitRef()
+            val prevPersistedCommit =
+                getPrevPersistedJsonCommitRef(jsonRepo)
+            val walk = jsonRepo.getWalkBetweenCommitInReverseOrder(
+                latestCommit,
+                prevPersistedCommit,
+                stepInAdvance = false,
+            )
+            val realPrevPersistedCommitForCheck = getPrevPersistedJsonCommitRef(jsonRepo)
+            var prev = walk.next()
+            val sidNameMappingSet = mutableSetOf<SpaceNameMappingData>()
+            var everFailed = false
+
+            while (prev != null) {
+                if (realPrevPersistedCommitForCheck == prev) {
+                    break
                 }
-                val curCommitId = ObjectId.toString(cur)
-                val curCommitFullMsg = cur.fullMessage
-                if (curCommitFullMsg.startsWith("META", ignoreCase = true)) {
-                    Dao.bgmDao().updatePrevPersistedCommitId(curCommitId)
-                    prev = cur
-                    return@outer
-                }
-                LOGGER.info("Persisting $curCommitFullMsg - $curCommitId")
-                val changedFilePathList = GitHelper.jsonRepoSingleton.findChangedFilePaths(prev, cur)
-                changedFilePathList.forEach inner@{ path ->
-                    if (!path.endsWith("json")) return@inner
-                    LOGGER.info("Path $path")
-                    var jsonStr = "NOT READY YET"
-                    runCatching {
-                        jsonStr = GitHelper.jsonRepoSingleton.getFileContentAsStringInACommit(cur, path)
-                        val topicUnmod = GSON.fromJson(jsonStr, Topic::class.java)
+                prev = walk.next()
+            }
 
-                        if (!isValidTopic(topicUnmod)) return@inner
-                        val topic = preProcessTopic(topicUnmod)
-                        val space = topic.space!!
-                        val spaceTypeId = topic.space!!.type.id
-                        val topicId = topic.id
-                        // val topicListFromDb =
-                        //    Dao.bgmDao().getTopicListByTypeAndTopicId(spaceTypeId, topicId)
-                        // val postListFromDb =
-                        //    Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
-                        val likeListFromDb = Dao.bgmDao().getLikeListByTypeAndTopicId(spaceTypeId, topicId)
-                        val likeRevListFromDb = Dao.bgmDao().getLikeRevListByTypeAndTopicId(spaceTypeId, topicId)
-                        // LOGGER.debug("topic {}", topicListFromDb)
-                        // LOGGER.debug("post {}", postListFromDb)
-                        LOGGER.debug("like {}", likeListFromDb)
-
-                        val postListFromFile = getPostListFromTopic(topic)
-                        val likeListFromFile = getLikeListFromTopic(topic)
-                        val likeRevUsernameFromFile = getLikeRevListFromTopic(topic)
-                        val userListFromFile = getUserListFromPostList(postListFromFile)
-
-                        // DONE : Calculate diff and update zero like,
-                        val processedLikeList = calZeroLike(likeListFromFile, likeListFromDb, topic.isEmptyTopic())
-
-                        // TODO: Calculate uid from username
-                        val (processedLikeRevList, constructedUser) =
-                            calLikeRev(likeRevUsernameFromFile, likeRevListFromDb, topic.isEmptyTopic())
-
-                        Dao.bgmDao().batchUpsertUser(userListFromFile)
-                        Dao.bgmDao().batchUpsertUser(constructedUser)
-                        Dao.bgmDao().batchUpsertLikes(processedLikeList)
-                        Dao.bgmDao().batchUpsertLikesRev(processedLikeRevList)
-                        Dao.bgmDao().batchUpsertPost(spaceTypeId, topic.getSid(), postListFromFile)
-                        Dao.bgmDao().batchUpsertTopic(spaceTypeId, listOf(topic))
-
-                        specialHandlingForSpaceNameMapping(
-                            space,
-                            topic,
-                            spaceTypeId,
-                            topicId,
-                            postListFromFile,
-                            sidNameMappingSet
-                        )
-                        Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
-                        sidNameMappingSet.clear()
-                    }.onFailure {
-                        LOGGER.error("Ex when checking content of $path at commit ${ObjectId.toString(cur)}", it)
-                        LOGGER.error("Json Str: $jsonStr")
-                        everFailed = true
+            LOGGER.info("The previously persisted json repo commit for ${jsonRepo.absolutePathWithoutDotGit()}: $prev")
+            run breakable@{
+                walk.forEach outer@{ cur ->
+                    if (cur == prev) {
+                        LOGGER.warn("Commit $cur has been iterated twice! Repo: ${jsonRepo.simpleName()}")
+                        return@breakable
                     }
-                }
+                    val curCommitId = ObjectId.toString(cur)
+                    val curCommitFullMsg = cur.fullMessage
+                    if (curCommitFullMsg.startsWith("META", ignoreCase = true)) {
+                        Dao.bgmDao().updatePrevPersistedCommitId(jsonRepo, curCommitId)
+                        prev = cur
+                        return@outer
+                    }
+                    LOGGER.info("Persisting $curCommitFullMsg - $curCommitId , repo - ${jsonRepo.simpleName()}")
+                    val changedFilePathList = jsonRepo.findChangedFilePaths(prev, cur)
+                    changedFilePathList.forEach inner@{ path ->
+                        if (!path.endsWith("json")) return@inner
+                        LOGGER.info("Path ${jsonRepo.simpleName()}/$path")
+                        var jsonStr = "NOT READY YET"
+                        runCatching {
+                            jsonStr = jsonRepo.getFileContentAsStringInACommit(cur, path)
+                            val topicUnmod = GSON.fromJson(jsonStr, Topic::class.java)
 
-                Dao.bgmDao().updatePrevPersistedCommitId(curCommitId)
-                prev = cur
+                            if (!isValidTopic(topicUnmod)) return@inner
+                            val topic = preProcessTopic(topicUnmod)
+                            val space = topic.space!!
+                            val spaceTypeId = topic.space!!.type.id
+                            val topicId = topic.id
+                            // val topicListFromDb =
+                            //    Dao.bgmDao().getTopicListByTypeAndTopicId(spaceTypeId, topicId)
+                            // val postListFromDb =
+                            //    Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
+                            val likeListFromDb = Dao.bgmDao().getLikeListByTypeAndTopicId(spaceTypeId, topicId)
+                            val likeRevListFromDb = Dao.bgmDao().getLikeRevListByTypeAndTopicId(spaceTypeId, topicId)
+                            // LOGGER.debug("topic {}", topicListFromDb)
+                            // LOGGER.debug("post {}", postListFromDb)
+                            LOGGER.debug("like {}", likeListFromDb)
+
+                            val postListFromFile = getPostListFromTopic(topic)
+                            val likeListFromFile = getLikeListFromTopic(topic)
+                            val likeRevUsernameFromFile = getLikeRevListFromTopic(topic)
+                            val userListFromFile = getUserListFromPostList(postListFromFile)
+
+                            // DONE : Calculate diff and update zero like,
+                            val processedLikeList = calZeroLike(likeListFromFile, likeListFromDb, topic.isEmptyTopic())
+
+                            // TODO: Calculate uid from username
+                            val (processedLikeRevList, constructedUser) =
+                                calLikeRev(likeRevUsernameFromFile, likeRevListFromDb, topic.isEmptyTopic())
+
+                            Dao.bgmDao().batchUpsertUser(userListFromFile)
+                            Dao.bgmDao().batchUpsertUser(constructedUser)
+                            Dao.bgmDao().batchUpsertLikes(processedLikeList)
+                            Dao.bgmDao().batchUpsertLikesRev(processedLikeRevList)
+                            Dao.bgmDao().batchUpsertPost(spaceTypeId, topic.getSid(), postListFromFile)
+                            Dao.bgmDao().batchUpsertTopic(spaceTypeId, listOf(topic))
+
+                            specialHandlingForSpaceNameMapping(
+                                space,
+                                topic,
+                                spaceTypeId,
+                                topicId,
+                                postListFromFile,
+                                sidNameMappingSet
+                            )
+                            Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
+                            sidNameMappingSet.clear()
+                        }.onFailure {
+                            LOGGER.error("Ex when checking content of $path at commit ${ObjectId.toString(cur)}, repo - ${jsonRepo.simpleName()}", it)
+                            LOGGER.error("Json Str: $jsonStr")
+                            everFailed = true
+                        }
+                    }
+
+                    Dao.bgmDao().updatePrevPersistedCommitId(jsonRepo, curCommitId)
+                    prev = cur
+                }
+                Dao.bgmDao().handleNegativeUid()
             }
-            Dao.bgmDao().handleNegativeUid()
-        }
-        LOGGER.info("Persisted last commit ${Dao.bgmDao().getPrevPersistedCommitId()}")
-        if (everFailed) {
-            LOGGER.error("Failed at persistence. Please check log!")
+            LOGGER.info("Persisted last commit for repo ${jsonRepo.simpleName()}: ${Dao.bgmDao().getPrevPersistedCommitId(jsonRepo)}")
+            if (everFailed) {
+                LOGGER.error("Failed at persistence for repo ${jsonRepo.simpleName()}. Please check log!")
+            }
         }
     }
 
