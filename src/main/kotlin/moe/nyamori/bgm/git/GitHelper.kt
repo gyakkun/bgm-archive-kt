@@ -56,11 +56,27 @@ object GitHelper {
         }
     }
 
+    val allArchiveRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        mutableListOf<Repository>().apply {
+            add(archiveRepoSingleton)
+            addAll(archiveStaticRepoListSingleton)
+        }
+    }
 
-    fun getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(): RevWalk {
+    val allJsonRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        mutableListOf<Repository>().apply {
+            add(jsonRepoSingleton)
+            addAll(jsonStaticRepoListSingleton)
+        }
+    }
+
+    fun Repository.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(): RevWalk {
+        require(hasCouplingJsonRepo()) {
+            "It should be an archive repo with coupling json repo!"
+        }
         val prevProcessedArchiveCommit = getPrevProcessedArchiveCommitRef()
-        val latestArchiveCommit = getLatestArchiveCommitRef()
-        return archiveRepoSingleton.getWalkBetweenCommitInReverseOrder(
+        val latestArchiveCommit = getLatestCommitRef()
+        return this.getWalkBetweenCommitInReverseOrder(
             latestArchiveCommit,
             prevProcessedArchiveCommit,
             stepInAdvance = false
@@ -214,5 +230,24 @@ object GitHelper {
             }
         }
         return result
+    }
+
+    fun Repository.absolutePathWithoutDotGit() =
+        this.directory.path.split(File.separator).filter { it != DOT_GIT }.joinToString(File.separator)
+
+    fun Repository.simpleName() =
+        this.directory.path.split(File.separator).last { it != DOT_GIT }
+
+    fun Repository.hasCouplingJsonRepo() = couplingJsonRepo() != null
+
+    fun Repository.couplingJsonRepo() =
+        allJsonRepoListSingleton.firstOrNull { jsonRepo ->
+            absolutePathWithoutDotGit() + "-json" == jsonRepo.absolutePathWithoutDotGit()
+        }
+
+    fun Repository.hasCouplingArchiveRepo() = couplingArchiveRepo() != null
+
+    fun Repository.couplingArchiveRepo() = allArchiveRepoListSingleton.firstOrNull { archiveRepo ->
+        absolutePathWithoutDotGit() == archiveRepo.absolutePathWithoutDotGit() + "-json"
     }
 }
