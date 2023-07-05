@@ -399,12 +399,13 @@ object SpotChecker {
             if (!file.extension.equals("json", ignoreCase = true)) return@walkThroughJson false
             if ((file.nameWithoutExtension.toIntOrNull() ?: -1) < maxId) return@walkThroughJson false
             if (file.nameWithoutExtension.hashCode() and 255 == 255) LOGGER.info("$file is processing")
-            val fileStr = FileUtil.getFileContent(file)!!
-            val topic = GSON.fromJson(fileStr, Topic::class.java)
-            if (topic.isEmptyTopic()) return@walkThroughJson false
-            if (topic.id < maxId) return@walkThroughJson true
+            val idFromFilename = file.nameWithoutExtension.toInt()
+            // val fileStr = FileUtil.getFileContent(file)!!
+            // val topic = GSON.fromJson(fileStr, Topic::class.java)
+            // if (topic.isEmptyTopic()) return@walkThroughJson false
+            // if (topic.id < maxId) return@walkThroughJson true
             synchronized(lock) {
-                maxId = topic.id.coerceAtLeast(maxId)
+                maxId = idFromFilename.coerceAtLeast(maxId)
             }
 
             return@walkThroughJson true
