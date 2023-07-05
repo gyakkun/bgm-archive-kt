@@ -4,12 +4,15 @@ import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
+import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
+import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
 import java.io.File
@@ -43,17 +46,17 @@ object SpotChecker {
     }
 
 
-    fun genSpotCheckListFile(spaceType: SpaceType) {
+    fun genSpotCheckListFile(archiveRepo: Repository, spaceType: SpaceType) {
         if (Config.BGM_ARCHIVE_DISABLE_SPOT_CHECK) return
         LOGGER.info("Generating spot check list file $SPOT_CHECK_BITSET_FILE_NAME for $spaceType.")
-        val scList = randomSelectTopicIds(spaceType)
+        val scList = randomSelectTopicIds(archiveRepo, spaceType)
         val scFile =
-            File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_LIST_FILE_NAME")
+            File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_LIST_FILE_NAME")
         if (!scFile.exists()) {
             LOGGER.error("Spot check list file for $spaceType not found! Creating one.")
             scFile.createNewFile()
         }
-        val holesInTopicListRange = checkIfHolesInTopicListRange(spaceType, getTopicList(spaceType))
+        val holesInTopicListRange = checkIfHolesInTopicListRange(spaceType, getTopicList(archiveRepo, spaceType))
         // if (true) return
         FileWriter(scFile).use { fw ->
             BufferedWriter(fw).use { bw ->
@@ -110,11 +113,11 @@ object SpotChecker {
         return result
     }
 
-    private fun randomSelectTopicIds(spaceType: SpaceType): List<Int> {
+    private fun randomSelectTopicIds(archiveRepo: Repository, spaceType: SpaceType): List<Int> {
         val result = mutableListOf<Int>()
-        val spotCheckedBs = getSpotCheckedTopicMask(spaceType)
-        val hiddenBs = getHiddenTopicMask(spaceType)
-        val maxId = getMaxId(spaceType)
+        val spotCheckedBs = getSpotCheckedTopicMask(archiveRepo, spaceType)
+        val hiddenBs = getHiddenTopicMask(archiveRepo, spaceType)
+        val maxId = getMaxId(archiveRepo, spaceType)
 
         spotCheckedBs.or(hiddenBs)
         val remainZeroCount = spotCheckedBs.size() - spotCheckedBs.cardinality()
@@ -146,7 +149,7 @@ object SpotChecker {
             )
             // Reset the mask file
             LOGGER.info("Going to re generate hidden topic mask file for $spaceType.")
-            genHiddenTopicMaskFile(spaceType)
+            genHiddenTopicMaskFile(archiveRepo, spaceType)
             return result
         }
         val samplingSize =
@@ -173,9 +176,9 @@ object SpotChecker {
         return result
     }
 
-    private fun getSpotCheckedTopicMask(spaceType: SpaceType): BitSet {
+    private fun getSpotCheckedTopicMask(archiveRepo: Repository, spaceType: SpaceType): BitSet {
         val maskFile =
-            File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
+            File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
         if (!maskFile.exists()) {
             LOGGER.warn("Spot checked mask bitset file not found for $spaceType. Creating one.")
             return BitSet()
@@ -183,12 +186,12 @@ object SpotChecker {
         return getBitsetFromLongPlaintextFile(maskFile)
     }
 
-    private fun getHiddenTopicMask(spaceType: SpaceType): BitSet {
+    private fun getHiddenTopicMask(archiveRepo: Repository, spaceType: SpaceType): BitSet {
         val maskFile =
-            File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
+            File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
         if (!maskFile.exists()) {
             LOGGER.warn("Hidden topic mask file not found for $spaceType. Creating one.")
-            genHiddenTopicMaskFile(spaceType)
+            genHiddenTopicMaskFile(archiveRepo, spaceType)
         }
         assert(maskFile.exists())
         return getBitsetFromLongPlaintextFile(maskFile)
@@ -202,9 +205,9 @@ object SpotChecker {
         return BitSet.valueOf(longArr)
     }
 
-    private fun genHiddenTopicMaskFile(spaceType: SpaceType) {
+    private fun genHiddenTopicMaskFile(archiveRepo: Repository, spaceType: SpaceType) {
         LOGGER.info("Generating hidden topic mask file for $spaceType.")
-        val maxId = getMaxId(spaceType)
+        val maxId = getMaxId(archiveRepo, spaceType)
         var newBs = BitSet(maxId + 2).apply { set(maxId + 1) } // Ensure (words in use) of bs is enough
         val visited = BitSet(maxId + 1)
         walkThroughJson { file ->
@@ -227,7 +230,7 @@ object SpotChecker {
         }
         LOGGER.info("New bitset size: ${newBs.size()}. Cardinality: ${newBs.cardinality()}. Zero count: ${newBs.size() - newBs.cardinality()}")
         val hiddenTopicMaskFile =
-            File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
+            File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
         if (hiddenTopicMaskFile.exists()) {
             LOGGER.warn("Old hidden topic mask file exists. Perform bitwise operation to gen a new one.")
             val oldBs = getBitsetFromLongPlaintextFile(hiddenTopicMaskFile)
@@ -274,15 +277,15 @@ object SpotChecker {
         }
     }
 
-    fun getMaxId(spaceType: SpaceType): Int {
-        val result = getTopicList(spaceType).max().coerceAtLeast(TYPE_MAX_ID_MAP[spaceType]!!)
+    fun getMaxId(archiveRepo: Repository, spaceType: SpaceType): Int {
+        val result = getTopicList(archiveRepo, spaceType).max().coerceAtLeast(TYPE_MAX_ID_MAP[spaceType]!!)
         TYPE_MAX_ID_MAP[spaceType] = result
         LOGGER.info("Max id for $spaceType: $result")
         return result
     }
 
-    private fun getTopicList(spaceType: SpaceType): List<Int> {
-        val prevProcessed = GitHelper.getPrevProcessedArchiveCommitRef() // archive repo
+    private fun getTopicList(archiveRepo: Repository, spaceType: SpaceType): List<Int> {
+        val prevProcessed = archiveRepo.getPrevProcessedArchiveCommitRef()
         val topiclist = runCatching {
             GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
                 prevProcessed,
@@ -290,7 +293,7 @@ object SpotChecker {
             )
         }.onFailure {
             LOGGER.error("Ex when getting topic list for $spaceType", it)
-        }.getOrDefault("")
+        }.getOrDefault("-1")
         val result = topiclist.lines().mapNotNull { it.toIntOrNull() }
         return result
     }

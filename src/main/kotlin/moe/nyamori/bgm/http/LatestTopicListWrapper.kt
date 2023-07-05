@@ -7,6 +7,7 @@ import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
+import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.HttpHelper.checkAndExtractSpaceTypeInContext
 import org.slf4j.LoggerFactory
@@ -27,7 +28,7 @@ object LatestTopicListWrapper : Handler {
 
     private fun getTopicList(spaceType: SpaceType): List<Int> {
         val topicListFile: String = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
-            GitHelper.getPrevProcessedArchiveCommitRef(),
+            GitHelper.archiveRepoSingleton.getPrevProcessedArchiveCommitRef(),
             spaceType.name.lowercase() + "/topiclist.txt"
         )
         return topicListFile.lines().mapNotNull { it.toIntOrNull() }.sorted()
