@@ -5,9 +5,12 @@ import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.Context
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.db.BgmDao
+import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.http.*
+import moe.nyamori.bgm.util.StringHashingHelper
 import org.slf4j.LoggerFactory
 
 class HttpServer {
@@ -42,6 +45,17 @@ class HttpServer {
                         get("/status", RepoStatusHandler)
                     }
                     path("/info") {
+                        get("/meta") {
+                            if (!it.isLocalhost()) {
+                                it.status(HttpStatus.NOT_FOUND)
+                                return@get
+                            }
+                            it.result(
+                                GitHelper.GSON.toJson(
+                                    Dao.bgmDao().getAllMetaData().associate { it.k to it.v }
+                                )
+                            )
+                        }
                         path("/repo") {
                             get("/html") {
                                 if (!it.isLocalhost()) {
@@ -51,7 +65,10 @@ class HttpServer {
                                 it.result(
                                     GitHelper.GSON.toJson(
                                         GitHelper.allArchiveRepoListSingleton.mapIndexed { idx, repo ->
-                                            idx to repo.absolutePathWithoutDotGit()
+                                            Pair(
+                                                idx,
+                                                StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
+                                            ) to repo.absolutePathWithoutDotGit()
                                         }.toMap()
                                     )
                                 )
@@ -64,7 +81,10 @@ class HttpServer {
                                 it.result(
                                     GitHelper.GSON.toJson(
                                         GitHelper.allJsonRepoListSingleton.mapIndexed { idx, repo ->
-                                            idx to repo.absolutePathWithoutDotGit()
+                                            Pair(
+                                                idx,
+                                                StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
+                                            ) to repo.absolutePathWithoutDotGit()
                                         }.toMap()
                                     )
                                 )
@@ -88,7 +108,8 @@ class HttpServer {
                     }
                 }
                 .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
-            Runtime.getRuntime().addShutdownHook(Thread {
+            Runtime.getRuntime().addShutdownHook(Thread
+            {
                 app.stop()
             })
         }
