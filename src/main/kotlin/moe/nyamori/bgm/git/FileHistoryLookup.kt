@@ -2,16 +2,15 @@ package moe.nyamori.bgm.git
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.LoadingCache
+import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
+import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
-import java.lang.IllegalArgumentException
 import java.sql.Timestamp
 import java.time.Duration
 import java.util.*
-import java.util.stream.Stream
-import kotlin.collections.ArrayList
 
 
 object FileHistoryLookup {
@@ -30,23 +29,17 @@ object FileHistoryLookup {
 
 
     fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> {
-        return Stream.concat(
-            repoPathToRevCommitCache.get(Pair(GitHelper.jsonRepoSingleton, relativePathToRepoFolder)).keys.stream(),
-            GitHelper.jsonStaticRepoListSingleton.map {
-                repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
-                    .keys
-            }.flatten().stream()
-        ).sorted().toList()
+        return allJsonRepoListSingleton.map {
+            repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
+                .keys
+        }.flatten().sorted()
     }
 
     fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> {
-        return Stream.concat(
-            repoPathToRevCommitCache.get(Pair(GitHelper.archiveRepoSingleton, relativePathToRepoFolder)).keys.stream(),
-            GitHelper.archiveStaticRepoListSingleton.map {
-                repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
-                    .keys
-            }.flatten().stream()
-        ).sorted().toList()
+        return allArchiveRepoListSingleton.map {
+            repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
+                .keys
+        }.flatten().sorted()
     }
 
 
@@ -65,7 +58,8 @@ object FileHistoryLookup {
         val result = TreeMap<Long, RevCommit>()
         revCommitList.forEach {
             if (it.fullMessage.startsWith("META") || it.fullMessage.startsWith("init")) return@forEach
-            result[it.fullMessage.split("|").last().trim().toLong()] = it
+            val ts = it.fullMessage.split("|").last().trim().toLongOrNull() ?: return@forEach
+            result[ts] = it
         }
         // Workaround for historical files added in META commit
         if (result.isEmpty() && revCommitList.isNotEmpty()) {
@@ -74,29 +68,28 @@ object FileHistoryLookup {
         return result
     }
 
-    fun getJsonCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit {
-        return getCommitAtTimestamp(GitHelper.jsonRepoSingleton, relativePathToRepoFolder, timestamp)
+    fun getJsonCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit? {
+        return allJsonRepoListSingleton.firstNotNullOfOrNull {
+            runCatching { getCommitAtTimestampByPath(it, relativePathToRepoFolder, timestamp) }
+                .getOrNull()
+        }
     }
 
-    fun getArchiveCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit {
-        return getCommitAtTimestamp(GitHelper.archiveRepoSingleton, relativePathToRepoFolder, timestamp)
+    fun getArchiveCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit? {
+        return allArchiveRepoListSingleton.firstNotNullOfOrNull {
+            runCatching { getCommitAtTimestampByPath(it, relativePathToRepoFolder, timestamp) }
+                .getOrNull()
+        }
     }
 
-    fun getCommitAtTimestamp(repo: Repository, relativePathToRepoFolder: String, timestamp: Long): RevCommit {
+    fun getCommitAtTimestampByPath(repo: Repository, relativePathToRepoFolder: String, timestamp: Long): RevCommit {
         val m: Map<Long, RevCommit> = repoPathToRevCommitCache.get(Pair(repo, relativePathToRepoFolder))
         if (!m.containsKey(timestamp)) throw IllegalArgumentException("Timestamp $timestamp not in commit history")
         return m[timestamp]!!
     }
 
     fun getArchiveFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): String {
-        val repoList = run {
-            val result = ArrayList<Repository>()
-            result.add(GitHelper.archiveRepoSingleton)
-            result.addAll(GitHelper.archiveStaticRepoListSingleton)
-            return@run result
-        }
-
-        repoList.forEach {
+        allArchiveRepoListSingleton.forEach {
             val timestampRevCommitMap = repoPathToRevCommitCache.get(Pair(it, relativePath))
             if (timestampRevCommitMap[timestamp] != null) {
                 return it.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!, relativePath)
@@ -113,14 +106,7 @@ object FileHistoryLookup {
     }
 
     fun getJsonFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): String {
-        val repoList = run {
-            val result = ArrayList<Repository>()
-            result.add(GitHelper.jsonRepoSingleton)
-            result.addAll(GitHelper.jsonStaticRepoListSingleton)
-            return@run result
-        }
-
-        repoList.forEach {
+        allJsonRepoListSingleton.forEach {
             val timestampRevCommitMap = repoPathToRevCommitCache.get(Pair(it, relativePath))
             if (timestampRevCommitMap[timestamp] != null) {
                 return it.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!, relativePath)
