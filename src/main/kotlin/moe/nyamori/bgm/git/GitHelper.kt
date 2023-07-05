@@ -132,13 +132,13 @@ object GitHelper {
         return jsonRepoSingleton.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao().getPrevPersistedCommitId())
     }
 
-    fun getPrevProcessedArchiveCommitRef(): RevCommit {
-        return archiveRepoSingleton.getGivenCommitByIdStrOrFirstCommit(getPrevProcessedArchiveCommitRevIdStr())
+    fun Repository.getPrevProcessedArchiveCommitRef(): RevCommit {
+        require(this.hasCouplingJsonRepo())
+        return getGivenCommitByIdStrOrFirstCommit(
+            getPrevProcessedArchiveCommitRevIdStr(couplingJsonRepo()!!)
+        )
     }
 
-    fun getLatestArchiveCommitRef(): RevCommit {
-        return archiveRepoSingleton.getLatestCommitRef()
-    }
 
     fun Repository.getLatestCommitRef(): RevCommit {
         this.use { repo ->
@@ -149,15 +149,15 @@ object GitHelper {
         }
     }
 
-    fun getPrevProcessedArchiveCommitRevIdStr(): String {
-        if (jsonRepoSingleton.isBare) {
-            return jsonRepoSingleton.getFileContentAsStringInACommit(
-                jsonRepoSingleton.getLatestCommitRef(),
+    fun getPrevProcessedArchiveCommitRevIdStr(jsonRepo: Repository): String {
+        if (jsonRepo.isBare) {
+            return jsonRepo.getFileContentAsStringInACommit(
+                jsonRepo.getLatestCommitRef(),
                 BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
             ).trim()
         } else {
             val prevProcessedCommitRevIdFile =
-                File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+                File(jsonRepo.absolutePathWithoutDotGit()).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
             if (!prevProcessedCommitRevIdFile.exists()) return EMPTY_STRING
             val rawFileStr = FileUtil.getFileContent(prevProcessedCommitRevIdFile)!!
             return rawFileStr.trim()
