@@ -44,14 +44,12 @@ object BinarySearchHelper {
                     throw InfiniteLoopException("Loop counter $ctr is over loop max limit $loopMaxLimit!")
                 }
                 mid = lo + (hi - lo + (if (bsType == BSType.CEILING) 1 else 0)) / 2
-                val midItem = list[mid]
-                if (judge(midItem)) {
+                if (judge(list[mid])) {
                     if (bsType == BSType.CEILING) {
                         lo = mid
                     } else { // FLOOR, EXACT
                         hi = mid
                     }
-                    result = midItem
                 } else {
                     if (bsType == BSType.CEILING) {
                         hi = mid - 1
@@ -60,8 +58,14 @@ object BinarySearchHelper {
                     }
                 }
             }
-            if (!judge(result)) return null
-            return result
+            if (bsType == BSType.CEILING) {
+                if (!judge(list[lo])) return null
+                return list[lo]
+            } else if (bsType == BSType.FLOOR) {
+                if (!judge(list[hi])) return null
+                return list[hi]
+            }
+            return null
         }
     }
 
