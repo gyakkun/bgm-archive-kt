@@ -287,7 +287,7 @@ object SpotChecker {
     private fun getTopicList(archiveRepo: Repository, spaceType: SpaceType): List<Int> {
         val prevProcessed = archiveRepo.getPrevProcessedArchiveCommitRef()
         val topiclist = runCatching {
-            GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
+            GitHelper.defaultArchiveRepoSingleton.getFileContentAsStringInACommit(
                 prevProcessed,
                 "${spaceType.name.lowercase()}/topiclist.txt"
             )

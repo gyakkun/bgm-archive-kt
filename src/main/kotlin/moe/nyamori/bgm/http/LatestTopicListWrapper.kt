@@ -27,8 +27,8 @@ object LatestTopicListWrapper : Handler {
             }
 
     private fun getTopicList(spaceType: SpaceType): List<Int> {
-        val topicListFile: String = GitHelper.archiveRepoSingleton.getFileContentAsStringInACommit(
-            GitHelper.archiveRepoSingleton.getPrevProcessedArchiveCommitRef(),
+        val topicListFile: String = GitHelper.defaultArchiveRepoSingleton.getFileContentAsStringInACommit(
+            GitHelper.defaultArchiveRepoSingleton.getPrevProcessedArchiveCommitRef(),
             spaceType.name.lowercase() + "/topiclist.txt"
         )
         return topicListFile.lines().mapNotNull { it.toIntOrNull() }.sorted()

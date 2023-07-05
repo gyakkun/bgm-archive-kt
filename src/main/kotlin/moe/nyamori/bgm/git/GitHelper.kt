@@ -30,12 +30,12 @@ object GitHelper {
     private val log = LoggerFactory.getLogger(GitHelper.javaClass)
     val GSON: Gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
 
-    val jsonRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        getJsonRepo()
+    val defaultJsonRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        getDefaultJsonRepo()
     }
 
-    val archiveRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        getArchiveRepo()
+    val defaultArchiveRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        getDefaultArchiveRepo()
     }
 
     val jsonStaticRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
@@ -58,14 +58,14 @@ object GitHelper {
 
     val allArchiveRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
         mutableListOf<Repository>().apply {
-            add(archiveRepoSingleton)
+            add(defaultArchiveRepoSingleton)
             addAll(archiveStaticRepoListSingleton)
         }
     }
 
     val allJsonRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
         mutableListOf<Repository>().apply {
-            add(jsonRepoSingleton)
+            add(defaultJsonRepoSingleton)
             addAll(jsonStaticRepoListSingleton)
         }
     }
@@ -177,11 +177,11 @@ object GitHelper {
             .build()
     }
 
-    private fun getJsonRepo(): Repository {
+    private fun getDefaultJsonRepo(): Repository {
         return getRepoByPath(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
     }
 
-    private fun getArchiveRepo(): Repository {
+    private fun getDefaultArchiveRepo(): Repository {
         return getRepoByPath(Config.BGM_ARCHIVE_GIT_REPO_DIR)
     }
 
