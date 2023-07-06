@@ -764,11 +764,13 @@ interface BgmDao : Transactional<BgmDao> {
                      blr.value   as  face_key,
                      bt.title    as  title,
                      bp.dateline as  dateline,
+                     bsnm.display_name   as  space_display_name,
                      rank() over (partition by bp.type,bp.mid, blr.uid order by bp.dateline desc,bp.id desc) rank_like_rev_asc
               from ba_user bu
                        inner join ba_likes_rev blr on blr.uid = bu.id
                        inner join ba_post bp on blr.type = bp.type and blr.mid = bp.mid and blr.pid = bp.id
                        inner join ba_topic bt on bp.type = bt.type and bp.mid = bt.id
+                       left  join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
               where blr.type = :t
                 and blr.total != 0
                 and bp.state!=1 and bp.state!=16

@@ -113,5 +113,6 @@ data class VUserLatestLikeRevRow(
     val username: String,
     val faceKey: Int,
     val title: String?,
-    val dateline: Long
+    val dateline: Long,
+    val spaceDisplayName: String?
 )

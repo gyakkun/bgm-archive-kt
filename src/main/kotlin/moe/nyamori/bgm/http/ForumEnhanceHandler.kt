@@ -353,7 +353,8 @@ object ForumEnhanceHandler : Handler {
                         title = title,
                         mid = mid,
                         dateline = dateline,
-                        likeRevList = likeRevList
+                        likeRevList = likeRevList,
+                        spaceDisplayName = it.value[0].spaceDisplayName
                     )
                 }.sortedBy { -it.dateline }.take(10)
             }.toMap()
@@ -480,7 +481,8 @@ object ForumEnhanceHandler : Handler {
         val title: String,
         val mid: Int,
         val dateline: Long, /*latest post dateline*/
-        val likeRevList: List<PidFaceKeyPair>
+        val likeRevList: List<PidFaceKeyPair>,
+        val spaceDisplayName: String? = null
     )
 
     data class PidFaceKeyPair(
