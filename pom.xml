@@ -139,16 +139,23 @@
         </dependency>
 
         <dependency>
-            <groupId>com.nixxcode.jvmbrotli</groupId>
-            <artifactId>jvmbrotli</artifactId>
-            <version>0.2.0</version>
+            <groupId>com.aayushatharva.brotli4j</groupId>
+            <artifactId>brotli4j</artifactId>
+            <version>1.12.0</version>
         </dependency>
 
         <dependency>
-            <groupId>com.nixxcode.jvmbrotli</groupId>
-            <artifactId>jvmbrotli-linux-x86-amd64</artifactId>
-            <version>0.2.0</version>
+            <groupId>com.aayushatharva.brotli4j</groupId>
+            <artifactId>native-linux-x86_64</artifactId>
+            <version>1.12.0</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.aayushatharva.brotli4j</groupId>
+            <artifactId>native-windows-x86_64</artifactId>
+            <version>1.12.0</version>
+        </dependency>
+
 
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
