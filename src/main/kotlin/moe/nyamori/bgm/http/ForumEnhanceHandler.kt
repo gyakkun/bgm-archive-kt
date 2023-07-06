@@ -329,7 +329,7 @@ object ForumEnhanceHandler : Handler {
                     if (it.title == null) return@mapNotNull null
                     if (!it.state.isPostNormal()) return@mapNotNull null
                     if (it.topicState.isTopicDeleted()) return@mapNotNull null
-                    PostBrief(it.title, it.mid, it.id, it.dateline)
+                    PostBrief(it.title, it.mid, it.id, it.dateline, it.spaceDisplayName)
                 }.sortedBy { -it.dateline }.take(10)
             }.toMap()
         val lastCreateTopicMap = vUserLatestCreateTopicRows.groupBy { it.username }
@@ -337,7 +337,7 @@ object ForumEnhanceHandler : Handler {
                 it.key to it.value.mapNotNull {
                     if (it.title == null) return@mapNotNull null
                     if (it.state.isTopicDeleted()) return@mapNotNull null
-                    TopicBrief(it.title, it.id, it.dateline)
+                    TopicBrief(it.title, it.id, it.dateline, it.spaceDisplayName)
                 }.take(10)
             }.toMap()
         val latestLikeRevMap = vUserLatestLikeRevRows.groupBy { it.username }
@@ -471,8 +471,11 @@ object ForumEnhanceHandler : Handler {
         val like: LikeStatForSpace = LikeStatForSpace()
     )
 
-    data class TopicBrief(val title: String, val id: Int, val dateline: Long)
-    data class PostBrief(val title: String, val mid: Int, val pid: Int, val dateline: Long)
+    data class TopicBrief(val title: String, val id: Int, val dateline: Long, val spaceDisplayName: String? = null)
+    data class PostBrief(
+        val title: String, val mid: Int, val pid: Int, val dateline: Long, val spaceDisplayName: String? = null
+    )
+
     data class LikeRevBrief(
         val title: String,
         val mid: Int,

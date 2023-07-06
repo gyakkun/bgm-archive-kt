@@ -597,10 +597,12 @@ interface BgmDao : Transactional<BgmDao> {
                    bt.title,
                    bu.username,
                    bt.state as topic_state,
+                   bsnm.display_name as space_display_name,
                    rank() over (partition by bp.type,bp.mid, bp.uid order by bp.dateline desc,bp.id desc) rank_reply_asc
             from ba_user bu
             inner join ba_post bp on bu.id = bp.uid
             inner join ba_topic bt on bp.mid = bt.id and bp.type = bt.type and bt.top_post_pid!=bp.id
+            left  join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid 
             where bp.type = :t
               and bp.uid in (select bu.id
                           from ba_user bu
@@ -619,12 +621,14 @@ interface BgmDao : Transactional<BgmDao> {
         """
         select *
         from (select bt.*,
-                     bp.dateline as                                                                  last_update_time,
-                     bu.username as                                                                  username,
+                     bp.dateline       as last_update_time,
+                     bu.username       as username,
+                     bsnm.display_name as space_display_name,
                      rank() over (partition by bt.type,bt.uid order by bp.dateline desc, bp.id desc) rank_last_reply
               from ba_user bu
                        inner join ba_topic bt on bu.id = bt.uid
                        inner join ba_post bp on bt.last_post_pid = bp.id and bt.type = bp.type
+                       left  join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid 
               where bt.type = :t
                 and bu.username in (<l>)
                 and bt.dateline >= ((select unixepoch() - 86400 * 365 * 3)))

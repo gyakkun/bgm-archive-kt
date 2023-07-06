@@ -65,6 +65,7 @@ data class VUserLatestCreateTopicRow(
     val lastUpdateTime: Long,
     val username: String,
     val rankLastReply: Int,
+    val spaceDisplayName: String?
     // val rankDateline: Int
 )
 
@@ -78,7 +79,8 @@ data class VUserLastReplyTopicRow(
     val title: String?,
     val username: String,
     val rankReplyAsc: Int,
-    val topicState: Long
+    val topicState: Long,
+    val spaceDisplayName: String?
 )
 
 data class VPostCountSpaceRow(
