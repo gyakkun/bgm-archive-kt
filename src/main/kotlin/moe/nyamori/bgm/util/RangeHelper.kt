@@ -8,23 +8,24 @@ object RangeHelper {
         val result: MutableList<IntArray> = ArrayList()
         if (nums.isEmpty()) return result
         var prev = nums[0]
-        var startVal = nums[0]
+        var rangeLeft = nums[0] // the left side of the range interval (inclusive)
         val n = nums.size
         for (i in 1 until n) {
-            if (nums[i] == prev + 1) {
-                prev = nums[i]
-            } else {
-                if (startVal != prev) {
-                    result.add(intArrayOf(startVal, prev))
+            val cur = nums[i]
+            if (cur == prev + 1) { // if it's incremented by one <=> continuous for current one
+                prev = cur
+            } else {               // otherwise, it's continuous until the previous one
+                if (rangeLeft != prev) {
+                    result.add(intArrayOf(rangeLeft, prev))
                 } else {
                     result.add(intArrayOf(prev))
                 }
-                prev = nums[i]
-                startVal = prev
+                prev = cur
+                rangeLeft = cur
             }
         }
-        if (startVal != prev) {
-            result.add(intArrayOf(startVal, prev))
+        if (rangeLeft != prev) {
+            result.add(intArrayOf(rangeLeft, prev))
         } else {
             result.add(intArrayOf(prev))
         }
@@ -34,7 +35,7 @@ object RangeHelper {
 
     @JvmStatic
     fun main(argv: Array<String>) {
-        val list = Dao.bgmDao().getAllTopicIdByType(SpaceType.EP.id)
+        val list = Dao.bgmDao().getAllTopicIdByType(SpaceType.PERSON.id).toSet()
         val max = list.max()
         val fake = (1..max).toMutableSet()
         fake.removeAll(list.toSet())
