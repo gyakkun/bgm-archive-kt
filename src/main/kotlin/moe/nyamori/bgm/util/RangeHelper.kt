@@ -39,11 +39,18 @@ object RangeHelper {
         val fake = (1..max).toMutableSet()
         fake.removeAll(list.toSet())
         val result = summaryRanges(fake.toList().sorted())
+        val ng = mutableListOf<Int>()
         result.forEach {
-            if (it.size == 1) System.err.println(it[0])
-            else {
-                (it[0]..it[1]).forEach { System.err.println(it) }
+            if (it.size == 1) {
+                System.err.println(it[0])
+                ng.add(it[0])
+            } else {
+                (it[0]..it[1]).forEach {
+                    System.err.println(it)
+                    ng.add(it)
+                }
             }
         }
+        System.err.println("Size: ${ng.size}")
     }
 }
