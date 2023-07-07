@@ -2,10 +2,7 @@ package moe.nyamori.bgm.parser
 
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
-import moe.nyamori.bgm.parser.group.GroupTopicParserR398
-import moe.nyamori.bgm.parser.group.GroupTopicParserR400
-import moe.nyamori.bgm.parser.group.GroupTopicParserR402
-import moe.nyamori.bgm.parser.group.GroupTopicParserR403
+import moe.nyamori.bgm.parser.group.*
 import moe.nyamori.bgm.util.ParserHelper
 import java.util.TreeMap
 
@@ -33,6 +30,7 @@ object GroupTopicParser : Parser {
         treeMap[400] = GroupTopicParserR400
         treeMap[402] = GroupTopicParserR402
         treeMap[403] = GroupTopicParserR403
+        treeMap[430] = GroupTopicParserR430
         return@run treeMap
     }
 }
