@@ -13,7 +13,7 @@ object ParserHelper {
     private val LOGGER = LoggerFactory.getLogger(ParserHelper.javaClass)
     fun guessUidFromUsername(username: String?): Int? {
         return username?.let { name ->
-            if (name.all { ch -> Character.isDigit(ch) }) {
+            if (name.isNotBlank() && name.all { ch -> Character.isDigit(ch) }) {
                 name.toInt()
             } else {
                 null
@@ -31,12 +31,12 @@ object ParserHelper {
         }
     }
 
-    fun getUidFromBgStyle(topPostUserBgStyle: String) = if (topPostUserBgStyle[47] == 'i') {
-        null
-    } else {
-        var tmp = topPostUserBgStyle.substring(57)
-        tmp = tmp.substring(0, tmp.indexOf(".jpg"))
-        tmp.toInt()
+    fun getUidFromBgStyle(topPostUserBgStyle: String): Int? {
+        val split = topPostUserBgStyle.split("/")
+        if (split.size <= 1) return null
+        val split2 = split.last().split(".")
+        if (split2.size <= 1) return null
+        return split2[0].toIntOrNull()
     }
 
     private val CSS_REV_REGEX = Regex("css\\?r(\\d+)+")
