@@ -2,10 +2,10 @@ package moe.nyamori.bgm.model
 
 
 sealed class Space(
+    val name: String?,
+    val displayName: String?,
     val type: SpaceType,
     val meta: Map<String, Any>?,
-    val name: String?,
-    val displayName: String?
 )
 
 class Subject(
@@ -13,14 +13,14 @@ class Subject(
     meta: Map<String, Any>? = null,
     name: String? = null,
     displayName: String? = null
-) : Space(type, meta, name, displayName)
+) : Space(name, displayName, type, meta)
 
 class Group(
     type: SpaceType = SpaceType.GROUP,
     meta: Map<String, Any>? = null,
     name: String? = null,
     displayName: String? = null
-) : Space(type, meta, name, displayName)
+) : Space(name, displayName, type, meta)
 
 
 class Blog(
@@ -28,7 +28,7 @@ class Blog(
     meta: Map<String, Any>? = null,
     var tags: List<String>? = null,
     var relatedSubjectIds: List<Int>? = null
-) : Space(type, meta, null, null)
+) : Space(null, null, type, meta)
 
 
 class Ep(
@@ -36,25 +36,25 @@ class Ep(
     meta: Map<String, Any>? = null,
     name: String? = null,
     displayName: String? = null
-) : Space(type, meta, name, displayName)
+) : Space(name, displayName, type, meta)
 
 class Character(
     type: SpaceType = SpaceType.CHARACTER,
     meta: Map<String, Any>? = null,
     name: String? = null,
     displayName: String? = null
-) : Space(type, meta, name, displayName)
+) : Space(name, displayName, type, meta)
 
 class Person(
     type: SpaceType = SpaceType.PERSON,
     meta: Map<String, Any>? = null,
     name: String? = null,
     displayName: String? = null
-) : Space(type, meta, name, displayName)
+) : Space(name, displayName, type, meta)
 
 class Reserved(
     type: SpaceType
-) : Space(type, null, null, null)
+) : Space(null, null, type, null)
 
 enum class SpaceType(val id: Int) {
     GROUP(8),
