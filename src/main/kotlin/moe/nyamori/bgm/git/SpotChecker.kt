@@ -35,7 +35,7 @@ object SpotChecker {
     const val SPOT_CHECK_LIST_FILE_NAME = "sc.txt"
     const val MIN_SPOT_CHECK_SIZE = 10
     const val MAX_SPOT_CHECK_SIZE = 80
-    const val RANGE_HOLE_INTERVAL_THRESHOLD = 5
+    const val RANGE_HOLE_INTERVAL_THRESHOLD = 10
     const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 100
     const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
     const val HOLE_CHECKED_SET_SIZE_LIMIT = 75
@@ -76,7 +76,7 @@ object SpotChecker {
 
 
     private val HOLE_CHECKED_SET = HashSet<Pair<SpaceType, Int>>() // Maintain in memory
-    private fun checkIfHolesInTopicListRange(spaceType: SpaceType, topicList: List<Int>): List<Int> {
+    fun checkIfHolesInTopicListRange(spaceType: SpaceType, topicList: List<Int>): List<Int> {
         if (spaceType in listOf(SpaceType.EP, SpaceType.CHARACTER, SpaceType.PERSON)) return emptyList()
         if (HOLE_CHECKED_SET.size >= HOLE_CHECKED_SET_SIZE_LIMIT) HOLE_CHECKED_SET.clear()
         // val spotCheckBs = getSpotCheckedTopicMask(spaceType)
