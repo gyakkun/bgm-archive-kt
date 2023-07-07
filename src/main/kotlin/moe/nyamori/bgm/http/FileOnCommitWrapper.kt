@@ -6,23 +6,11 @@ import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.HttpHelper.checkAndExtractSpaceTypeInContext
 
 class FileOnCommitWrapper(val isHtml: Boolean = false) : Handler {
-    private val fileOnCommitJsonHandlerMap = mapOf<SpaceType, Handler>(
-        SpaceType.GROUP to FileOnCommit(SpaceType.GROUP),
-        SpaceType.SUBJECT to FileOnCommit(SpaceType.SUBJECT),
-        SpaceType.BLOG to FileOnCommit(SpaceType.BLOG),
-        SpaceType.EP to FileOnCommit(SpaceType.EP),
-        SpaceType.PERSON to FileOnCommit(SpaceType.PERSON),
-        SpaceType.CHARACTER to FileOnCommit(SpaceType.CHARACTER),
-    )
+    private val fileOnCommitJsonHandlerMap =
+        SpaceType.entries.associateWith { FileOnCommit(it) }
 
-    private val fileOnCommitHtmlHandlerMap = mapOf<SpaceType, Handler>(
-        SpaceType.GROUP to FileOnCommit(SpaceType.GROUP, isHtml = true),
-        SpaceType.SUBJECT to FileOnCommit(SpaceType.SUBJECT, isHtml = true),
-        SpaceType.BLOG to FileOnCommit(SpaceType.BLOG, isHtml = true),
-        SpaceType.EP to FileOnCommit(SpaceType.EP, isHtml = true),
-        SpaceType.PERSON to FileOnCommit(SpaceType.PERSON, isHtml = true),
-        SpaceType.CHARACTER  to FileOnCommit(SpaceType.CHARACTER, isHtml = true),
-    )
+    private val fileOnCommitHtmlHandlerMap =
+        SpaceType.entries.associateWith { FileOnCommit(it, isHtml = true) }
 
     override fun handle(ctx: Context) {
         val spaceType = checkAndExtractSpaceTypeInContext(ctx)
