@@ -143,7 +143,10 @@ object JsonToDbProcessor {
                             Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
                             sidNameMappingSet.clear()
                         }.onFailure {
-                            LOGGER.error("Ex when checking content of $path at commit ${ObjectId.toString(cur)}, repo - ${jsonRepo.simpleName()}", it)
+                            LOGGER.error(
+                                "Ex when checking content of $path at commit ${ObjectId.toString(cur)}, repo - ${jsonRepo.simpleName()}",
+                                it
+                            )
                             LOGGER.error("Json Str: $jsonStr")
                             everFailed = true
                         }
@@ -154,7 +157,11 @@ object JsonToDbProcessor {
                 }
                 Dao.bgmDao().handleNegativeUid()
             }
-            LOGGER.info("Persisted last commit for repo ${jsonRepo.simpleName()}: ${Dao.bgmDao().getPrevPersistedCommitId(jsonRepo)}")
+            LOGGER.info(
+                "Persisted last commit for repo ${jsonRepo.simpleName()}: ${
+                    Dao.bgmDao().getPrevPersistedCommitId(jsonRepo)
+                }"
+            )
             if (everFailed) {
                 LOGGER.error("Failed at persistence for repo ${jsonRepo.simpleName()}. Please check log!")
             }
@@ -182,8 +189,7 @@ object JsonToDbProcessor {
                 runCatching {
                     val topPost = topic.getAllPosts().firstOrNull {
                         it.id == topic.topPostPid
-                    }
-                    if (topPost == null) return@runCatching
+                    } ?: return@runCatching
                     if (topPost.user == null) return@runCatching
                     sidNameMappingSet.add(
                         SpaceNameMappingData(
@@ -197,70 +203,28 @@ object JsonToDbProcessor {
                     LOGGER.error("Ex when extracting blog topic user/sid/name/displayName, ", it)
                 }
             }
-
-        } else if (space is Subject) {
-            if (space.name != null) {
-                sidNameMappingSet.add(
-                    SpaceNameMappingData(
-                        SpaceType.SUBJECT.id,
-                        topic.getSid() ?: StringHashingHelper.stringHash(space.name!!),
-                        space.name!!,
-                        space.displayName!!
-                    )
-                )
-            } else {
-            }
-        } else if (space is Group) {
-            if (space.name != null) {
-                sidNameMappingSet.add(
-                    SpaceNameMappingData(
-                        SpaceType.GROUP.id,
-                        topic.getSid() ?: StringHashingHelper.stringHash(space.name!!),
-                        space.name!!,
-                        space.displayName!!
-                    )
-                )
-            } else {
-            }
-        } else if (space is Ep) {
-            if (space.name != null) {
-                sidNameMappingSet.add(
-                    SpaceNameMappingData(
-                        SpaceType.EP.id,
-                        topic.getSid() ?: StringHashingHelper.stringHash(space.name!!),
-                        space.name!!,
-                        space.displayName!!
-                    )
-                )
-            } else {
-            }
-        } else if (space is Character) {
-            if (space.name != null) {
-                sidNameMappingSet.add(
-                    SpaceNameMappingData(
-                        SpaceType.CHARACTER.id,
-                        topic.getSid() ?: StringHashingHelper.stringHash(space.name!!),
-                        space.name!!,
-                        space.displayName!!
-                    )
-                )
-            } else {
-            }
-        } else if (space is Person) {
-            if (space.name != null) {
-                sidNameMappingSet.add(
-                    SpaceNameMappingData(
-                        SpaceType.PERSON.id,
-                        topic.getSid() ?: StringHashingHelper.stringHash(space.name!!),
-                        space.name!!,
-                        space.displayName!!
-                    )
-                )
-            } else {
-            }
         } else {
-            //
+            runCatching {
+                if (space.name != null && space.displayName != null) {
+                    sidNameMappingSet.add(
+                        SpaceNameMappingData(
+                            space.type.id,
+                            topic.getSid() ?: StringHashingHelper.stringHash(space.name),
+                            space.name,
+                            space.displayName
+                        )
+                    )
+                }
+            }.onFailure {
+                LOGGER.error("Ex when extracting space id - name mapping, ", it)
+            }
         }
+    }
+
+    @JvmStatic
+    fun main(argv: Array<String>) {
+        val space = Blog()
+        System.err.println("Blog as reserved : ${space.name}")
     }
 
     private fun calDeletedBlogPostRow(postListFromFile: List<Post>, postListFromDb: List<PostRow>): Iterable<PostRow> {
