@@ -1,5 +1,8 @@
 package moe.nyamori.bgm.util
 
+import moe.nyamori.bgm.db.Dao
+import moe.nyamori.bgm.model.SpaceType
+
 object RangeHelper {
     fun summaryRanges(nums: List<Int>): List<IntArray> {
         val result: MutableList<IntArray> = ArrayList()
@@ -26,5 +29,21 @@ object RangeHelper {
             result.add(intArrayOf(prev))
         }
         return result
+    }
+
+
+    @JvmStatic
+    fun main(argv: Array<String>) {
+        val list = Dao.bgmDao().getAllTopicIdByType(SpaceType.EP.id)
+        val max = list.max()
+        val fake = (1..max).toMutableSet()
+        fake.removeAll(list.toSet())
+        val result = summaryRanges(fake.toList().sorted())
+        result.forEach {
+            if (it.size == 1) System.err.println(it[0])
+            else {
+                (it[0]..it[1]).forEach { System.err.println(it) }
+            }
+        }
     }
 }

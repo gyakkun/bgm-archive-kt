@@ -789,5 +789,8 @@ interface BgmDao : Transactional<BgmDao> {
         @BindList("l") l: Iterable<String>
     ): List<VUserLatestLikeRevRow>
 
+
+    @SqlQuery("select id from ba_topic where type = ?")
+    fun getAllTopicIdByType(type: Int): List<Int>
 }
 
