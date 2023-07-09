@@ -27,11 +27,22 @@ object LatestTopicListWrapper : Handler {
             }
 
     private fun getTopicList(spaceType: SpaceType): List<Int> {
-        val topicListFile: String = GitHelper.defaultArchiveRepoSingleton.getFileContentAsStringInACommit(
-            GitHelper.defaultArchiveRepoSingleton.getPrevProcessedArchiveCommitRef(),
-            spaceType.name.lowercase() + "/topiclist.txt"
-        )
-        return topicListFile.lines().mapNotNull { it.toIntOrNull() }.sorted()
+        var result = listOf(-1)
+        GitHelper.allArchiveRepoListSingleton.forEach { repo ->
+            runCatching {
+                val topiclistFile = repo.getFileContentAsStringInACommit(
+                    repo.getPrevProcessedArchiveCommitRef(),
+                    spaceType.name.lowercase() + "/topiclist.txt"
+                )
+                val tmpResult = topiclistFile.lines().mapNotNull { it.toIntOrNull() }.sorted()
+                if (tmpResult.max() > result.max()) {
+                    result = tmpResult
+                }
+            }.onFailure {
+                // ignore
+            }
+        }
+        return result
     }
 
     override fun handle(ctx: Context) {
