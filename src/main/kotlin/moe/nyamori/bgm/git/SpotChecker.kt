@@ -2,7 +2,6 @@ package moe.nyamori.bgm.git
 
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
-import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
@@ -198,7 +197,7 @@ object SpotChecker {
     }
 
     private fun getBitsetFromLongPlaintextFile(maskFile: File): BitSet {
-        val maskStr = FileUtil.getFileContent(maskFile)
+        val maskStr = maskFile.readText(Charsets.UTF_8)
         val longList = mutableListOf<Long>()
         maskStr!!.lines().mapNotNull { it.toLongOrNull() }.forEach { longList.add(it) }
         val longArr = longList.toLongArray()
@@ -221,7 +220,7 @@ object SpotChecker {
             if (!file.extension.equals("json", ignoreCase = true)) return@walkThroughJson false
             if ((file.nameWithoutExtension.toIntOrNull() ?: -1) > maxId) return@walkThroughJson false
             if (file.nameWithoutExtension.hashCode() and 255 == 255) LOGGER.info("$file is processing")
-            val fileStr = FileUtil.getFileContent(file)!!
+            val fileStr = file.readText(Charsets.UTF_8)
             val topic = GSON.fromJson(fileStr, Topic::class.java)
             visited.set(topic.id)
             if (topic.isBlogRedirect()/* Possibly reopen */) {
@@ -356,7 +355,7 @@ object SpotChecker {
             if (!file.extension.equals("json", ignoreCase = true)) return@walkThroughJson false
             if ((file.nameWithoutExtension.toIntOrNull() ?: -1) > maxId) return@walkThroughJson false
             if (file.nameWithoutExtension.hashCode() and 255 == 255) LOGGER.info("$file is processing")
-            val fileStr = FileUtil.getFileContent(file)!!
+            val fileStr = file.readText(Charsets.UTF_8)
             val topic = GSON.fromJson(fileStr, Topic::class.java)
             if (topic.isEmptyTopic()) {
                 emptyTopicSet.add(topic.id)
@@ -400,7 +399,7 @@ object SpotChecker {
             if ((file.nameWithoutExtension.toIntOrNull() ?: -1) < maxId) return@walkThroughJson false
             if (file.nameWithoutExtension.hashCode() and 255 == 255) LOGGER.info("$file is processing")
             val idFromFilename = file.nameWithoutExtension.toInt()
-            // val fileStr = FileUtil.getFileContent(file)!!
+            // val fileStr = file.readText(UTF_8)
             // val topic = GSON.fromJson(fileStr, Topic::class.java)
             // if (topic.isEmptyTopic()) return@walkThroughJson false
             // if (topic.id < maxId) return@walkThroughJson true

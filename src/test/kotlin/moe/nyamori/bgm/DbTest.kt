@@ -1,7 +1,6 @@
 package moe.nyamori.bgm
 
 import com.google.gson.*
-import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.db.SpaceNameMappingData
@@ -114,7 +113,7 @@ class DbTest {
                     // if (file.absolutePath.contains("blog")) return@inner
                     if (!file.extension.equals("json", ignoreCase = true)) return@inner
                     if (file.nameWithoutExtension.hashCode() and 127 == 127) LOGGER.info("$file is processing")
-                    val fileStr = FileUtil.getFileContent(file)!!
+                    val fileStr = file.readText(Charsets.UTF_8)
                     var topic = GSON.fromJson(fileStr, Topic::class.java)
                     if (!isValidTopic(topic)) return@inner
                     topic = preProcessTopic(topic)
@@ -162,7 +161,7 @@ class DbTest {
                     if (!file.absolutePath.contains("group") && !file.absolutePath.contains("subject")) return@inner
                     if (!file.extension.equals("json", ignoreCase = true)) return@inner
                     if (file.nameWithoutExtension.hashCode() and 127 == 127) LOGGER.info("$file is processing")
-                    val fileStr = FileUtil.getFileContent(file)!!
+                    val fileStr = file.readText(Charsets.UTF_8)
                     val topic = GSON.fromJson(fileStr, Topic::class.java)
                     if (!isValidTopic(topic)) return@inner
                     if (topic.isEmptyTopic()) return@inner

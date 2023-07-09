@@ -4,7 +4,6 @@ import ch.qos.logback.core.CoreConstants.EMPTY_STRING
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.ibm.icu.text.CharsetDetector
-import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
 import moe.nyamori.bgm.db.Dao
@@ -23,7 +22,6 @@ import org.eclipse.jgit.treewalk.CanonicalTreeParser
 import org.eclipse.jgit.treewalk.TreeWalk
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.lang.IllegalArgumentException
 import java.nio.charset.StandardCharsets
 
 object GitHelper {
@@ -159,7 +157,7 @@ object GitHelper {
             val prevProcessedCommitRevIdFile =
                 File(jsonRepo.absolutePathWithoutDotGit()).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
             if (!prevProcessedCommitRevIdFile.exists()) return EMPTY_STRING
-            val rawFileStr = FileUtil.getFileContent(prevProcessedCommitRevIdFile)!!
+            val rawFileStr = prevProcessedCommitRevIdFile.readText(Charsets.UTF_8)
             return rawFileStr.trim()
         }
     }

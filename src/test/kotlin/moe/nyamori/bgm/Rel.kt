@@ -1,6 +1,5 @@
 package moe.nyamori.bgm
 
-import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.Post
@@ -31,7 +30,7 @@ class Rel {
             val groupJsonDir = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(SpaceType.SUBJECT.name.lowercase())
             groupJsonDir.walk().asStream().parallel().forEach fileIteration@{ file ->
                 if (file.extension.lowercase() != "json") return@fileIteration
-                val fileContent = FileUtil.getFileContent(file)
+                val fileContent = file.readText(Charsets.UTF_8)
                 try {
                     val topic = GitHelper.GSON.fromJson(fileContent, Topic::class.java)
                     if (!topic.display) return@fileIteration

@@ -1,6 +1,5 @@
 package moe.nyamori.bgm
 
-import com.vladsch.flexmark.util.misc.FileUtil
 import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.SpotChecker
@@ -10,8 +9,9 @@ import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
-import java.util.Vector
+import java.util.*
 import java.util.concurrent.CountDownLatch
+import kotlin.text.Charsets.UTF_8
 
 object ConsecutiveDetect {
     private val LOGGER = LoggerFactory.getLogger(ConsecutiveDetect::class.java)
@@ -29,7 +29,7 @@ object ConsecutiveDetect {
             if (!file.exists()) {
                 System.err.println(file)
             } else {
-                val str = FileUtil.getFileContent(file)
+                val str = file.readText(UTF_8)
                 if (!str!!.contains("2008-2023 Bangumi")) {
                     System.err.println("Error page: ${file}")
                 }

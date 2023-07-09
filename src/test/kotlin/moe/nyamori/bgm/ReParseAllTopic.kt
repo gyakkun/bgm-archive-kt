@@ -1,6 +1,5 @@
 package moe.nyamori.bgm
 
-import com.vladsch.flexmark.util.misc.FileUtil
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.SpaceType
@@ -59,7 +58,7 @@ object ReParseAllTopic {
                     val topicId = file.nameWithoutExtension.toInt()
                     ng.add(Pair(spaceType, topicId))
                     val (topic, success) = TopicParserEntrance.parseTopic(
-                        FileUtil.getFileContent(file)!!,
+                        file.readText(Charsets.UTF_8),
                         topicId,
                         spaceType
                     )
