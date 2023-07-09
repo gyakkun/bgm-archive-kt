@@ -8,6 +8,7 @@ import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.FilePathHelper
 import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
+import moe.nyamori.bgm.util.ParserHelper.getStyleRevNumberFromHtmlString
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -58,8 +59,7 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                     timestamp,
                     relativePath
                 )
-                html = htmlModifier(html, timestamp)
-
+                html = htmlModifier(html)
                 ctx.html(html)
             } else {
                 ctx.json(
@@ -77,26 +77,22 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
         }
     }
 
-    private fun htmlModifier(html: String, timestamp: Long): String {
+    private fun htmlModifier(html: String): String {
         var result = html
-        result = result.replace("chii.in", "bgm.tv")
-        result = result.replace("bangumi.tv", "bgm.tv")
-        result = result.replace("data-theme=\"light\"", "data-theme=\"dark\"")
-        result = result.replace("//lain.bgm.tv", "https://lain.bgm.tv")
-        result = result.replace("src=\"/", "src=\"https://bgm.tv/")
-        result = result.replace("href=\"/", "href=\"https://bgm.tv/")
-
-        // R412 "Tietie"
-        if (timestamp >= 1680307200000) {
-            result = result.replace(
-                "</body>", """
-                                            <script src="https://bgm.tv/min/g=ui?r412" type="text/javascript"></script>
-                                            <script src="https://bgm.tv/min/g=mobile?r412" type="text/javascript"></script>
-                                            <script type="text/javascript">chiiLib.topic_history.init();chiiLib.likes.init();</script>
-                                            </body>
-                                        """.trimIndent()
-            )
-        }
+        val rev = getStyleRevNumberFromHtmlString(html)
+        result = result
+            .replace("chii.in", "bgm.tv")
+            .replace("bangumi.tv", "bgm.tv")
+            .replace("data-theme=\"light\"", "data-theme=\"dark\"")
+            .replace(
+            "</body>",
+            """
+                <script src="https://bgm.tv/min/g=ui?r$rev" type="text/javascript"></script>
+                <script src="https://bgm.tv/min/g=mobile?r$rev" type="text/javascript"></script>
+                <script type="text/javascript">chiiLib.topic_history.init();chiiLib.likes.init();</script>
+                </body>
+            """.trimIndent()
+        )
         return result
     }
 }

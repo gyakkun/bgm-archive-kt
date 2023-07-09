@@ -5,117 +5,112 @@ import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.Context
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.db.BgmDao
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.util.StringHashingHelper
-import org.slf4j.LoggerFactory
 
-class HttpServer {
-    companion object {
-        private val log = LoggerFactory.getLogger(HttpServer::class.java)
+object HttpServer {
 
-        @JvmStatic
-        fun main(args: Array<String>) {
-            val app = Javalin.create { config ->
-                config.compression.brotliAndGzip()
-                config.plugins.enableCors { cors ->
-                    cors.add {
-                        it.allowHost("bgm.tv", "bangumi.tv", "chii.in")
-                        it.allowHost("*.bgm.tv", "*.bangumi.tv", "*.chii.in")
-                    }
+    @JvmStatic
+    fun main(args: Array<String>) {
+        val app = Javalin.create { config ->
+            config.compression.brotliAndGzip()
+            config.plugins.enableCors { cors ->
+                cors.add {
+                    it.allowHost("bgm.tv", "bangumi.tv", "chii.in")
+                    it.allowHost("*.bgm.tv", "*.bangumi.tv", "*.chii.in")
                 }
             }
-                .routes {
-                    path("/history") {
-                        path("/{spaceType}") {
-                            get("/latest_topic_list", LatestTopicListWrapper)
-                            path("/{topicId}") {
-                                get(FileHistoryWrapper)
-                                get("/link", LinkHandlerWrapper)
-                                path("/{timestamp}") {
-                                    get(FileOnCommitWrapper())
-                                    get("/html", FileOnCommitWrapper(isHtml = true))
-                                }
+        }
+            .routes {
+                path("/history") {
+                    path("/{spaceType}") {
+                        get("/latest_topic_list", LatestTopicListWrapper)
+                        path("/{topicId}") {
+                            get(FileHistoryWrapper)
+                            get("/link", LinkHandlerWrapper)
+                            path("/{timestamp}") {
+                                get(FileOnCommitWrapper())
+                                get("/html", FileOnCommitWrapper(isHtml = true))
                             }
-
                         }
-                        get("/status", RepoStatusHandler)
+
                     }
-                    path("/info") {
-                        get("/meta") {
+                    get("/status", RepoStatusHandler)
+                }
+                path("/info") {
+                    get("/meta") {
+                        if (!it.isLocalhost()) {
+                            it.status(HttpStatus.NOT_FOUND)
+                            return@get
+                        }
+                        it.result(
+                            GitHelper.GSON.toJson(
+                                Dao.bgmDao().getAllMetaData().associate { it.k to it.v }
+                            )
+                        )
+                    }
+                    path("/repo") {
+                        get("/html") {
                             if (!it.isLocalhost()) {
                                 it.status(HttpStatus.NOT_FOUND)
                                 return@get
                             }
                             it.result(
                                 GitHelper.GSON.toJson(
-                                    Dao.bgmDao().getAllMetaData().associate { it.k to it.v }
+                                    GitHelper.allArchiveRepoListSingleton.mapIndexed { idx, repo ->
+                                        Pair(
+                                            idx,
+                                            StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
+                                        ) to repo.absolutePathWithoutDotGit()
+                                    }.toMap()
                                 )
                             )
                         }
-                        path("/repo") {
-                            get("/html") {
-                                if (!it.isLocalhost()) {
-                                    it.status(HttpStatus.NOT_FOUND)
-                                    return@get
-                                }
-                                it.result(
-                                    GitHelper.GSON.toJson(
-                                        GitHelper.allArchiveRepoListSingleton.mapIndexed { idx, repo ->
-                                            Pair(
-                                                idx,
-                                                StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
-                                            ) to repo.absolutePathWithoutDotGit()
-                                        }.toMap()
-                                    )
-                                )
+                        get("/json") {
+                            if (!it.isLocalhost()) {
+                                it.status(HttpStatus.NOT_FOUND)
+                                return@get
                             }
-                            get("/json") {
-                                if (!it.isLocalhost()) {
-                                    it.status(HttpStatus.NOT_FOUND)
-                                    return@get
-                                }
-                                it.result(
-                                    GitHelper.GSON.toJson(
-                                        GitHelper.allJsonRepoListSingleton.mapIndexed { idx, repo ->
-                                            Pair(
-                                                idx,
-                                                StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
-                                            ) to repo.absolutePathWithoutDotGit()
-                                        }.toMap()
-                                    )
+                            it.result(
+                                GitHelper.GSON.toJson(
+                                    GitHelper.allJsonRepoListSingleton.mapIndexed { idx, repo ->
+                                        Pair(
+                                            idx,
+                                            StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
+                                        ) to repo.absolutePathWithoutDotGit()
+                                    }.toMap()
                                 )
-                            }
+                            )
                         }
-                    }
-                    path("/hook") {
-                        path("/db") {
-                            get("/persist", DbPersistHook)
-                            get("/reset", DbSetPersistIdHandler)
-                        }
-
-                        get("commit", CommitHook)
-                    }
-                    path("/forum-enhance") {
-                        post("/query", ForumEnhanceHandler)
-                        get("/deleted_post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
-                    }
-                    get("/img/*") {
-                        it.redirect("https://bgm.tv" + it.path())
                     }
                 }
-                .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
-            Runtime.getRuntime().addShutdownHook(Thread
-            {
-                app.stop()
-            })
-        }
+                path("/hook") {
+                    path("/db") {
+                        get("/persist", DbPersistHook)
+                        get("/reset", DbSetPersistIdHandler)
+                    }
 
+                    get("/commit", CommitHook)
+                }
+                path("/forum-enhance") {
+                    post("/query", ForumEnhanceHandler)
+                    get("/deleted_post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
+                }
+                get("/*") { // redirect all
+                    it.redirect("https://bgm.tv" + it.path())
+                }
+            }
+            .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
+        Runtime.getRuntime().addShutdownHook(Thread
+        {
+            app.stop()
+        })
     }
+
+    private fun ip(ctx: Context) = ctx.header("X-Forwarded-For")?.split(",")?.get(0) ?: ctx.ip()
+    private fun Context.isLocalhost() = ip(this).let { it == "localhost" || it == "127.0.0.1" }
 }
 
-fun ip(ctx: Context) = ctx.header("X-Forwarded-For")?.split(",")?.get(0) ?: ctx.ip()
-fun Context.isLocalhost() = ip(this).let { it == "localhost" || it == "127.0.0.1" }
