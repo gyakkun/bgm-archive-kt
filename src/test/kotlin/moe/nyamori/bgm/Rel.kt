@@ -120,7 +120,7 @@ class Rel {
                 BufferedWriter(fw).use { bfw ->
                     ppl.forEach {
                         bfw.write("${it.first.first},${it.first.second},${it.second}")
-                        bfw.newLine()
+                        bfw.write("\n")
                     }
                     bfw.flush()
                 }
