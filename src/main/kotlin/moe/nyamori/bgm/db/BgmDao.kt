@@ -792,5 +792,9 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery("select id from ba_topic where type = ?")
     fun getAllTopicIdByType(type: Int): List<Int>
+
+    @SqlUpdate("delete from meta_data")
+    @Transaction
+    fun _TRUNCATE_ALL_META():Int
 }
 

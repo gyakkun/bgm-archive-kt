@@ -91,6 +91,7 @@ object HttpServer {
                     path("/db") {
                         get("/persist", DbPersistHook)
                         get("/reset", DbSetPersistIdHandler)
+                        get("/purge", DbPurgeAllMetaHandler)
                     }
 
                     get("/commit", CommitHook)
