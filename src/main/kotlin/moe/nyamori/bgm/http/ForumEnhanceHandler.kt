@@ -96,7 +96,7 @@ object ForumEnhanceHandler : Handler {
     fun checkValidReq(ctx: Context): Pair<SpaceType, List<String>>? {
         val bodyStr = ctx.body()
         val bodyMap = GSON.fromJson<Map<String, Any>>(bodyStr, STRING_OBJECT_TYPE_TOKEN)
-        if (bodyMap["type"] == null || bodyMap["type"] !is String || bodyMap["type"]!! !in SpaceType.values()
+        if (bodyMap["type"] == null || bodyMap["type"] !is String || bodyMap["type"]!! !in SpaceType.entries
                 .map { it.name.lowercase() }
         ) {
             ctx.status(HttpStatus.BAD_REQUEST)

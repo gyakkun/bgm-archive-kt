@@ -83,7 +83,7 @@ object CommitToJsonProcessor {
                         val commitMsgSplitArr = curCommit.fullMessage.split(" ")
                         val commitSpaceType = if (commitMsgSplitArr.isNotEmpty()) {
                             when (commitMsgSplitArr[0]) {
-                                in SpaceType.values().map { it.toString().uppercase() } -> SpaceType.valueOf(
+                                in SpaceType.entries.map { it.toString().uppercase() } -> SpaceType.valueOf(
                                     commitMsgSplitArr[0]
                                 )
 
@@ -109,7 +109,7 @@ object CommitToJsonProcessor {
                                 val pathSplitArr = path.split("/")
                                 val htmlSpaceType = if (pathSplitArr.isNotEmpty()) {
                                     when (pathSplitArr[0]) {
-                                        in SpaceType.values().map { it.toString().lowercase() } ->
+                                        in SpaceType.entries.map { it.toString().lowercase() } ->
                                             SpaceType.valueOf(
                                                 pathSplitArr.first().uppercase()
                                             )

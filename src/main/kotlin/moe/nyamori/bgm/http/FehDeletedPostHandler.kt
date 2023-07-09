@@ -46,7 +46,7 @@ object FehDeletedPostHandler : Handler {
 
     fun doHandle(ctx: Context) {
         val type = ctx.pathParam("type")
-        require(type.isNotBlank() && type in SpaceType.values().map { it.name.lowercase() }) {
+        require(type.isNotBlank() && type in SpaceType.entries.map { it.name.lowercase() }) {
             "Type should be within blog, subject and group!"
         }
         val topicId =

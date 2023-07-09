@@ -11,7 +11,7 @@ object HttpHelper {
     val DB_READ_SEMAPHORE = Semaphore(5)
     fun checkAndExtractSpaceTypeInContext(ctx: Context): SpaceType {
         val spaceTypeFromPath = ctx.pathParam("spaceType")
-        if (SpaceType.values().none {
+        if (SpaceType.entries.toTypedArray().none {
                 it.name.equals(spaceTypeFromPath, ignoreCase = true)
             }
         ) {

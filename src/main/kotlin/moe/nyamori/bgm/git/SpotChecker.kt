@@ -40,7 +40,7 @@ object SpotChecker {
     const val HOLE_CHECKED_SET_SIZE_LIMIT = 75
     private val TYPE_MAX_ID_MAP = run {
         val result = mutableMapOf<SpaceType, Int>()
-        SpaceType.values().forEach { result[it] = -1 }
+        SpaceType.entries.forEach { result[it] = -1 }
         result
     }
 
@@ -152,7 +152,7 @@ object SpotChecker {
             return result
         }
         val samplingSize =
-            (fakeTotalCount / (30 * (Config.BGM_ARCHIVE_HOW_MANY_COMMIT_ON_GITHUB_PER_DAY / (2 * (SpaceType.values().size)))))
+            (fakeTotalCount / (30 * (Config.BGM_ARCHIVE_HOW_MANY_COMMIT_ON_GITHUB_PER_DAY / (2 * (SpaceType.entries.size)))))
                 .coerceAtLeast(MIN_SPOT_CHECK_SIZE).coerceAtMost(MAX_SPOT_CHECK_SIZE)
         val r = Random()
 
