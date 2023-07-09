@@ -10,6 +10,7 @@ import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.HttpHelper.checkAndExtractSpaceTypeInContext
+import moe.nyamori.bgm.util.TopicListHelper.getTopicList
 import org.slf4j.LoggerFactory
 import java.time.Duration
 import java.util.concurrent.TimeUnit
@@ -25,25 +26,6 @@ object LatestTopicListWrapper : Handler {
             .build { spaceType ->
                 getTopicList(spaceType)
             }
-
-    private fun getTopicList(spaceType: SpaceType): List<Int> {
-        var result = listOf(-1)
-        GitHelper.allArchiveRepoListSingleton.forEach { repo ->
-            runCatching {
-                val topiclistFile = repo.getFileContentAsStringInACommit(
-                    repo.getPrevProcessedArchiveCommitRef(),
-                    spaceType.name.lowercase() + "/topiclist.txt"
-                )
-                val tmpResult = topiclistFile.lines().mapNotNull { it.toIntOrNull() }.sorted()
-                if (tmpResult.max() > result.max()) {
-                    result = tmpResult
-                }
-            }.onFailure {
-                // ignore
-            }
-        }
-        return result
-    }
 
     override fun handle(ctx: Context) {
         val spaceType = checkAndExtractSpaceTypeInContext(ctx)
