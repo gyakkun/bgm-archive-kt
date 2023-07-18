@@ -126,29 +126,14 @@ object TopicJsonHelper {
                     val res = ArrayList<LikeRevUsername>()
                     (faces as Map<String, Any?>).forEach {
                         val m = it.value as Map<String, Any?>
-                        val mid = (m["main_id"] as Double).toInt()
-                        val value = (m["value"] as String).toInt()
-                        val users = (m["users"] as List<Map<String, Any?>>?) ?: return@forEach
-                        users.forEach {
-                            if (it["username"] == null) return@forEach
-                            if (it["username"]!! !is String) return@forEach
-                            val username = it["username"]!! as String
-                            val nickname =
-                                if (it["nickname"] != null && it["nickname"] is String) it["nickname"]!! as String else null
-                            res.add(
-                                LikeRevUsername
-                                    (
-                                    type = topic.space!!.type.id,
-                                    mid = mid,
-                                    pid = pid,
-                                    value = value,
-                                    total = 1,
-                                    username = username,
-                                    nickname = nickname
-                                )
-                            )
-
-                        }
+                        if (extractLikesRevFromMap(m, res, topic, pid)) return@forEach
+                    }
+                    return@map res
+                } else if (faces is List<*>) {
+                    val res = ArrayList<LikeRevUsername>()
+                    (faces as List<Map<String, Any?>>).forEach {
+                        val m = it
+                        if (extractLikesRevFromMap(m, res, topic, pid)) return@forEach
                     }
                     return@map res
                 } else {
@@ -158,6 +143,37 @@ object TopicJsonHelper {
         }.onFailure {
             LOGGER.error("Ex when extracting like rev username list for topic: ${topic.space}, id-${topic.id}", it)
         }.getOrDefault(emptyList())
+    }
+
+    private fun extractLikesRevFromMap(
+        m: Map<String, Any?>,
+        res: ArrayList<LikeRevUsername>,
+        topic: Topic,
+        pid: Int
+    ): Boolean {
+        val mid = (m["main_id"] as Double).toInt()
+        val value = (m["value"] as String).toInt()
+        val users = (m["users"] as List<Map<String, Any?>>?) ?: return true
+        users.forEach {
+            if (it["username"] == null) return@forEach
+            if (it["username"]!! !is String) return@forEach
+            val username = it["username"]!! as String
+            val nickname =
+                if (it["nickname"] != null && it["nickname"] is String) it["nickname"]!! as String else null
+            res.add(
+                LikeRevUsername
+                    (
+                    type = topic.space!!.type.id,
+                    mid = mid,
+                    pid = pid,
+                    value = value,
+                    total = 1,
+                    username = username,
+                    nickname = nickname
+                )
+            )
+        }
+        return false
     }
 
     private fun getTotal(likeItemMap: Map<String, Any?>): Int {
