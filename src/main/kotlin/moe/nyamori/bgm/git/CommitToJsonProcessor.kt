@@ -256,16 +256,21 @@ object CommitToJsonProcessor {
             it.write(commitMsg)
             it.flush()
         }
-        val jsonFileListToCommit = StringBuffer(" ")
+        val jsonFileListToGitAdd = StringBuffer(" ")
         // There's a trailing space on each file to add
-        changedFilePathList.forEach { path -> jsonFileListToCommit.append("${path.replace("html", "json")} ") }
-        jsonFileListToCommit.append("$BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME ")
+        changedFilePathList.forEach { path -> jsonFileListToGitAdd.append("${path.replace("html", "json")} ") }
+        jsonFileListToGitAdd.append("$BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME ")
+        log.info("File list to git add: ${jsonFileListToGitAdd.toString()}")
+        log.info("About to git add")
         val addPathProcess = Runtime.getRuntime()
-            .exec("git add $jsonFileListToCommit", null, jsonRepoDir)
+            .exec("git add ${jsonFileListToGitAdd.toString()}", null, jsonRepoDir)
         addPathProcess.blockAndPrintProcessResults()
+        log.info("Complete git add")
+        log.info("About to git commit")
         val gitProcess = Runtime.getRuntime()
             .exec("git commit -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
         gitProcess.blockAndPrintProcessResults()
+        log.info("Complete git commit")
         commitMsgFile.delete()
     }
 
