@@ -233,36 +233,36 @@ object CommitToJsonProcessor {
         if (Config.BGM_ARCHIVE_PREFER_JGIT) {
             jgitCommitJsonRepo(jsonRepo, changedFilePathList, archiveCommit)
         } else {
-            commandLineCommitJsonRepoAddFileInBatch(jsonRepo, archiveCommit)
-            // commandLineCommitJsonRepoAddFileSeparately(archiveCommit, changedFilePathList)
+            if (Config.BGM_ARCHIVE_PREFER_GIT_BATCH_ADD) {
+                commandLineCommitJsonRepoAddFileInBatch(jsonRepo, archiveCommit)
+            } else {
+                commandLineCommitJsonRepoAddFileSeparately(jsonRepo, archiveCommit, changedFilePathList)
+            }
         }
         timing = System.currentTimeMillis() - timing
         log.info("Timing: $timing for git add/commit ${archiveCommit.fullMessage}")
     }
 
     private fun commandLineCommitJsonRepoAddFileSeparately(
-        archiveRepo: Repository,
+        jsonRepo: Repository,
         archiveCommit: RevCommit,
         changedFilePathList: List<String>
     ) {
         val commitMsg = archiveCommit.fullMessage
-        val jsonRepoDir = File(archiveRepo.absolutePathWithoutDotGit())
+        val jsonRepoDir = File(jsonRepo.absolutePathWithoutDotGit())
         val commitMsgFile =
             jsonRepoDir.resolve(".git").resolve("tmp-" + UUID.randomUUID())
         FileWriter(commitMsgFile).use {
             it.write(commitMsg)
             it.flush()
         }
-        for (path in changedFilePathList) {
-            val addPathProcess = Runtime.getRuntime()
-                .exec("git add ${path.replace("html", "json")}", null, jsonRepoDir)
-            addPathProcess.blockAndPrintProcessResults()
-        }
-        val addLastCommitIdProcess = Runtime.getRuntime().exec(
-            "git add $BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME",
-            null, jsonRepoDir
-        )
-        addLastCommitIdProcess.blockAndPrintProcessResults()
+        val jsonFileListToCommit = StringBuffer(" ")
+        // There's a trailing space on each file to add
+        changedFilePathList.forEach { path -> jsonFileListToCommit.append("${path.replace("html", "json")} ") }
+        jsonFileListToCommit.append("$BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME ")
+        val addPathProcess = Runtime.getRuntime()
+            .exec("git add $jsonFileListToCommit", null, jsonRepoDir)
+        addPathProcess.blockAndPrintProcessResults()
         val gitProcess = Runtime.getRuntime()
             .exec("git commit -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
         gitProcess.blockAndPrintProcessResults()

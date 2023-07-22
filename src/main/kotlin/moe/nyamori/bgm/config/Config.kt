@@ -37,6 +37,9 @@ object Config {
     val BGM_ARCHIVE_PREFER_JGIT: Boolean =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_PREFER_JGIT", "false").toBoolean()
 
+    val BGM_ARCHIVE_PREFER_GIT_BATCH_ADD: Boolean =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_PREFER_GIT_BATCH_ADD", "false").toBoolean()
+
     val BGM_ARCHIVE_DISABLE_HOOK: Boolean =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_DISABLE_HOOK", "false").toBoolean()
 
