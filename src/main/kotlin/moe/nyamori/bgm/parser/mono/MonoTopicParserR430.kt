@@ -155,7 +155,7 @@ class MonoTopicParserR430(
                     .first()?.html()
             }
 
-        val dateline = postDiv.select("div.post_actions.re_info > div:nth-child(1) > small").text().let {
+        val dateline = postDiv.select("div.post_actions.re_info > div.action").first()!!.text().let {
             val datelineStr =
                 it.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
             return@let SDF_YYYY_M_D_HH_MM.parse(datelineStr).time / 1000

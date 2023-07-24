@@ -150,8 +150,8 @@ object EpTopicParserR416 : Parser {
                     .first()?.html()
             }
 
-        val dateline = postDiv.select("div.post_actions.re_info > div:nth-child(1) > small").text().let {
-            val datelineStr = it.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
+        val dateline = postDiv.select("div.post_actions.re_info > div.action").first()!!.text().let { text ->
+            val datelineStr = text.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
             return@let SDF_YYYY_M_D_HH_MM.parse(datelineStr).time / 1000
         }
         val state = PostToStateHelper.fromPostHtmlToState(contentHtml ?: "")
