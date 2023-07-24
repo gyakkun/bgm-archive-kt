@@ -9,6 +9,7 @@ class CharacterParserTest {
     @Test
     fun testCharacterMisc() {
         for (i in listOf(
+            "bad_date_after_tidy",
             "character_1",
             "not_found",
         )) {

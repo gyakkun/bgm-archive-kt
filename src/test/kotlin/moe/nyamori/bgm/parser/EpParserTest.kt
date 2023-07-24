@@ -8,6 +8,7 @@ class EpParserTest {
     @Test
     fun testEpMisc() {
         for (i in listOf(
+            "bad_date_after_tidy",
             "music",
             "anime_1",
             "anime_3",
