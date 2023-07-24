@@ -6,7 +6,8 @@ data class User(
     var id: Int?,
     var username: String,
     var nickname: String? = null,
-    var sign: String? = null
+    var sign: String? = null,
+    var createdAt: Int? = -1
 ) {
     fun getId(): Int {
         if (id != null) return id!!

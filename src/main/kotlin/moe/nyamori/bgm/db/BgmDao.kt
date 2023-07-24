@@ -76,11 +76,15 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlBatch(
         """
-        insert into ba_user (id, username, nickname) values (
+        insert into ba_user (id, username, nickname, created_at) values (
             :id,
             :username,
-            :nickname
-        ) on conflict(id) do update set username = :username, nickname = coalesce(:nickname, nickname) 
+            :nickname,
+            :createdAt
+        ) on conflict(id) do 
+        update set username = :username,
+                   nickname = coalesce(:nickname, nickname),
+                   created_at = max(:createdAt, created_at)
         """
     )
     @Transaction
@@ -796,5 +800,9 @@ interface BgmDao : Transactional<BgmDao> {
     @SqlUpdate("delete from meta_data")
     @Transaction
     fun _TRUNCATE_ALL_META():Int
+
+    @SqlQuery("select * from ba_user")
+    @RegisterKotlinMapper(User::class)
+    fun selectAllUser():List<User>
 }
 
