@@ -258,12 +258,22 @@ object CommitToJsonProcessor {
         }
         val jsonFileListToGitAdd = StringBuffer(" ")
         // There's a trailing space on each file to add
-        changedFilePathList.forEach { path -> jsonFileListToGitAdd.append("${path.replace("html", "json")} ") }
-        jsonFileListToGitAdd.append("$BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME ")
-        log.info("File list to git add: ${jsonFileListToGitAdd.toString()}")
+        changedFilePathList.forEach { path ->
+            if (!path.endsWith("html")) return@forEach
+            val absolutePath = jsonRepoDir.resolve(path.replace("html", "json"))
+            jsonFileListToGitAdd.append("${absolutePath.absolutePath} ")
+        }
+        BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME.apply {
+            val absolutePath = jsonRepoDir.resolve(this)
+            jsonFileListToGitAdd.append("${absolutePath.absolutePath} ")
+        }
+        val gitAddCommand = "git add ${jsonFileListToGitAdd.toString()}"
+        log.debug("File list to git add: ${jsonFileListToGitAdd.toString()}")
         log.info("About to git add")
+        log.debug("Json repo dir: ${jsonRepoDir.absolutePath}")
+        log.debug("Git command: $gitAddCommand")
         val addPathProcess = Runtime.getRuntime()
-            .exec("git add ${jsonFileListToGitAdd.toString()}", null, jsonRepoDir)
+            .exec(gitAddCommand, null, jsonRepoDir)
         addPathProcess.blockAndPrintProcessResults()
         log.info("Complete git add")
         log.info("About to git commit")
