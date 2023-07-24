@@ -333,13 +333,15 @@ object CommitToJsonProcessor {
     fun Process.blockAndPrintProcessResults(): List<String> {
         val result = ArrayList<String?>()
         // Here actually block the process
-        InputStreamReader(this.inputStream).use { isr ->
-            BufferedReader(isr).use { reader ->
-                var line: String?
-                // reader.readLine()
-                while (reader.readLine().also { line = it } != null) {
-                    System.err.println(line)
-                    result.add(line)
+        listOf(this.errorStream, this.inputStream).forEach {
+            InputStreamReader(it).use { isr ->
+                BufferedReader(isr).use { reader ->
+                    var line: String?
+                    // reader.readLine()
+                    while (reader.readLine().also { line = it } != null) {
+                        System.err.println(line)
+                        result.add(line)
+                    }
                 }
             }
         }
