@@ -260,8 +260,12 @@ interface BgmDao : Transactional<BgmDao> {
         updateNegativeUidInPost(userList)
         // preRemoveConflictSidInBlog(userList)
         updateNegativeSidInBlogTopic(userList)
-        // No need to remove Negative Sid In Space Naming Mapping , otherwise it will conflict the unique key constraint
 
+        // First upsert naming mapping for blog
+        val upsertBlogCount = upsertPositiveSidForBlog()
+        // Remove the negative one
+        val deleteBlogCount = deleteNegativeSidForBlog()
+        LOGGER.info("upsertBlogCount $upsertBlogCount , deleteBlogCount $deleteBlogCount")
 
         val canUpdate = preRemoveConflictSidInLikesRev(userList)
         updateNegativeUidInLikesRev(canUpdate)
@@ -269,8 +273,41 @@ interface BgmDao : Transactional<BgmDao> {
         removeNegativeUidUser(userList)
 
         return emptyList()
-
     }
+
+    @SqlUpdate(
+        """
+            insert into ba_space_naming_mapping (type, sid, name, display_name)
+            select 100      as type,
+                   id       as sid,
+                   username as name,
+                   nickname as display_name
+            from ba_user
+            inner join ba_space_naming_mapping on ba_space_naming_mapping.type = 100 and ba_space_naming_mapping.sid < 0 and ba_space_naming_mapping.name = ba_user.username
+            where true
+            on conflict(type,sid) do update set name        = name,
+                                                display_name=display_name
+        """
+    )
+    @Transaction
+    fun upsertPositiveSidForBlog():Int
+
+    @SqlUpdate(
+        """
+        delete
+        from ba_space_naming_mapping
+        where type = 100
+          and name in (select name
+                       from (select type, name, count(*) count
+                             from ba_space_naming_mapping
+                             where type = 100
+                             group by type, name
+                             having count > 1))
+          and sid < 0;
+    """
+    )
+    @Transaction
+    fun deleteNegativeSidForBlog():Int
 
     @SqlBatch(
         """
