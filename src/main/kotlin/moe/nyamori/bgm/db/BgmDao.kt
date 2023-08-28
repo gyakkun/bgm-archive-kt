@@ -641,6 +641,8 @@ interface BgmDao : Transactional<BgmDao> {
             inner join ba_topic bt on bp.mid = bt.id and bp.type = bt.type and bt.top_post_pid!=bp.id
             left  join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid 
             where bp.type = :t
+              -- and bt.state != 1
+              -- and bp.state != 1
               and bp.uid in (select bu.id
                           from ba_user bu
                           where bu.username in (<l>)))
@@ -667,6 +669,7 @@ interface BgmDao : Transactional<BgmDao> {
                        inner join ba_post bp on bt.last_post_pid = bp.id and bt.type = bp.type
                        left  join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid 
               where bt.type = :t
+                and bt.state != 1
                 and bu.username in (<l>)
                 and bt.dateline >= ((select unixepoch() - 86400 * 365 * 3)))
         where rank_last_reply <= 10
