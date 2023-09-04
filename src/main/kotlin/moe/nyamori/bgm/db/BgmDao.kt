@@ -285,8 +285,8 @@ interface BgmDao : Transactional<BgmDao> {
             from ba_user
             inner join ba_space_naming_mapping on ba_space_naming_mapping.type = 100 and ba_space_naming_mapping.sid < 0 and ba_space_naming_mapping.name = ba_user.username
             where true
-            on conflict(type,sid) do update set name        = name,
-                                                display_name=display_name
+            on conflict(type,sid) do update set name         = excluded.name,
+                                                display_name = excluded.display_name;
         """
     )
     @Transaction
