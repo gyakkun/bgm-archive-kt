@@ -92,4 +92,7 @@ object Config {
 
     val BGM_ARCHIVE_HOW_MANY_COMMIT_ON_GITHUB_PER_DAY: Int =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_HOW_MANY_COMMIT_ON_GITHUB_PER_DAY", "500").toIntOrNull() ?: 500
+
+    val BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS: Long =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS", "200000").toLongOrNull() ?: 200_000 // 200s
 }

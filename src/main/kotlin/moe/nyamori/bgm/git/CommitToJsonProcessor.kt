@@ -3,6 +3,7 @@ package moe.nyamori.bgm.git
 import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
@@ -68,6 +69,7 @@ object CommitToJsonProcessor {
             log.info("The previously processed commit for repo - ${archiveRepo.simpleName()}: $prev")
             run breakable@{
                 walk.forEachIndexed { commitIdx, curCommit ->
+                    var timing = System.currentTimeMillis()
                     try {
                         val noGoodIdTreeSet = TreeSet<Int>()
                         if (curCommit == prev) {
@@ -181,7 +183,26 @@ object CommitToJsonProcessor {
                         if (commitIdx % 100 == 0) {
                             Git(jsonRepo).gc()
                         }
-                        SpotChecker.genSpotCheckListFile(archiveRepo, commitSpaceType)
+                        timing = System.currentTimeMillis() - timing
+                        if (timing >= BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS) {
+                            log.error(
+                                "Process commit taking longer than expected (threshold:${BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS}ms). Skipping generating spot check file. Cur commit: ${
+                                    ObjectId.toString(
+                                        curCommit
+                                    )
+                                }"
+                            )
+                        } else if (commitIdx != 0) {
+                            log.warn(
+                                "Not processing the first commit. Not generating spot check file for safety. Cur commit: ${
+                                    ObjectId.toString(
+                                        curCommit
+                                    )
+                                }"
+                            )
+                        } else {
+                            SpotChecker.genSpotCheckListFile(archiveRepo, commitSpaceType)
+                        }
                     } catch (ex: Exception) {
                         log.error(
                             "Ex occurs when processing repo - ${archiveRepo.simpleName()},  commit - ${
