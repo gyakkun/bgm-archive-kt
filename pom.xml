@@ -18,7 +18,7 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
-        <kt.major.version>1.9.20</kt.major.version>
+        <kt.major.version>1.9.21</kt.major.version>
         <junit.version>5.9.2</junit.version>
         <jdbi.version>3.41.3</jdbi.version>
         <slf4j.version>2.0.9</slf4j.version>
