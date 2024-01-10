@@ -18,11 +18,11 @@
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
-        <kt.major.version>1.9.21</kt.major.version>
+        <kt.major.version>1.9.22</kt.major.version>
         <junit.version>5.9.2</junit.version>
-        <jdbi.version>3.41.3</jdbi.version>
-        <slf4j.version>2.0.9</slf4j.version>
-        <jackson.version>2.15.3</jackson.version>
+        <jdbi.version>3.43.0</jdbi.version>
+        <slf4j.version>2.0.11</slf4j.version>
+        <jackson.version>2.16.1</jackson.version>
     </properties>
 
     <dependencyManagement>
@@ -71,7 +71,7 @@
         <dependency>
             <groupId>org.jsoup</groupId>
             <artifactId>jsoup</artifactId>
-            <version>1.16.2</version>
+            <version>1.17.2</version>
         </dependency>
 
         <dependency>
@@ -83,7 +83,7 @@
         <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
-            <version>6.7.0.202309050840-r</version>
+            <version>6.8.0.202311291450-r</version>
         </dependency>
 
         <dependency>
@@ -101,9 +101,8 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.4.11</version>
+            <version>1.4.14</version>
         </dependency>
-
 
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
@@ -133,21 +132,20 @@
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>brotli4j</artifactId>
-            <version>1.12.0</version>
+            <version>1.15.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>native-linux-x86_64</artifactId>
-            <version>1.12.0</version>
+            <version>1.15.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>native-windows-x86_64</artifactId>
-            <version>1.12.0</version>
+            <version>1.15.0</version>
         </dependency>
-
 
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>
@@ -158,7 +156,7 @@
         <dependency>
             <groupId>com.ibm.icu</groupId>
             <artifactId>icu4j</artifactId>
-            <version>73.2</version>
+            <version>74.2</version>
         </dependency>
 
         <dependency>
@@ -184,19 +182,19 @@
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
-            <version>5.0.1</version>
+            <version>5.1.0</version>
         </dependency>
 
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.43.2.2</version>
+            <version>3.44.1.0</version>
         </dependency>
 
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>9.22.3</version>
+            <version>10.4.1</version>
         </dependency>
 
     </dependencies>
