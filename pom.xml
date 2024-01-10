@@ -39,6 +39,16 @@
 
     <dependencies>
         <dependency>
+            <groupId>io.muserver</groupId>
+            <artifactId>mu-server</artifactId>
+            <version>0.74.3</version>
+        </dependency>
+        <dependency>
+            <groupId>io.muserver</groupId>
+            <artifactId>murp</artifactId>
+            <version>1.0.0</version>
+        </dependency>
+        <dependency>
             <groupId>org.jetbrains.kotlinx</groupId>
             <artifactId>kotlinx-coroutines-core</artifactId>
             <version>1.7.3</version>
@@ -101,7 +111,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.4.11</version>
+            <version>1.4.14</version>
         </dependency>
 
 
@@ -197,6 +207,12 @@
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
             <version>9.22.3</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.hsbc.cranker</groupId>
+            <artifactId>cranker-connector</artifactId>
+            <version>1.2.3</version>
         </dependency>
 
     </dependencies>

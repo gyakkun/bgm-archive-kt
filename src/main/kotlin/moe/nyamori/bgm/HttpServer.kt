@@ -1,10 +1,14 @@
 package moe.nyamori.bgm
 
+import com.hsbc.cranker.connector.CrankerConnectorBuilder
+import com.hsbc.cranker.connector.CrankerConnectorBuilder.createHttpClient
+import com.hsbc.cranker.connector.ProxyEventListener
+import com.hsbc.cranker.connector.RouterEventListener
+import com.hsbc.cranker.connector.RouterRegistration
 import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.ContentType
 import io.javalin.http.Context
-import io.javalin.http.Header.CONTENT_TYPE
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
@@ -12,8 +16,13 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.util.StringHashingHelper
+import org.slf4j.LoggerFactory
+import java.net.URI
+import java.net.http.HttpRequest
+import java.util.concurrent.TimeUnit
 
 object HttpServer {
+    private val LOGGER = LoggerFactory.getLogger(HttpServer::class.java)
 
     @JvmStatic
     fun main(args: Array<String>) {
@@ -106,14 +115,50 @@ object HttpServer {
                     it.redirect("https://bgm.tv" + it.path())
                 }
             }
-            .after{
+            .after {
                 if (it.res().contentType == ContentType.APPLICATION_JSON.mimeType) {
                     it.contentType(ContentType.APPLICATION_JSON.mimeType + "; charset=utf-8")
                 }
             }
             .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
+        val crankerConnector = CrankerConnectorBuilder.connector()
+            .withRoute("bgm")
+            .withTarget(URI.create("http://${Config.BGM_ARCHIVE_ADDRESS}:${app.port()}"))
+            // .withRouterLookupByDNS(URI.create("wss://crr.nyamori.moe"))
+            .withRouterUris { listOf(URI.create("wss://crr.nyamori.moe")) }
+            .withHttpClient(createHttpClient(false).build())
+            .withComponentName("bgm-archive-kt")
+            .withSlidingWindowSize(8)
+            .withRouterRegistrationListener(object : RouterEventListener {
+                override fun onRegistrationChanged(data: RouterEventListener.ChangeData?) {
+                    LOGGER.warn("[onRegistrationChanged] {}", data)
+                }
+
+                override fun onRouterDnsLookupError(error: Throwable?) {
+                    LOGGER.warn("[onRouterDnsLookupError] ", error)
+                }
+
+                override fun onSocketConnectionError(router: RouterRegistration?, exception: Throwable?) {
+                    LOGGER.warn("[onSocketConnectionError] {}", router, exception)
+                }
+            })
+            .withProxyEventListener(object : ProxyEventListener {
+                override fun beforeProxyToTarget(
+                    request: HttpRequest,
+                    requestBuilder: HttpRequest.Builder
+                ): HttpRequest {
+                    return requestBuilder.uri(
+                        URI.create(
+                            request.uri().toString().replaceFirst("/bgm", "/", true)
+                        )
+                    ).build()
+                }
+            })
+            .start()
+
         Runtime.getRuntime().addShutdownHook(Thread
         {
+            crankerConnector.stop(1000, TimeUnit.MILLISECONDS)
             app.stop()
         })
     }
