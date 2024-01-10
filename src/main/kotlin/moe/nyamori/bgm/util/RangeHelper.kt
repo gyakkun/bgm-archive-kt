@@ -5,7 +5,7 @@ import moe.nyamori.bgm.model.SpaceType
 
 object RangeHelper {
     fun summaryRanges(nums: List<Int>): List<IntArray> {
-        val result: MutableList<IntArray> = ArrayList()
+        val result: MutableList<IntArray> = mutableListOf()
         if (nums.isEmpty()) return result
         var prev = nums[0]
         var rangeLeft = nums[0] // the left side of the range interval (inclusive)
@@ -14,6 +14,7 @@ object RangeHelper {
             val cur = nums[i]
             if (cur == prev + 1) { // if it's incremented by one <=> continuous for current one
                 prev = cur
+                continue
             } else {               // otherwise, it's continuous until the previous one
                 if (rangeLeft != prev) {
                     result.add(intArrayOf(rangeLeft, prev))
