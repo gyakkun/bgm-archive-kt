@@ -281,8 +281,12 @@ object CommitToJsonProcessor {
         // There's a trailing space on each file to add
         changedFilePathList.forEach { path ->
             if (!path.endsWith("html")) return@forEach
-            val absolutePath = jsonRepoDir.resolve(path.replace("html", "json"))
-            jsonFileListToGitAdd.append("${absolutePath.absolutePath} ")
+            val absolutePathFile = jsonRepoDir.resolve(path.replace("html", "json"))
+            if (!absolutePathFile.exists()) {
+                log.error("Failed to find file ${absolutePathFile.absolutePath}")
+                return@forEach
+            }
+            jsonFileListToGitAdd.append("${absolutePathFile.absolutePath} ")
         }
         BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME.apply {
             val absolutePath = jsonRepoDir.resolve(this)
