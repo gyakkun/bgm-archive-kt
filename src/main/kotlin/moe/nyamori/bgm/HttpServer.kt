@@ -6,6 +6,7 @@ import io.javalin.http.ContentType
 import io.javalin.http.Context
 import io.javalin.http.Header.CONTENT_TYPE
 import io.javalin.http.HttpStatus
+import io.javalin.plugin.bundled.RouteOverviewUtil.metaInfo
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
@@ -105,10 +106,10 @@ object HttpServer {
                 get("/*") { // redirect all
                     it.redirect("https://bgm.tv" + it.path())
                 }
-            }
-            after {
-                if (it.res().contentType == ContentType.APPLICATION_JSON.mimeType) {
-                    it.contentType(ContentType.APPLICATION_JSON.mimeType + "; charset=utf-8")
+                after {
+                    if (it.res().contentType == ContentType.APPLICATION_JSON.mimeType) {
+                        it.contentType(ContentType.APPLICATION_JSON.mimeType + "; charset=utf-8")
+                    }
                 }
             }
         }.start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
