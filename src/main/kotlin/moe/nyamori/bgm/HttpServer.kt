@@ -18,15 +18,15 @@ object HttpServer {
     @JvmStatic
     fun main(args: Array<String>) {
         val app = Javalin.create { config ->
-            config.compression.brotliAndGzip()
-            config.plugins.enableCors { cors ->
-                cors.add {
+            config.useVirtualThreads = true
+            config.http.brotliAndGzipCompression()
+            config.bundledPlugins.enableCors { cors ->
+                cors.addRule {
                     it.allowHost("bgm.tv", "bangumi.tv", "chii.in")
                     it.allowHost("*.bgm.tv", "*.bangumi.tv", "*.chii.in")
                 }
             }
-        }
-            .routes {
+            config.router.apiBuilder {
                 path("/history") {
                     path("/{spaceType}") {
                         get("/latest_topic_list", LatestTopicListWrapper)
@@ -106,12 +106,13 @@ object HttpServer {
                     it.redirect("https://bgm.tv" + it.path())
                 }
             }
-            .after{
+            after {
                 if (it.res().contentType == ContentType.APPLICATION_JSON.mimeType) {
                     it.contentType(ContentType.APPLICATION_JSON.mimeType + "; charset=utf-8")
                 }
             }
-            .start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
+        }.start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
+
         Runtime.getRuntime().addShutdownHook(Thread
         {
             app.stop()

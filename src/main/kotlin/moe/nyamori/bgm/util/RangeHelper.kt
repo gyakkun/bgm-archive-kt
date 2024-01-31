@@ -35,7 +35,7 @@ object RangeHelper {
 
     @JvmStatic
     fun main(argv: Array<String>) {
-        val list = Dao.bgmDao().getAllTopicIdByType(SpaceType.PERSON.id).toSet()
+        val list = Dao.bgmDao().getAllTopicIdByType(SpaceType.BLOG.id).toSet()
         val max = list.max()
         val fake = (1..max).toMutableSet()
         fake.removeAll(list.toSet())

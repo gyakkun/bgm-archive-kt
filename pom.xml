@@ -126,7 +126,7 @@
         <dependency>
             <groupId>io.javalin</groupId>
             <artifactId>javalin</artifactId>
-            <version>5.6.3</version>
+            <version>6.0.0</version>
         </dependency>
 
         <dependency>
@@ -138,13 +138,13 @@
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>native-linux-x86_64</artifactId>
-            <version>1.15.0</version>
+            <version>1.16.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>native-windows-x86_64</artifactId>
-            <version>1.15.0</version>
+            <version>1.16.0</version>
         </dependency>
 
         <dependency>
@@ -188,13 +188,13 @@
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.44.1.0</version>
+            <version>3.45.0.0</version>
         </dependency>
 
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>10.4.1</version>
+            <version>10.6.0</version>
         </dependency>
 
     </dependencies>
