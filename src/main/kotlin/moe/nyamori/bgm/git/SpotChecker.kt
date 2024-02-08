@@ -162,7 +162,7 @@ object SpotChecker {
                 .coerceAtLeast(MIN_SPOT_CHECK_SIZE).coerceAtMost(MAX_SPOT_CHECK_SIZE)
         val r = Random()
 
-        repeat(samplingSize) {
+        repeat(samplingSize.coerceAtMost(remainZeroCount)) {
             var victim: Int
             do {
                 victim = spotCheckedBs.nextClearBit(r.nextInt(0, spotCheckedBs.size().coerceAtMost(maxId)))
@@ -331,7 +331,8 @@ object SpotChecker {
 //        SpaceType.values().forEach {
 //            genHiddenTopicMaskFile(it)
 //        }
-        genEmptyTopicMaskFile(SpaceType.EP)
+        randomSelectTopicIds(GitHelper.defaultArchiveRepoSingleton, spaceType = SpaceType.EP)
+//        genEmptyTopicMaskFile(SpaceType.EP)
     }
 
     private fun genEmptyTopicMaskFile(spaceType: SpaceType) {
