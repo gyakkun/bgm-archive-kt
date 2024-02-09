@@ -33,9 +33,10 @@ object SpotChecker {
     const val SPOT_CHECK_LIST_FILE_NAME = "sc.txt"
     const val MIN_SPOT_CHECK_SIZE = 10
     const val MAX_SPOT_CHECK_SIZE = 80
-    const val RANGE_HOLE_INTERVAL_THRESHOLD = 10
+    const val RANGE_HOLE_INTERVAL_THRESHOLD = 35
     const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 100
     const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
+    val HOLE_CHECK_SKIP_TYPE = listOf(SpaceType.EP, SpaceType.CHARACTER, SpaceType.PERSON)
     private val HOLE_CHECKED_TYPE_SET = mutableSetOf<SpaceType>()
     val HOLE_CHECKED_SET_SIZE_LIMIT: Int
         get() {
@@ -79,7 +80,7 @@ object SpotChecker {
 
     private val HOLE_CHECKED_SET = HashSet<Pair<SpaceType, Int>>() // Maintain in memory
     fun checkIfHolesInTopicListRange(spaceType: SpaceType, topicList: List<Int>): List<Int> {
-        if (spaceType in listOf(SpaceType.EP, SpaceType.CHARACTER, SpaceType.PERSON)) return emptyList()
+        if (spaceType in HOLE_CHECK_SKIP_TYPE) return emptyList()
         HOLE_CHECKED_TYPE_SET.add(spaceType)
         if (HOLE_CHECKED_SET.size >= HOLE_CHECKED_SET_SIZE_LIMIT) {
             LOGGER.info("HOLE_CHECKED_SET size ${HOLE_CHECKED_SET.size} is larger than limit ${HOLE_CHECKED_SET_SIZE_LIMIT}. Clearing.")
@@ -88,7 +89,7 @@ object SpotChecker {
         val holes = mutableListOf<Int>()
         val maxId = topicList.max()
         val fakeTopicList = mutableListOf<Int>().apply {
-            val checkSize = RANGE_HOLE_DETECT_DATE_BACK_LIMIT.coerceAtMost(2 * topicList.size / 3)
+            val checkSize = RANGE_HOLE_DETECT_DATE_BACK_LIMIT.coerceAtMost(topicList.size * 6 / 7)
             val lowerBound = maxId - checkSize + 1
             (lowerBound..maxId).forEach { add(it) }
         }
