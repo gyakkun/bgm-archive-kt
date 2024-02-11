@@ -58,7 +58,7 @@ object FileHistoryLookup {
             log.warn("$this is a bare repository. Will use it as-is to find commit list to a file ")
         }
         val gitProcess = Runtime.getRuntime()
-            .exec("git --no-pager log --pretty=\"%H|%s\" -- $relativePathToRepoFolder", null, gitRepoDir)
+            .exec("git --no-pager log --pretty='%H|%s' -- $relativePathToRepoFolder", null, gitRepoDir)
         val msgList = gitProcess.blockAndPrintProcessResults(printAtStdErr = false)
         val res = this.use { repo ->
             msgList.map {
