@@ -13,35 +13,35 @@ object Dao {
     private val latch = CountDownLatch(1)
 
     init {
-        Flyway.configure()
-            .dataSource(DSProvider.ds)
-            .baselineOnMigrate(true)
-            .baselineVersion("0")
-            .sqlMigrationPrefix("0")
-            .locations("db/migration")
-            .schemas("main")
-            .table("flyway_schema_history")
-            .callbacks(object : Callback {
-                override fun supports(event: Event?, context: Context?): Boolean {
-                    return event!! == Event.AFTER_MIGRATE
-                }
-
-                override fun canHandleInTransaction(p0: Event?, p1: Context?): Boolean {
-                    return true
-                }
-
-                override fun handle(event: Event?, context: Context?) {
-                    latch.countDown()
-                    System.err.println("Migration done!")
-                    return
-                }
-
-                override fun getCallbackName(): String {
-                    return "Hi there!"
-                }
-            })
-            .load()
-            .migrate()
+        // Flyway.configure()
+        //     .dataSource(DSProvider.ds)
+        //     .baselineOnMigrate(true)
+        //     .baselineVersion("0")
+        //     .sqlMigrationPrefix("0")
+        //     .locations("db/migration")
+        //     .schemas("main")
+        //     .table("flyway_schema_history")
+        //     .callbacks(object : Callback {
+        //         override fun supports(event: Event?, context: Context?): Boolean {
+        //             return event!! == Event.AFTER_MIGRATE
+        //         }
+//
+        //         override fun canHandleInTransaction(p0: Event?, p1: Context?): Boolean {
+        //             return true
+        //         }
+//
+        //         override fun handle(event: Event?, context: Context?) {
+        //             latch.countDown()
+        //             System.err.println("Migration done!")
+        //             return
+        //         }
+//
+        //         override fun getCallbackName(): String {
+        //             return "Hi there!"
+        //         }
+        //     })
+        //     .load()
+        //     .migrate()
     }
 
     private val jdbi: Jdbi = Jdbi.create(DSProvider.ds).apply {
@@ -51,7 +51,7 @@ object Dao {
     }
 
     fun bgmDao(): BgmDao {
-        latch.await()
+        // latch.await()
         return jdbi.onDemand(BgmDao::class.java)
             ?: throw IllegalStateException("Should get jdbi dao class but got null")
     }

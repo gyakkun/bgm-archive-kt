@@ -192,11 +192,21 @@
         </dependency>
 
         <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <version>42.7.1</version>
+        </dependency>
+
+        <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
             <version>10.6.0</version>
         </dependency>
-
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+            <version>10.6.0</version>
+        </dependency>
     </dependencies>
 
     <repositories>
@@ -271,6 +281,9 @@
                                     <mainClass>moe.nyamori.bgm.HttpServer</mainClass>
                                 </manifest>
                             </archive>
+                            <descriptors>
+                                <descriptor>src/assembly/my-jar-pack.xml</descriptor>
+                            </descriptors>
                             <descriptorRefs>
                                 <descriptorRef>jar-with-dependencies</descriptorRef>
                             </descriptorRefs>

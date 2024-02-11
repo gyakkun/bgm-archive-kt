@@ -14,9 +14,11 @@ object DSProvider {
             }
         }
         val hikariConfig = HikariConfig().apply {
-            jdbcUrl = "jdbc:sqlite:" + Config.BGM_ARCHIVE_SQLITE_FILE
-            driverClassName = "org.sqlite.JDBC"
-            poolName = "SQLitePool"
+            jdbcUrl = "jdbc:postgresql://localhost:5432/postgres"
+            // jdbcUrl = "jdbc:sqlite:" + Config.BGM_ARCHIVE_SQLITE_FILE
+            // driverClassName = "org.sqlite.JDBC"
+            // poolName = "SQLitePool"
+            poolName = "PgPool"
             // isAutoCommit = false
             minimumIdle = 2
             maximumPoolSize = 8
