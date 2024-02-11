@@ -100,10 +100,10 @@ object GitHelper {
 
     fun Repository.getRevCommitById(id: String): RevCommit {
         this.use { repo ->
-            // val revWalk = RevWalk(repo)
-            // val revId = repo.resolve(id)
-            // val revCommit = revWalk.parseCommit(revId)
-            return repo.parseCommit(ObjectId.fromString(id))
+            val revWalk = RevWalk(repo)
+            val revId = repo.resolve(id)
+            val revCommit = revWalk.parseCommit(revId)
+            return revCommit
         }
     }
 
