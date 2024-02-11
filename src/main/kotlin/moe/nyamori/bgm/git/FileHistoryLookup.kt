@@ -52,25 +52,17 @@ object FileHistoryLookup {
         var gitRepoDir = this.directory
         if (gitRepoDir.isFile) throw IllegalStateException("Git repo directory should not be a file!")
         if (gitRepoDir.name == DOT_GIT) {
-            log.debug(
-                "{} is a bare repository?={}. Locating parent work tree folder: {}",
-                this,
-                this.isBare,
-                gitRepoDir.parentFile
-            )
+            log.info("$this is not a bare repository?=${this.isBare}. Locating parent work tree folder: ${gitRepoDir.parentFile}")
             gitRepoDir = gitRepoDir.parentFile
         } else {
             log.warn("$this is a bare repository. Will use it as-is to find commit list to a file ")
         }
-        val timing = System.currentTimeMillis()
-        val cmd = "git --no-pager log --pretty=%H -- $relativePathToRepoFolder"
         val gitProcess = Runtime.getRuntime()
-            .exec(cmd, null, gitRepoDir)
-        val msgList = gitProcess.blockAndPrintProcessResults(toLines = true, printAtStdErr = false)
-        log.info("External git get log timing: ${System.currentTimeMillis() - timing}ms")
+            .exec("git --no-pager log --pretty='%H|%s' -- $relativePathToRepoFolder", null, gitRepoDir)
+        val msgList = gitProcess.blockAndPrintProcessResults(printAtStdErr = false)
         val res = this.use { repo ->
             msgList.map {
-                val commitHashStr = it
+                val commitHashStr = it.split("|")[0]
                 repo.parseCommit(ObjectId.fromString(commitHashStr))
             }
         }
@@ -78,7 +70,6 @@ object FileHistoryLookup {
     }.onFailure {
         log.error("Failed to get rev commit list by calling external git process: ", it)
     }.getOrElse {
-        log.warn("Fall back to jgit get commit history for $relativePathToRepoFolder at $this")
         val result = ArrayList<RevCommit>()
         Git(this).use { git ->
             val commitList = git.log()

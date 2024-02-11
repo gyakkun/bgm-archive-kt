@@ -375,26 +375,21 @@ object CommitToJsonProcessor {
         }
     }
 
-    fun Process.blockAndPrintProcessResults(
-        toLines: Boolean = true,
-        printAtStdErr: Boolean = true
-    ): List<String> {
+    fun Process.blockAndPrintProcessResults(printAtStdErr: Boolean = true): List<String> {
         val result = CopyOnWriteArrayList<String?>()
         // Here actually block the process
         listOf(this.errorStream, this.inputStream).forEach { out ->
             thread {
-                out.use { outUsing ->
-                    InputStreamReader(outUsing).use { isr ->
-                        if (!toLines) result.add(isr.readText())
-                        else
-                            BufferedReader(isr).use { reader ->
-                                var line: String?
-                                // reader.readLine()
-                                while (reader.readLine().also { line = it } != null) {
-                                    if (printAtStdErr) System.err.println(line)
-                                    result.add(line)
-                                }
+                out.use {
+                    InputStreamReader(out).use { isr ->
+                        BufferedReader(isr).use { reader ->
+                            var line: String?
+                            // reader.readLine()
+                            while (reader.readLine().also { line = it } != null) {
+                                if (printAtStdErr) System.err.println(line)
+                                result.add(line)
                             }
+                        }
                     }
                 }
             }
