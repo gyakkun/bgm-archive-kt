@@ -51,7 +51,11 @@ object CommitToJsonProcessor {
             }
         }
 
+        var shouldSpotCheck = true
+        var firstCommitSpaceType: SpaceType? = null
+        var repoCounter = 0
         reposToProcess.forEach { archiveRepo ->
+            repoCounter++
             val walk =
                 archiveRepo.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder()
             val jsonRepo = archiveRepo.couplingJsonRepo()!!
@@ -96,7 +100,7 @@ object CommitToJsonProcessor {
                         } else {
                             throw IllegalStateException("Not a valid commit message! - ${curCommit.shortMessage}")
                         }
-
+                        if (firstCommitSpaceType == null) firstCommitSpaceType = commitSpaceType
                         val changedFilePathList = archiveRepo.findChangedFilePaths(prev, curCommit)
 
                         for (pathIdx in changedFilePathList.indices) {
@@ -192,7 +196,9 @@ object CommitToJsonProcessor {
                                     )
                                 }"
                             )
-                        } else if (commitIdx != 0) {
+                            shouldSpotCheck = false
+                        }
+                        if (commitIdx != 0) {
                             log.warn(
                                 "Not processing the first commit. Not generating spot check file for safety. Cur commit: ${
                                     ObjectId.toString(
@@ -200,8 +206,11 @@ object CommitToJsonProcessor {
                                     )
                                 }"
                             )
-                        } else {
-                            SpotChecker.genSpotCheckListFile(archiveRepo, commitSpaceType)
+                            shouldSpotCheck = false
+                        }
+                        if (repoCounter != 1) {
+                            log.warn("Processing more than one archive repo. Skipping spot check.")
+                            shouldSpotCheck = false
                         }
                     } catch (ex: Exception) {
                         log.error(
@@ -212,6 +221,15 @@ object CommitToJsonProcessor {
                                 )
                             } - ${curCommit.shortMessage}", ex
                         )
+                    }
+                }
+                runCatching {
+                    if (shouldSpotCheck && firstCommitSpaceType != null) {
+                        SpotChecker.genSpotCheckListFile(archiveRepo, firstCommitSpaceType!!)
+                    }
+                }.onFailure {
+                    if (shouldSpotCheck && firstCommitSpaceType != null) {
+                        log.error("Failed at spot check. SpaceType=${firstCommitSpaceType!!}")
                     }
                 }
             }
