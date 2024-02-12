@@ -7,6 +7,7 @@ import com.ibm.icu.text.CharsetDetector
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
 import moe.nyamori.bgm.db.Dao
+import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.diff.DiffEntry.DEV_NULL
 import org.eclipse.jgit.lib.Constants.DOT_GIT
@@ -183,8 +184,28 @@ object GitHelper {
         return getRepoByPath(Config.BGM_ARCHIVE_GIT_REPO_DIR)
     }
 
-    fun Repository.getFileContentAsStringInACommit(commit: RevCommit, path: String): String {
-        TreeWalk.forPath(this, path, commit.tree).use { treeWalk ->
+    fun Repository.getFileContentAsStringInACommit(commit: RevCommit, relativePathToRepoFolder: String)
+            : String = runCatching {
+        var gitRepoDir = this.directory
+        if (gitRepoDir.isFile) throw IllegalStateException("Git repo directory should not be a file!")
+        if (gitRepoDir.name == DOT_GIT) {
+            log.info("$this is a bare repository?=${this.isBare}. Locating parent work tree folder: ${gitRepoDir.parentFile}")
+            gitRepoDir = gitRepoDir.parentFile
+        } else {
+            log.warn("$this is a bare repository. Will use it as-is to find commit list to a file ")
+        }
+        val timing = System.currentTimeMillis()
+        val cmd = "git --no-pager show ${ObjectId.toString(commit.id)}:$relativePathToRepoFolder"
+        val gitProcess = Runtime.getRuntime()
+            .exec(cmd, null, gitRepoDir)
+        val msgList = gitProcess.blockAndPrintProcessResults(toLines = false, printAtStdErr = false)
+        log.info("External git get file content: ${System.currentTimeMillis() - timing}ms")
+        log.info("msgListLen = ${msgList.size}")
+        msgList.joinToString("\n")
+    }.onFailure {
+        log.error("Failed to get file content as string ")
+    }.getOrElse {
+        TreeWalk.forPath(this, relativePathToRepoFolder, commit.tree).use { treeWalk ->
             val blobId: ObjectId = treeWalk.getObjectId(0)
             this.newObjectReader().use { objectReader ->
                 val objectLoader: ObjectLoader = objectReader.open(blobId)
@@ -197,7 +218,7 @@ object GitHelper {
                     StandardCharsets.UTF_8.name()
                 } else {
                     if (cm.name != StandardCharsets.UTF_8.name()) {
-                        log.warn("Select charset ${cm.name} for $path at commit ${commit.shortMessage}")
+                        log.warn("Select charset ${cm.name} for $relativePathToRepoFolder at commit ${commit.shortMessage}")
                     }
                     cm.name
                 }
