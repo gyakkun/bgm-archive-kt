@@ -184,7 +184,8 @@ object GitHelper {
         return getRepoByPath(Config.BGM_ARCHIVE_GIT_REPO_DIR)
     }
 
-    fun Repository.getFileContentAsInputStreamInACommit(commit: RevCommit , relativePathToRepoFolder: String) = runCatching {
+    fun Repository.getFileContentAsStringInACommit(commit: RevCommit, relativePathToRepoFolder: String)
+            : String = runCatching {
         var gitRepoDir = this.directory
         if (gitRepoDir.isFile) throw IllegalStateException("Git repo directory should not be a file!")
         if (gitRepoDir.name == DOT_GIT) {
@@ -197,20 +198,13 @@ object GitHelper {
         val cmd = "git --no-pager show ${ObjectId.toString(commit.id)}:$relativePathToRepoFolder"
         val gitProcess = Runtime.getRuntime()
             .exec(cmd, null, gitRepoDir)
-        val ins = (gitProcess.blockAndPrintProcessResults(
-            directStdOutStream = true,
-            printAtStdErr = false
-        ) as CommitToJsonProcessor.OfInputStream).ins
+        val msgList = gitProcess.blockAndPrintProcessResults(toLines = false, printAtStdErr = false)
         log.info("External git get file content: ${System.currentTimeMillis() - timing}ms")
-        ins
+        log.info("msgListLen = ${msgList.size}")
+        msgList.joinToString("\n")
     }.onFailure {
-        log.error("Failed to get file content as input stream: ", it)
+        log.error("Failed to get file content as string ")
     }.getOrElse {
-        this.getFileContentAsStringInACommit(commit,relativePathToRepoFolder).byteInputStream()
-    }
-
-    fun Repository.getFileContentAsStringInACommit(commit: RevCommit, relativePathToRepoFolder: String)
-            : String = run {
         TreeWalk.forPath(this, relativePathToRepoFolder, commit.tree).use { treeWalk ->
             val blobId: ObjectId = treeWalk.getObjectId(0)
             this.newObjectReader().use { objectReader ->

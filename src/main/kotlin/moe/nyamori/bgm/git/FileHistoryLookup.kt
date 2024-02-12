@@ -5,7 +5,6 @@ import com.github.benmanes.caffeine.cache.LoadingCache
 import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
 import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
-import moe.nyamori.bgm.git.GitHelper.getFileContentAsInputStreamInACommit
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants.DOT_GIT
@@ -13,7 +12,6 @@ import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
 import org.slf4j.LoggerFactory
-import java.io.InputStream
 import java.sql.Timestamp
 import java.time.Duration
 import java.util.*
@@ -68,10 +66,7 @@ object FileHistoryLookup {
         val cmd = "git --no-pager log --pretty=%H -- $relativePathToRepoFolder"
         val gitProcess = Runtime.getRuntime()
             .exec(cmd, null, gitRepoDir)
-        val msgList = (gitProcess.blockAndPrintProcessResults(
-            directStdOutStream = false,
-            printAtStdErr = false
-        ) as CommitToJsonProcessor.ListOfString).strList
+        val msgList = gitProcess.blockAndPrintProcessResults(toLines = true, printAtStdErr = false)
         log.info("External git get log timing: ${System.currentTimeMillis() - timing}ms")
         val res = this.use { repo ->
             msgList.map {
@@ -108,17 +103,31 @@ object FileHistoryLookup {
         return result
     }
 
+    fun getJsonCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit? {
+        return allJsonRepoListSingleton.firstNotNullOfOrNull {
+            runCatching { getCommitAtTimestampByPath(it, relativePathToRepoFolder, timestamp) }
+                .getOrNull()
+        }
+    }
+
+    fun getArchiveCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit? {
+        return allArchiveRepoListSingleton.firstNotNullOfOrNull {
+            runCatching { getCommitAtTimestampByPath(it, relativePathToRepoFolder, timestamp) }
+                .getOrNull()
+        }
+    }
+
     fun getCommitAtTimestampByPath(repo: Repository, relativePathToRepoFolder: String, timestamp: Long): RevCommit {
         val m: Map<Long, RevCommit> = repoPathToRevCommitCache.get(Pair(repo, relativePathToRepoFolder))
         if (!m.containsKey(timestamp)) throw IllegalArgumentException("Timestamp $timestamp not in commit history")
         return m[timestamp]!!
     }
 
-    fun getArchiveFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): InputStream {
+    fun getArchiveFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): String {
         allArchiveRepoListSingleton.forEach {
             val timestampRevCommitMap = repoPathToRevCommitCache.get(Pair(it, relativePath))
             if (timestampRevCommitMap[timestamp] != null) {
-                return it.getFileContentAsInputStreamInACommit(timestampRevCommitMap[timestamp]!!, relativePath)
+                return it.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!, relativePath)
             }
         }
 
@@ -131,11 +140,11 @@ object FileHistoryLookup {
         )
     }
 
-    fun getJsonFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): InputStream {
+    fun getJsonFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): String {
         allJsonRepoListSingleton.forEach {
             val timestampRevCommitMap = repoPathToRevCommitCache.get(Pair(it, relativePath))
             if (timestampRevCommitMap[timestamp] != null) {
-                return it.getFileContentAsInputStreamInACommit(timestampRevCommitMap[timestamp]!!, relativePath)
+                return it.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!, relativePath)
             }
         }
 
