@@ -1,6 +1,5 @@
 package moe.nyamori.bgm.util
 
-import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
@@ -20,15 +19,9 @@ fun Process.blockAndPrintProcessResults(
         out.use { outUsing ->
             InputStreamReader(outUsing, UTF_8).use { isr ->
                 if (!toLines) result.add(isr.readText())
-                else
-                    BufferedReader(isr).use { reader ->
-                        var line: String?
-                        // reader.readLine()
-                        while (reader.readLine().also { line = it } != null) {
-                            if (printAtStdErr) System.err.println(line)
-                            result.add(line)
-                        }
-                    }
+                else result.addAll(isr.readText().lines())
+
+                if(printAtStdErr) System.err.println(result)
             }
         }
         latch.countDown()
