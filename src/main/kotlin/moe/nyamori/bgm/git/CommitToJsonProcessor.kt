@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.*
+import java.util.concurrent.CopyOnWriteArrayList
+import kotlin.concurrent.thread
 
 
 object CommitToJsonProcessor {
@@ -373,21 +375,26 @@ object CommitToJsonProcessor {
         }
     }
 
-    fun Process.blockAndPrintProcessResults(): List<String> {
-        val result = ArrayList<String?>()
+    fun Process.blockAndPrintProcessResults(printAtStdErr: Boolean = true): List<String> {
+        val result = CopyOnWriteArrayList<String?>()
         // Here actually block the process
-        listOf(this.errorStream, this.inputStream).forEach {
-            InputStreamReader(it).use { isr ->
-                BufferedReader(isr).use { reader ->
-                    var line: String?
-                    // reader.readLine()
-                    while (reader.readLine().also { line = it } != null) {
-                        System.err.println(line)
-                        result.add(line)
+        listOf(this.errorStream, this.inputStream).forEach { out ->
+            thread {
+                out.use {
+                    InputStreamReader(out).use { isr ->
+                        BufferedReader(isr).use { reader ->
+                            var line: String?
+                            // reader.readLine()
+                            while (reader.readLine().also { line = it } != null) {
+                                if (printAtStdErr) System.err.println(line)
+                                result.add(line)
+                            }
+                        }
                     }
                 }
             }
         }
+        this.waitFor()
         return result.filterNotNull()
     }
 

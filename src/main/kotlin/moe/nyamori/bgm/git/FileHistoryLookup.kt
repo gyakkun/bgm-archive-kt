@@ -2,18 +2,24 @@ package moe.nyamori.bgm.git
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.LoadingCache
+import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
 import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.lib.Constants.DOT_GIT
+import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
+import org.slf4j.LoggerFactory
 import java.sql.Timestamp
 import java.time.Duration
 import java.util.*
 
 
 object FileHistoryLookup {
+    private val log = LoggerFactory.getLogger(FileHistoryLookup::class.java)
+
     @JvmStatic
     fun main(args: Array<String>) {
 
@@ -23,8 +29,8 @@ object FileHistoryLookup {
         Caffeine.newBuilder()
             .maximumSize(10)
             .expireAfterWrite(Duration.ofMinutes(30))
-            .build { key ->
-                getTimestampCommitMapFromRevCommitList(key.first.getRevCommitList(key.second))
+            .build { (repo, relPath) ->
+                getTimestampCommitMapFromRevCommitList(repo.getRevCommitList(relPath))
             }
 
 
@@ -42,8 +48,28 @@ object FileHistoryLookup {
         }.flatten().sorted()
     }
 
-
-    fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<RevCommit> {
+    fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<RevCommit> = runCatching {
+        var gitRepoDir = this.directory
+        if (gitRepoDir.isFile) throw IllegalStateException("Git repo directory should not be a file!")
+        if (gitRepoDir.name == DOT_GIT) {
+            log.info("$this is not a bare repository?=${this.isBare}. Locating parent work tree folder: ${gitRepoDir.parentFile}")
+            gitRepoDir = gitRepoDir.parentFile
+        } else {
+            log.warn("$this is a bare repository. Will use it as-is to find commit list to a file ")
+        }
+        val gitProcess = Runtime.getRuntime()
+            .exec("git --no-pager log --pretty=\"%H|%s\" -- $relativePathToRepoFolder", null, gitRepoDir)
+        val msgList = gitProcess.blockAndPrintProcessResults(printAtStdErr = false)
+        val res = this.use { repo ->
+            msgList.map {
+                val commitHashStr = it.split("|")[0]
+                repo.parseCommit(ObjectId.fromString(commitHashStr))
+            }
+        }
+        res
+    }.onFailure {
+        log.error("Failed to get rev commit list by calling external git process: ", it)
+    }.getOrElse {
         val result = ArrayList<RevCommit>()
         Git(this).use { git ->
             val commitList = git.log()
@@ -51,7 +77,7 @@ object FileHistoryLookup {
                 .call()
             commitList.forEach { result.add(it) }
         }
-        return result
+        result
     }
 
     private fun getTimestampCommitMapFromRevCommitList(revCommitList: List<RevCommit>): Map<Long, RevCommit> {
