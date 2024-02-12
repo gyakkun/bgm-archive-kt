@@ -2,9 +2,7 @@ package moe.nyamori.bgm.git
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.LoadingCache
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
@@ -39,21 +37,25 @@ object FileHistoryLookup {
 
 
     fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> = runBlocking {
-        allJsonRepoListSingleton.map {
-            async {
-                repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
-                    .keys
-            }
-        }.awaitAll().flatten().sorted()
+        withContext(Dispatchers.IO) {
+            allJsonRepoListSingleton.map {
+                async {
+                    repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
+                        .keys
+                }
+            }.awaitAll().flatten().sorted()
+        }
     }
 
     fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> = runBlocking {
-        allArchiveRepoListSingleton.map {
-            async {
-                repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
-                    .keys
-            }
-        }.awaitAll().flatten().sorted()
+        withContext(Dispatchers.IO) {
+            allArchiveRepoListSingleton.map {
+                async {
+                    repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
+                        .keys
+                }
+            }.awaitAll().flatten().sorted()
+        }
     }
 
     fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<CommitHashAndTimestampAndMsg> =
@@ -75,8 +77,8 @@ object FileHistoryLookup {
             val cmd = "git --no-pager log --pretty=\\\"%H|%ct|%s\\\" -- $relativePathToRepoFolder"
             val gitProcess = Runtime.getRuntime()
                 .exec(cmd, null, gitRepoDir)
-            val cmdOut = gitProcess.blockAndPrintProcessResults(toLines = true, printAtStdErr = false)
-            log.info("$this External git get log timing: ${System.currentTimeMillis() - timing}ms")
+            val cmdOut = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = true, printAtStdErr = false)
+            log.info("$this External git get log timing: ${System.currentTimeMillis() - timing}ms. RelPath: $relativePathToRepoFolder")
             cmdOut
                 .map { it.replace("\\", "").replace("\"", "") }
                 .map {
@@ -100,7 +102,10 @@ object FileHistoryLookup {
                     )
                 }.filterNotNull()
         }.onFailure {
-            log.error("$this Failed to get rev commit list by calling external git process: ", it)
+            log.error(
+                "$this Failed to get rev commit list at $relativePathToRepoFolder by calling external git process: ",
+                it
+            )
         }.getOrElse {
             log.warn("Fall back to jgit get commit history for $relativePathToRepoFolder at $this")
             Git(this).use { git ->

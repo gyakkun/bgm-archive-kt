@@ -319,12 +319,13 @@ object CommitToJsonProcessor {
         log.debug("Git command: $gitAddCommand")
         val addPathProcess = Runtime.getRuntime()
             .exec(gitAddCommand, null, jsonRepoDir)
-        addPathProcess.blockAndPrintProcessResults()
+        addPathProcess.blockAndPrintProcessResults(cmd = gitAddCommand)
         log.info("Complete git add")
         log.info("About to git commit")
+        val gitCommitCmd = "git commit --quiet -F " + commitMsgFile.absolutePath
         val gitProcess = Runtime.getRuntime()
-            .exec("git commit --quiet -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
-        gitProcess.blockAndPrintProcessResults()
+            .exec(gitCommitCmd, null, jsonRepoDir)
+        gitProcess.blockAndPrintProcessResults(cmd = gitCommitCmd)
         log.info("Complete git commit")
         commitMsgFile.delete()
     }
@@ -339,14 +340,16 @@ object CommitToJsonProcessor {
             it.flush()
         }
         log.info("About to git add")
+        val gitAddAsterisk = "git add *"
         var gitProcess = Runtime.getRuntime()
-            .exec("git add *", null, jsonRepoDir)
-        gitProcess.blockAndPrintProcessResults()
+            .exec(gitAddAsterisk, null, jsonRepoDir)
+        gitProcess.blockAndPrintProcessResults(cmd = gitAddAsterisk)
         log.info("Complete git add")
         log.info("About to git commit")
+        val gitCommitCmd = "git commit --quiet -F " + commitMsgFile.absolutePath
         gitProcess = Runtime.getRuntime()
-            .exec("git commit --quiet -F " + commitMsgFile.absolutePath, null, jsonRepoDir)
-        gitProcess.blockAndPrintProcessResults()
+            .exec(gitCommitCmd, null, jsonRepoDir)
+        gitProcess.blockAndPrintProcessResults(cmd = gitCommitCmd)
         log.info("Complete git commit")
         commitMsgFile.delete()
     }

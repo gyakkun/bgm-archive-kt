@@ -189,7 +189,12 @@ object GitHelper {
         var gitRepoDir = this.directory
         if (gitRepoDir.isFile) throw IllegalStateException("Git repo directory should not be a file!")
         if (gitRepoDir.name == DOT_GIT) {
-            log.info("$this is a bare repository?=${this.isBare}. Locating parent work tree folder: ${gitRepoDir.parentFile}")
+            log.debug(
+                "{} is a bare repository?={}. Locating parent work tree folder: {}",
+                this,
+                this.isBare,
+                gitRepoDir.parentFile
+            )
             gitRepoDir = gitRepoDir.parentFile
         } else {
             log.warn("$this is a bare repository. Will use it as-is to find commit list to a file ")
@@ -198,12 +203,12 @@ object GitHelper {
         val cmd = "git --no-pager show $commitId:$relativePathToRepoFolder"
         val gitProcess = Runtime.getRuntime()
             .exec(cmd, null, gitRepoDir)
-        val msgList = gitProcess.blockAndPrintProcessResults(toLines = false, printAtStdErr = false)
-        log.info("$this External git get file content: ${System.currentTimeMillis() - timing}ms")
+        val msgList = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = false, printAtStdErr = false)
+        log.info("$this External git get file content: ${System.currentTimeMillis() - timing}ms. RelPath: $relativePathToRepoFolder")
         log.info("msgListLen = ${msgList.size}")
         msgList.joinToString("\n")
     }.onFailure {
-        log.error("$this Failed to get file content as string: ", it)
+        log.error("$this Failed to get file content as string at $relativePathToRepoFolder: ", it)
     }.getOrElse {
         val revCommit = this.parseCommit(ObjectId.fromString(commitId))
         if (revCommit == null) {

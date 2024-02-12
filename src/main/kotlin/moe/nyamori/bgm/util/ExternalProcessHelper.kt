@@ -1,15 +1,21 @@
 package moe.nyamori.bgm.util
 
+import org.slf4j.LoggerFactory
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
+private val log = LoggerFactory.getLogger("ExternalProcessHelper")
+
 fun Process.blockAndPrintProcessResults(
+    cmd: String? = null,
     toLines: Boolean = true,
     printAtStdErr: Boolean = true
 ): List<String> {
+    cmd?.let { log.info("Running external process: $it") }
     val result = CopyOnWriteArrayList<String?>()
     val latch = CountDownLatch(2)
     // Here actually block the process
@@ -32,6 +38,6 @@ fun Process.blockAndPrintProcessResults(
         }
     }
     this.waitFor()
-    latch.await()
+    latch.await(60, TimeUnit.SECONDS)
     return result.filterNotNull()
 }
