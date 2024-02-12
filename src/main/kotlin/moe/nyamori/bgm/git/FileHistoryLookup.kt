@@ -36,17 +36,17 @@ object FileHistoryLookup {
 
 
     fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> {
-        return allJsonRepoListSingleton.map {
+        return allJsonRepoListSingleton.stream().parallel().map {
             repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
                 .keys
-        }.flatten().sorted()
+        }.flatMap { it.stream() }.sorted().toList()
     }
 
     fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> {
-        return allArchiveRepoListSingleton.map {
+        return allArchiveRepoListSingleton.stream().parallel().map {
             repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
                 .keys
-        }.flatten().sorted()
+        }.flatMap { it.stream() }.sorted().toList()
     }
 
     fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<CommitHashAndTimestampAndMsg> =
