@@ -2,7 +2,7 @@ package moe.nyamori.bgm.git
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.LoadingCache
-import kotlinx.coroutines.*
+import com.github.benmanes.caffeine.cache.Scheduler
 import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
@@ -30,33 +30,25 @@ object FileHistoryLookup {
     private val repoPathToRevCommitCache: LoadingCache<Pair<Repository, String>, Map<Long, CommitHashAndTimestampAndMsg>> =
         Caffeine.newBuilder()
             .maximumSize(100)
+            .scheduler(Scheduler.systemScheduler())
+            .expireAfterAccess(Duration.ofMinutes(30))
             .expireAfterWrite(Duration.ofMinutes(30))
             .build { (repo, relPath) ->
                 getTimestampCommitMapFromRevCommitList(repo.getRevCommitList(relPath))
             }
 
 
-    fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> = runBlocking {
-        withContext(Dispatchers.IO) {
-            allJsonRepoListSingleton.map {
-                async {
+    fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> =
+        allJsonRepoListSingleton.parallelStream().map {
                     repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
                         .keys
-                }
-            }.awaitAll().flatten().sorted()
-        }
-    }
+        }.flatMap { it.stream() }.sorted().toList()
 
-    fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> = runBlocking {
-        withContext(Dispatchers.IO) {
-            allArchiveRepoListSingleton.map {
-                async {
+    fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> =
+        allArchiveRepoListSingleton.parallelStream().map {
                     repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
                         .keys
-                }
-            }.awaitAll().flatten().sorted()
-        }
-    }
+        }.flatMap { it.stream() }.sorted().toList()
 
     fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<CommitHashAndTimestampAndMsg> =
         runCatching {
