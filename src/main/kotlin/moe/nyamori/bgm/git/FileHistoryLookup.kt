@@ -10,7 +10,6 @@ import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants.DOT_GIT
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Repository
-import org.eclipse.jgit.revwalk.RevCommit
 import org.slf4j.LoggerFactory
 import java.sql.Timestamp
 import java.time.Duration
@@ -25,9 +24,11 @@ object FileHistoryLookup {
 
     }
 
-    private val repoPathToRevCommitCache: LoadingCache<Pair<Repository, String>, Map<Long, RevCommit>> =
+    data class CommitHashAndTimestampAndMsg(val hash: String, val timestamp: Long, val msg: String)
+
+    private val repoPathToRevCommitCache: LoadingCache<Pair<Repository, String>, Map<Long, CommitHashAndTimestampAndMsg>> =
         Caffeine.newBuilder()
-            .maximumSize(10)
+            .maximumSize(100)
             .expireAfterWrite(Duration.ofMinutes(30))
             .build { (repo, relPath) ->
                 getTimestampCommitMapFromRevCommitList(repo.getRevCommitList(relPath))
@@ -48,77 +49,83 @@ object FileHistoryLookup {
         }.flatten().sorted()
     }
 
-    fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<RevCommit> = runCatching {
-        var gitRepoDir = this.directory
-        if (gitRepoDir.isFile) throw IllegalStateException("Git repo directory should not be a file!")
-        if (gitRepoDir.name == DOT_GIT) {
-            log.debug(
-                "{} is a bare repository?={}. Locating parent work tree folder: {}",
-                this,
-                this.isBare,
-                gitRepoDir.parentFile
-            )
-            gitRepoDir = gitRepoDir.parentFile
-        } else {
-            log.warn("$this is a bare repository. Will use it as-is to find commit list to a file ")
-        }
-        val timing = System.currentTimeMillis()
-        val cmd = "git --no-pager log --pretty=%H -- $relativePathToRepoFolder"
-        val gitProcess = Runtime.getRuntime()
-            .exec(cmd, null, gitRepoDir)
-        val msgList = gitProcess.blockAndPrintProcessResults(toLines = true, printAtStdErr = false)
-        log.info("External git get log timing: ${System.currentTimeMillis() - timing}ms")
-        val res = this.use { repo ->
-            msgList.map {
-                val commitHashStr = it
-                repo.parseCommit(ObjectId.fromString(commitHashStr))
+    fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<CommitHashAndTimestampAndMsg> =
+        runCatching {
+            var gitRepoDir = this.directory
+            if (gitRepoDir.isFile) throw IllegalStateException("Git repo directory should not be a file!")
+            if (gitRepoDir.name == DOT_GIT) {
+                log.debug(
+                    "{} is a bare repository?={}. Locating parent work tree folder: {}",
+                    this,
+                    this.isBare,
+                    gitRepoDir.parentFile
+                )
+                gitRepoDir = gitRepoDir.parentFile
+            } else {
+                log.warn("$this is a bare repository. Will use it as-is to find commit list to a file ")
+            }
+            val timing = System.currentTimeMillis()
+            val cmd = "git --no-pager log --pretty=\\\"%H|%ct|%s\\\" -- $relativePathToRepoFolder"
+            val gitProcess = Runtime.getRuntime()
+                .exec(cmd, null, gitRepoDir)
+            val cmdOut = gitProcess.blockAndPrintProcessResults(toLines = true, printAtStdErr = false)
+            log.info("External git get log timing: ${System.currentTimeMillis() - timing}ms")
+            cmdOut
+                .map { it.replace("\\", "").replace("\"", "") }
+                .map {
+                    val firstVerticalBarIdx = it.indexOfFirst { it == '|' }
+                    if (firstVerticalBarIdx < 0) {
+                        log.error("No vertical bar (|) found in prettied msg: $it")
+                        return@map null
+                    }
+                    val secVerticalBarIdx = it.indexOf('|', firstVerticalBarIdx + 1)
+                    if (secVerticalBarIdx < 0) {
+                        log.error("The second vertical bar (|) not found in prettied msg: $it")
+                        return@map null
+                    }
+                    // Sec
+                    val timestamp =
+                        it.substring(firstVerticalBarIdx + 1, secVerticalBarIdx).toLongOrNull() ?: return@map null
+                    CommitHashAndTimestampAndMsg(
+                        it.substring(0, firstVerticalBarIdx),
+                        timestamp,
+                        it.substring(secVerticalBarIdx + 1)
+                    )
+                }.filterNotNull()
+        }.onFailure {
+            log.error("Failed to get rev commit list by calling external git process: ", it)
+        }.getOrElse {
+            log.warn("Fall back to jgit get commit history for $relativePathToRepoFolder at $this")
+            Git(this).use { git ->
+                val commitList = git.log()
+                    .addPath(relativePathToRepoFolder)
+                    .call()
+                commitList.map {
+                    CommitHashAndTimestampAndMsg(
+                        ObjectId.toString(it.id),
+                        it.commitTime.toLong(), // Sec
+                        it.fullMessage
+                    )
+                }
             }
         }
-        res
-    }.onFailure {
-        log.error("Failed to get rev commit list by calling external git process: ", it)
-    }.getOrElse {
-        log.warn("Fall back to jgit get commit history for $relativePathToRepoFolder at $this")
-        val result = ArrayList<RevCommit>()
-        Git(this).use { git ->
-            val commitList = git.log()
-                .addPath(relativePathToRepoFolder)
-                .call()
-            commitList.forEach { result.add(it) }
-        }
-        result
-    }
 
-    private fun getTimestampCommitMapFromRevCommitList(revCommitList: List<RevCommit>): Map<Long, RevCommit> {
-        val result = TreeMap<Long, RevCommit>()
-        revCommitList.forEach {
-            if (it.fullMessage.startsWith("META") || it.fullMessage.startsWith("init")) return@forEach
-            val ts = it.fullMessage.split("|").last().trim().toLongOrNull() ?: return@forEach
+    private fun getTimestampCommitMapFromRevCommitList(revCommitIdList: List<CommitHashAndTimestampAndMsg>): Map<Long, CommitHashAndTimestampAndMsg/*commit id*/> {
+        val result = TreeMap<Long, CommitHashAndTimestampAndMsg>()
+        revCommitIdList.forEach {
+            if (it.msg.startsWith("META") || it.msg.startsWith("init")) return@forEach
+            val ts = it.msg.split("|").last().trim().toLongOrNull() ?: return@forEach
             result[ts] = it
         }
         // Workaround for historical files added in META commit
-        if (result.isEmpty() && revCommitList.isNotEmpty()) {
-            result[revCommitList.first().commitTime.toLong() * 1000] = revCommitList.first()
+        if (result.isEmpty() && revCommitIdList.isNotEmpty()) {
+            result[revCommitIdList.first().timestamp * 1000] = revCommitIdList.first()
         }
         return result
     }
 
-    fun getJsonCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit? {
-        return allJsonRepoListSingleton.firstNotNullOfOrNull {
-            runCatching { getCommitAtTimestampByPath(it, relativePathToRepoFolder, timestamp) }
-                .getOrNull()
-        }
-    }
-
-    fun getArchiveCommitAtTimestamp(relativePathToRepoFolder: String, timestamp: Long): RevCommit? {
-        return allArchiveRepoListSingleton.firstNotNullOfOrNull {
-            runCatching { getCommitAtTimestampByPath(it, relativePathToRepoFolder, timestamp) }
-                .getOrNull()
-        }
-    }
-
-    fun getCommitAtTimestampByPath(repo: Repository, relativePathToRepoFolder: String, timestamp: Long): RevCommit {
-        val m: Map<Long, RevCommit> = repoPathToRevCommitCache.get(Pair(repo, relativePathToRepoFolder))
+    fun getCommitAtTimestampByPath(repo: Repository, relativePathToRepoFolder: String, timestamp: Long): CommitHashAndTimestampAndMsg {
+        val m: Map<Long, CommitHashAndTimestampAndMsg> = repoPathToRevCommitCache.get(Pair(repo, relativePathToRepoFolder))
         if (!m.containsKey(timestamp)) throw IllegalArgumentException("Timestamp $timestamp not in commit history")
         return m[timestamp]!!
     }
@@ -127,7 +134,7 @@ object FileHistoryLookup {
         allArchiveRepoListSingleton.forEach {
             val timestampRevCommitMap = repoPathToRevCommitCache.get(Pair(it, relativePath))
             if (timestampRevCommitMap[timestamp] != null) {
-                return it.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!, relativePath)
+                return it.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!.hash, relativePath)
             }
         }
 
@@ -144,7 +151,7 @@ object FileHistoryLookup {
         allJsonRepoListSingleton.forEach {
             val timestampRevCommitMap = repoPathToRevCommitCache.get(Pair(it, relativePath))
             if (timestampRevCommitMap[timestamp] != null) {
-                return it.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!, relativePath)
+                return it.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!.hash, relativePath)
             }
         }
 

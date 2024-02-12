@@ -135,7 +135,7 @@ object CommitToJsonProcessor {
                                     log.error("At commit -  ${curCommit.name}, repo - ${archiveRepo.simpleName()}, path = $path")
                                 }
 
-                                val fileContentInStr = archiveRepo.getFileContentAsStringInACommit(curCommit, path)
+                                val fileContentInStr = archiveRepo.getFileContentAsStringInACommit(ObjectId.toString(curCommit.id), path)
                                 val topicId = path.split("/").last().replace(".html", "").toInt()
 
                                 var timing = System.currentTimeMillis()

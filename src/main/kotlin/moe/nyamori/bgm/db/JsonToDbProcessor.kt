@@ -95,7 +95,7 @@ object JsonToDbProcessor {
                         LOGGER.info("Path ${jsonRepo.simpleName()}/$path")
                         var jsonStr = "NOT READY YET"
                         runCatching {
-                            jsonStr = jsonRepo.getFileContentAsStringInACommit(cur, path)
+                            jsonStr = jsonRepo.getFileContentAsStringInACommit(ObjectId.toString(cur.id), path)
                             val topicUnmod = GSON.fromJson(jsonStr, Topic::class.java)
 
                             if (!isValidTopic(topicUnmod)) return@inner
