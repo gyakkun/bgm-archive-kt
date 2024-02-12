@@ -2,6 +2,9 @@ package moe.nyamori.bgm.git
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.LoadingCache
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
@@ -35,18 +38,22 @@ object FileHistoryLookup {
             }
 
 
-    fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> {
-        return allJsonRepoListSingleton.stream().parallel().map {
-            repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
-                .keys
-        }.flatMap { it.stream() }.sorted().toList()
+    fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> = runBlocking {
+        allJsonRepoListSingleton.map {
+            async {
+                repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
+                    .keys
+            }
+        }.awaitAll().flatten().sorted()
     }
 
-    fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> {
-        return allArchiveRepoListSingleton.stream().parallel().map {
-            repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
-                .keys
-        }.flatMap { it.stream() }.sorted().toList()
+    fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> = runBlocking {
+        allArchiveRepoListSingleton.map {
+            async {
+                repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
+                    .keys
+            }
+        }.awaitAll().flatten().sorted()
     }
 
     fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<CommitHashAndTimestampAndMsg> =
