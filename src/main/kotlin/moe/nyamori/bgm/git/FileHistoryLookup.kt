@@ -2,6 +2,9 @@ package moe.nyamori.bgm.git
 
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.LoadingCache
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
 import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
@@ -35,18 +38,22 @@ object FileHistoryLookup {
             }
 
 
-    fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> {
-        return allJsonRepoListSingleton.map {
-            repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
-                .keys
-        }.flatten().sorted()
+    fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> = runBlocking {
+        allJsonRepoListSingleton.map {
+            async {
+                repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
+                    .keys
+            }
+        }.awaitAll().flatten().sorted()
     }
 
-    fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> {
-        return allArchiveRepoListSingleton.map {
-            repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
-                .keys
-        }.flatten().sorted()
+    fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> = runBlocking {
+        allArchiveRepoListSingleton.map {
+            async {
+                repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
+                    .keys
+            }
+        }.awaitAll().flatten().sorted()
     }
 
     fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<CommitHashAndTimestampAndMsg> =
@@ -124,8 +131,13 @@ object FileHistoryLookup {
         return result
     }
 
-    fun getCommitAtTimestampByPath(repo: Repository, relativePathToRepoFolder: String, timestamp: Long): CommitHashAndTimestampAndMsg {
-        val m: Map<Long, CommitHashAndTimestampAndMsg> = repoPathToRevCommitCache.get(Pair(repo, relativePathToRepoFolder))
+    fun getCommitAtTimestampByPath(
+        repo: Repository,
+        relativePathToRepoFolder: String,
+        timestamp: Long
+    ): CommitHashAndTimestampAndMsg {
+        val m: Map<Long, CommitHashAndTimestampAndMsg> =
+            repoPathToRevCommitCache.get(Pair(repo, relativePathToRepoFolder))
         if (!m.containsKey(timestamp)) throw IllegalArgumentException("Timestamp $timestamp not in commit history")
         return m[timestamp]!!
     }
