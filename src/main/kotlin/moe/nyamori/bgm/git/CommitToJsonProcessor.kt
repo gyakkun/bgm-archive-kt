@@ -23,7 +23,6 @@ import java.io.*
 import java.nio.charset.StandardCharsets.UTF_8
 import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.concurrent.thread
 
 
 object CommitToJsonProcessor {
@@ -135,7 +134,8 @@ object CommitToJsonProcessor {
                                     log.error("At commit -  ${curCommit.name}, repo - ${archiveRepo.simpleName()}, path = $path")
                                 }
 
-                                val fileContentInStr = archiveRepo.getFileContentAsStringInACommit(ObjectId.toString(curCommit.id), path)
+                                val fileContentInStr =
+                                    archiveRepo.getFileContentAsStringInACommit(ObjectId.toString(curCommit.id), path)
                                 val topicId = path.split("/").last().replace(".html", "").toInt()
 
                                 var timing = System.currentTimeMillis()
@@ -381,21 +381,19 @@ object CommitToJsonProcessor {
     ): List<String> {
         val result = CopyOnWriteArrayList<String?>()
         // Here actually block the process
-        listOf(this.errorStream, this.inputStream).forEach { out ->
-            thread {
-                out.use { outUsing ->
-                    InputStreamReader(outUsing).use { isr ->
-                        if (!toLines) result.add(isr.readText())
-                        else
-                            BufferedReader(isr,1024_000).use { reader ->
-                                var line: String?
-                                // reader.readLine()
-                                while (reader.readLine().also { line = it } != null) {
-                                    if (printAtStdErr) System.err.println(line)
-                                    result.add(line)
-                                }
+        listOf(/*this.errorStream,*/ this.inputStream).forEach { out ->
+            out.use { outUsing ->
+                InputStreamReader(outUsing).use { isr ->
+                    if (!toLines) result.add(isr.readText())
+                    else
+                        BufferedReader(isr, 1024_000).use { reader ->
+                            var line: String?
+                            // reader.readLine()
+                            while (reader.readLine().also { line = it } != null) {
+                                if (printAtStdErr) System.err.println(line)
+                                result.add(line)
                             }
-                    }
+                        }
                 }
             }
         }
