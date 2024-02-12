@@ -76,7 +76,7 @@ object FileHistoryLookup {
             val gitProcess = Runtime.getRuntime()
                 .exec(cmd, null, gitRepoDir)
             val cmdOut = gitProcess.blockAndPrintProcessResults(toLines = true, printAtStdErr = false)
-            log.info("External git get log timing: ${System.currentTimeMillis() - timing}ms")
+            log.info("$this External git get log timing: ${System.currentTimeMillis() - timing}ms")
             cmdOut
                 .map { it.replace("\\", "").replace("\"", "") }
                 .map {
@@ -100,7 +100,7 @@ object FileHistoryLookup {
                     )
                 }.filterNotNull()
         }.onFailure {
-            log.error("Failed to get rev commit list by calling external git process: ", it)
+            log.error("$this Failed to get rev commit list by calling external git process: ", it)
         }.getOrElse {
             log.warn("Fall back to jgit get commit history for $relativePathToRepoFolder at $this")
             Git(this).use { git ->

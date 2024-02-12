@@ -199,11 +199,11 @@ object GitHelper {
         val gitProcess = Runtime.getRuntime()
             .exec(cmd, null, gitRepoDir)
         val msgList = gitProcess.blockAndPrintProcessResults(toLines = false, printAtStdErr = false)
-        log.info("External git get file content: ${System.currentTimeMillis() - timing}ms")
+        log.info("$this External git get file content: ${System.currentTimeMillis() - timing}ms")
         log.info("msgListLen = ${msgList.size}")
         msgList.joinToString("\n")
     }.onFailure {
-        log.error("Failed to get file content as string ")
+        log.error("$this Failed to get file content as string: ", it)
     }.getOrElse {
         val revCommit = this.parseCommit(ObjectId.fromString(commitId))
         if (revCommit == null) {
