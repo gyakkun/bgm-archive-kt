@@ -26,7 +26,7 @@ class ParserHelperTest {
         val filePath = "blog/" + FilePathHelper.numberToPath(313741) + ".html"
         val commitList = GitHelper.defaultArchiveRepoSingleton.getRevCommitList(filePath)
         for (i in commitList) {
-            val htmlString = GitHelper.defaultArchiveRepoSingleton.getFileContentAsStringInACommit(i, filePath)
+            val htmlString = GitHelper.defaultArchiveRepoSingleton.getFileContentAsStringInACommit(i.hash, filePath)
             val revId = ParserHelper.getStyleRevNumberFromHtmlString(htmlString)
             val htmlFile =
                 File("E:\\SOURCE_ROOT\\bgm-archive-kt\\src\\test\\resources\\html_samples\\blog\\$revId.html")
