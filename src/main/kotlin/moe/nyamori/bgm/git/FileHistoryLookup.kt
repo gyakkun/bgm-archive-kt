@@ -5,10 +5,10 @@ import com.github.benmanes.caffeine.cache.LoadingCache
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
-import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
 import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
+import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants.DOT_GIT
 import org.eclipse.jgit.lib.ObjectId

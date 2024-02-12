@@ -3,7 +3,7 @@ package moe.nyamori.bgm.http
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
+import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import java.io.File
 
 object RepoStatusHandler : Handler {

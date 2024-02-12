@@ -7,7 +7,7 @@ import com.ibm.icu.text.CharsetDetector
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
 import moe.nyamori.bgm.db.Dao
-import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
+import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.diff.DiffEntry.DEV_NULL
 import org.eclipse.jgit.lib.Constants.DOT_GIT
