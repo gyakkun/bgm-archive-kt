@@ -375,32 +375,46 @@ object CommitToJsonProcessor {
         }
     }
 
+    sealed interface WrappedInputStreamOrListOfString;
+
+    @JvmInline
+    value class ListOfString(val strList: List<String>) : WrappedInputStreamOrListOfString
+
+    @JvmInline
+    value class OfInputStream(val ins: InputStream) : WrappedInputStreamOrListOfString
+
     fun Process.blockAndPrintProcessResults(
-        toLines: Boolean = true,
+        directStdOutStream: Boolean = false,
         printAtStdErr: Boolean = true
-    ): List<String> {
+    ): WrappedInputStreamOrListOfString {
+        if (directStdOutStream) {
+            thread {
+                this.errorStream.use {
+                    it.readAllBytes()
+                }
+            }
+            return OfInputStream(this.inputStream)
+        }
         val result = CopyOnWriteArrayList<String?>()
         // Here actually block the process
         listOf(this.errorStream, this.inputStream).forEach { out ->
             thread {
                 out.use { outUsing ->
                     InputStreamReader(outUsing).use { isr ->
-                        if (!toLines) result.add(isr.readText())
-                        else
-                            BufferedReader(isr).use { reader ->
-                                var line: String?
-                                // reader.readLine()
-                                while (reader.readLine().also { line = it } != null) {
-                                    if (printAtStdErr) System.err.println(line)
-                                    result.add(line)
-                                }
+                        BufferedReader(isr).use { reader ->
+                            var line: String?
+                            // reader.readLine()
+                            while (reader.readLine().also { line = it } != null) {
+                                if (printAtStdErr) System.err.println(line)
+                                result.add(line)
                             }
+                        }
                     }
                 }
             }
         }
         this.waitFor()
-        return result.filterNotNull()
+        return ListOfString(result.filterNotNull())
     }
 
     private fun writeJsonFile(jsonRepo: Repository, path: String, json: String) {

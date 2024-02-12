@@ -3,6 +3,7 @@ package moe.nyamori.bgm.http
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.git.CommitToJsonProcessor.blockAndPrintProcessResults
 import java.io.File
 
@@ -22,7 +23,7 @@ object RepoStatusHandler : Handler {
                     it.path.split(File.separator).last() to run {
                         val gitProcess = Runtime.getRuntime()
                             .exec("git count-objects -vH", null, it)
-                        gitProcess.blockAndPrintProcessResults().map {
+                        (gitProcess.blockAndPrintProcessResults() as CommitToJsonProcessor.ListOfString).strList.map {
                             it.split(":")
                         }.associate { Pair(it[0].trim(), it[1].trim()) }
                     }

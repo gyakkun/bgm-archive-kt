@@ -55,12 +55,12 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
 
             ctx.header(CACHE_CONTROL, "max-age=86400")
             if (isHtml) {
-                var html = FileHistoryLookup.getArchiveFileContentAsStringAtTimestamp(
+                var htmlIns = FileHistoryLookup.getArchiveFileContentAsStringAtTimestamp(
                     timestamp,
                     relativePath
                 )
-                html = htmlModifier(html)
-                ctx.html(html)
+                htmlIns = htmlModifier(htmlIns)
+                ctx.html(htmlIns)
             } else {
                 ctx.json(
                     FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
