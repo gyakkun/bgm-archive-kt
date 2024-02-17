@@ -14,9 +14,9 @@ import moe.nyamori.bgm.git.GitHelper.hasCouplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.TopicParserEntrance
+import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
-import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
 import org.slf4j.LoggerFactory
@@ -135,7 +135,7 @@ object CommitToJsonProcessor {
                                 }
 
                                 val fileContentInStr =
-                                    archiveRepo.getFileContentAsStringInACommit(ObjectId.toString(curCommit.id), path)
+                                    archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path)
                                 val topicId = path.split("/").last().replace(".html", "").toInt()
 
                                 var timing = System.currentTimeMillis()
@@ -193,9 +193,7 @@ object CommitToJsonProcessor {
                         if (timing >= BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS) {
                             log.error(
                                 "Process commit taking longer than expected (threshold:${BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS}ms). Skipping generating spot check file. Cur commit: ${
-                                    ObjectId.toString(
-                                        curCommit
-                                    )
+                                    curCommit.sha1Str()
                                 }"
                             )
                             shouldSpotCheck = false
@@ -203,9 +201,7 @@ object CommitToJsonProcessor {
                         if (commitIdx != 0) {
                             log.warn(
                                 "Not processing the first commit. Not generating spot check file for safety. Cur commit: ${
-                                    ObjectId.toString(
-                                        curCommit
-                                    )
+                                    curCommit.sha1Str()
                                 }"
                             )
                             shouldSpotCheck = false
@@ -242,7 +238,7 @@ object CommitToJsonProcessor {
         log.info("Writing last commit id: ${jsonRepo.simpleName()}/$prevProcessedCommit")
         val lastCommitIdFile =
             File(jsonRepo.absolutePathWithoutDotGit()).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
-        val lastCommitIdStr = ObjectId.toString(prevProcessedCommit.id)
+        val lastCommitIdStr = prevProcessedCommit.sha1Str()
         FileWriter(lastCommitIdFile).use {
             it.write(lastCommitIdStr)
             it.flush()

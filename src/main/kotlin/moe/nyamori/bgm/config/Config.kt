@@ -63,6 +63,11 @@ object Config {
         "prev_persisted_json_commit_rev_id"
     )
 
+    val BGM_ARCHIVE_DB_META_KEY_PREV_CACHED_COMMIT_REV_ID: String = System.getenv().getOrDefault(
+        "E_BGM_ARCHIVE_DB_META_KEY_PREV_CACHED_COMMIT_REV_ID",
+        "prev_cached_commit_rev_id"
+    )
+
     val BGM_ARCHIVE_DISABLE_SPOT_CHECK: Boolean =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_DISABLE_SPOT_CHECK", "false").toBoolean()
 

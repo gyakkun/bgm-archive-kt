@@ -4,9 +4,7 @@ import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.ContentType
 import io.javalin.http.Context
-import io.javalin.http.Header.CONTENT_TYPE
 import io.javalin.http.HttpStatus
-import io.javalin.plugin.bundled.RouteOverviewUtil.metaInfo
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
@@ -51,7 +49,7 @@ object HttpServer {
                         }
                         it.result(
                             GitHelper.GSON.toJson(
-                                Dao.bgmDao().getAllMetaData().associate { it.k to it.v }
+                                Dao.bgmDao.getAllMetaData().associate { it.k to it.v }
                             )
                         )
                     }
@@ -98,6 +96,7 @@ object HttpServer {
                     }
 
                     get("/commit", CommitHook)
+                    get("/cache", CacheHook)
                 }
                 path("/forum-enhance") {
                     post("/query", ForumEnhanceHandler)

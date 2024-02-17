@@ -11,7 +11,7 @@ import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
 import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
 
-class FileHistory(private val spaceType: SpaceType, private val isHtml: Boolean = false) : Handler {
+class FileHistory(private val spaceType: SpaceType) : Handler {
     private val log = LoggerFactory.getLogger(FileHistory::class.java)
 
     override fun handle(ctx: Context) {
@@ -21,6 +21,7 @@ class FileHistory(private val spaceType: SpaceType, private val isHtml: Boolean 
                 ctx.html("The server is busy. Please wait and refresh later.")
                 return
             }
+            val isHtml = ctx.queryParam("isHtml")?.toBooleanStrictOrNull() ?: false
             val topicId = ctx.pathParam("topicId").toInt()
             val timestampList = if (isHtml) {
                 FileHistoryLookup.getArchiveTimestampList(

@@ -37,7 +37,7 @@ object RangeHelper {
     fun main(argv: Array<String>) {
         val st = if (argv.isNotEmpty()) kotlin.runCatching {  SpaceType.valueOf(argv[0].uppercase()) }.getOrDefault(SpaceType.BLOG)
                  else SpaceType.BLOG
-        val list = Dao.bgmDao().getAllTopicIdByType(st.id).toSet()
+        val list = Dao.bgmDao.getAllTopicIdByType(st.id).toSet()
         val max = list.max()
         val fake = (1..max).toMutableSet()
         fake.removeAll(list.toSet())

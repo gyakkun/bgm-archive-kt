@@ -6,6 +6,7 @@ import org.flywaydb.core.api.callback.Context
 import org.flywaydb.core.api.callback.Event
 import org.jdbi.v3.core.Jdbi
 import org.jdbi.v3.core.kotlin.KotlinPlugin
+import org.jdbi.v3.core.statement.Slf4JSqlLogger
 import org.jdbi.v3.sqlobject.SqlObjectPlugin
 import java.util.concurrent.CountDownLatch
 
@@ -47,12 +48,12 @@ object Dao {
     private val jdbi: Jdbi = Jdbi.create(DSProvider.ds).apply {
         installPlugin(SqlObjectPlugin())
         installPlugin(KotlinPlugin())
-        // setSqlLogger(Slf4JSqlLogger())
+        setSqlLogger(Slf4JSqlLogger())
     }
 
-    fun bgmDao(): BgmDao {
+    val bgmDao: BgmDao by lazy {
         latch.await()
-        return jdbi.onDemand(BgmDao::class.java)
+        jdbi.onDemand(BgmDao::class.java)
             ?: throw IllegalStateException("Should get jdbi dao class but got null")
     }
 

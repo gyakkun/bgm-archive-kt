@@ -39,15 +39,15 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                 addAll(timestampList)
             }
             if (!ts.contains(timestamp)) {
-                var ceilingTimestamp = ts.floor(timestamp)
-                if (ceilingTimestamp == null) {
-                    ceilingTimestamp = ts.first()
+                var floorTimestamp = ts.floor(timestamp)
+                if (floorTimestamp == null) {
+                    floorTimestamp = ts.first()
                 }
                 ctx.redirect(
                     if (isHtml) {
-                        ctx.path().replace(Regex("/${timestampPathParam}/html"), "/${ceilingTimestamp}/html")
+                        ctx.path().replace(Regex("/${timestampPathParam}/html"), "/${floorTimestamp}/html")
                     } else {
-                        ctx.path().replace(Regex("/${timestampPathParam}/*\$"), "/${ceilingTimestamp}")
+                        ctx.path().replace(Regex("/${timestampPathParam}/*\$"), "/${floorTimestamp}")
                     }
                 )
                 return

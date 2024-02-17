@@ -7,6 +7,7 @@ import moe.nyamori.bgm.db.SpaceNameMappingData
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper.stringHash
 import moe.nyamori.bgm.util.TopicJsonHelper.getLikeListFromTopic
@@ -36,7 +37,7 @@ class DbTest {
         @Throws(IOException::class)
         @JvmStatic
         fun main(args: Array<String>) {
-            Dao.bgmDao().healthCheck()
+            Dao.bgmDao.healthCheck()
             val dbTest = DbTest()
             dbTest.readJsonAndUpsert()
 
@@ -49,17 +50,17 @@ class DbTest {
 
     @Test
     fun healthCheck() {
-        assert(Dao.bgmDao().healthCheck() == 1)
+        assert(Dao.bgmDao.healthCheck() == 1)
     }
 
     // @Test
     fun insertTest() {
-        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi", id = null, nickname = "")))
-        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi1", id = null, nickname = "")))
-        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi3", id = null, nickname = "")))
-        Dao.bgmDao().batchUpsertUser(listOf(User(username = "hihihi4", id = 123456, nickname = "")))
+        Dao.bgmDao.batchUpsertUser(listOf(User(username = "hihihi", id = null, nickname = "")))
+        Dao.bgmDao.batchUpsertUser(listOf(User(username = "hihihi1", id = null, nickname = "")))
+        Dao.bgmDao.batchUpsertUser(listOf(User(username = "hihihi3", id = null, nickname = "")))
+        Dao.bgmDao.batchUpsertUser(listOf(User(username = "hihihi4", id = 123456, nickname = "")))
 
-        Dao.bgmDao().batchUpsertTopic(
+        Dao.bgmDao.batchUpsertTopic(
             typeId = SpaceType.GROUP.id, listOf(
                 Topic(
                     id = 12345,
@@ -84,7 +85,7 @@ class DbTest {
             )
         )
 
-        Dao.bgmDao().batchUpsertLikes(
+        Dao.bgmDao.batchUpsertLikes(
             listOf(
                 Like(1, 2, 3, 4, 5),
                 Like(1, 2, 3, 4, 5),
@@ -121,10 +122,10 @@ class DbTest {
                     val postList = getPostListFromTopic(topic)
                     val userList = getUserListFromPostList(postList)
 
-                    Dao.bgmDao().batchUpsertUser(userList)
-                    Dao.bgmDao().batchUpsertLikes(likeList)
-                    Dao.bgmDao().batchUpsertPost(topic.space!!.type.id, topic.getSid(), postList)
-                    Dao.bgmDao().batchUpsertTopic(topic.space!!.type.id, listOf(topic))
+                    Dao.bgmDao.batchUpsertUser(userList)
+                    Dao.bgmDao.batchUpsertLikes(likeList)
+                    Dao.bgmDao.batchUpsertPost(topic.space!!.type.id, topic.getSid(), postList)
+                    Dao.bgmDao.batchUpsertTopic(topic.space!!.type.id, listOf(topic))
 
                     if (topic.space!! is Blog) {
                         handleBlogTagAndRelatedSubject(topic)
@@ -134,10 +135,10 @@ class DbTest {
                 }
             }
         }
-        Dao.bgmDao().handleNegativeUid()
-        Dao.bgmDao().updatePrevPersistedCommitId(
+        Dao.bgmDao.handleNegativeUid()
+        Dao.bgmDao.updatePrevPersistedCommitId(
             GitHelper.defaultJsonRepoSingleton,
-            ObjectId.toString(GitHelper.defaultJsonRepoSingleton.getLatestCommitRef())
+            GitHelper.defaultJsonRepoSingleton.getLatestCommitRef().sha1Str()
         )
     }
 
@@ -194,7 +195,7 @@ class DbTest {
                 }
             }
         }
-        Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
+        Dao.bgmDao.upsertSidAlias(sidNameMappingSet)
     }
 
 

@@ -116,3 +116,9 @@ data class VUserLatestLikeRevRow(
     val dateline: Long,
     val spaceDisplayName: String?
 )
+
+// For Cache query
+data class RepoIdCommitId(
+    val repoId: Long,
+    val commitId: String
+)

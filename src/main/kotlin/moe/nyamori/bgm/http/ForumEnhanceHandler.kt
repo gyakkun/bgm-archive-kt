@@ -115,7 +115,7 @@ object ForumEnhanceHandler : Handler {
             return null
         }
         var userList = (bodyMap["users"]!! as List<String>).distinct()
-        userList = Dao.bgmDao().getValidUsernameListFromList(userList)
+        userList = Dao.bgmDao.getValidUsernameListFromList(userList)
         if (userList.size > 200) {
             LOGGER.warn("User list too large, take the first 200.")
             userList = userList.take(200)
@@ -129,57 +129,57 @@ object ForumEnhanceHandler : Handler {
     ): Deferred<Map<String, UserStat>> = GlobalScope.async {
         val allPostCountByTypeAndUsernameList = async {
             timingWrapper("getAllPostCountByTypeAndUsernameList") {
-                Dao.bgmDao().getAllPostCountByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getAllPostCountByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val allTopicCountByTypeAndUsernameList = async {
             timingWrapper("getAllTopicCountByTypeAndUsernameList") {
-                Dao.bgmDao().getAllTopicCountByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getAllTopicCountByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likesSumByTypeAndUsernameList = async {
             timingWrapper("getLikesSumByTypeAndUsernameList") {
-                Dao.bgmDao().getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likeRevSumByTypeAndUsernameList = async {
             timingWrapper("getLikeRevSumByTypeAndUsernameList") {
-                Dao.bgmDao().getLikeRevSumByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getLikeRevSumByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val postCountSpaceByTypeAndUsernameList = async {
             timingWrapper("getPostCountSpaceByTypeAndUsernameList") {
-                Dao.bgmDao().getPostCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getPostCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val topicCountSpaceByTypeAndUsernameList = async {
             timingWrapper("getTopicCountSpaceByTypeAndUsernameList") {
-                Dao.bgmDao().getTopicCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getTopicCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val userLastReplyTopicByTypeAndUsernameList = async {
             timingWrapper("getUserLastReplyTopicByTypeAndUsernameList") {
-                Dao.bgmDao().getUserLastReplyTopicByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getUserLastReplyTopicByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val userLatestCreateTopicAndUsernameList = async {
             timingWrapper("getUserLatestCreateTopicAndUsernameList") {
-                Dao.bgmDao().getUserLatestCreateTopicAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getUserLatestCreateTopicAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likeRevCountForSpaceByTypeAndUsernameList = async {
             timingWrapper("getLikeRevStatForSpaceByTypeAndUsernameList") {
-                Dao.bgmDao().getLikeRevStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getLikeRevStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likeCountForSpaceByTypeAndUsernameList = async {
             timingWrapper("getLikeStatForSpaceByTypeAndUsernameList") {
-                Dao.bgmDao().getLikeStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getLikeStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val userLatestLikeRevByTypeAndUsernameList = async {
             timingWrapper("getUserLatestLikeRevByTypeAndUsernameList") {
-                Dao.bgmDao().getUserLatestLikeRevByTypeAndUsernameList(spaceType.id, usernameList)
+                Dao.bgmDao.getUserLatestLikeRevByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val vAllPostCountRows = allPostCountByTypeAndUsernameList.await()

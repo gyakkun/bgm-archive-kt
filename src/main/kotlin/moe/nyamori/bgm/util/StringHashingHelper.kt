@@ -1,5 +1,7 @@
 package moe.nyamori.bgm.util
 
+import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
+import org.eclipse.jgit.lib.Repository
 import kotlin.math.abs
 
 object StringHashingHelper {
@@ -29,4 +31,7 @@ object StringHashingHelper {
         val hash2 = hashFun2(str) and mask2
         return -abs(hash1 xor hash2)
     }
+
+    fun Repository.hashedAbsolutePathWithoutGitId() = StringHashingHelper.stringHash(this.absolutePathWithoutDotGit())
+
 }

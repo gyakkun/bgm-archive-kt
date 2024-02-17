@@ -27,7 +27,8 @@ object LinkHandler : Handler {
     const getTimeline = async () => {
         let path = document.location.pathname
         let timelineList = []
-        let jsonListPath = path.replace("/link", "")
+        // let jsonListPath = path.replace("/link", "")
+        let jsonListPath = path.replace("/link", "?isHtml=true")
         timelineList = await fetch(jsonListPath)
             .then(d => { return d.text() })
             .then(t => { return JSON.parse(t) })

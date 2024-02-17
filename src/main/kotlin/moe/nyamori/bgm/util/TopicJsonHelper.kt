@@ -4,7 +4,6 @@ import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.parser.ep.EpTopicParserR416
 import org.slf4j.LoggerFactory
-import java.util.ArrayList
 
 object TopicJsonHelper {
     private val LOGGER = LoggerFactory.getLogger(TopicJsonHelper.javaClass)
@@ -31,10 +30,10 @@ object TopicJsonHelper {
         val relatedSubjectIds = blogSpace.relatedSubjectIds
         val tags = blogSpace.tags
         if (!relatedSubjectIds.isNullOrEmpty()) {
-            Dao.bgmDao().upsertBlogSubjectIdMapping(relatedSubjectIds.map { Pair(topic.id, it) })
+            Dao.bgmDao.upsertBlogSubjectIdMapping(relatedSubjectIds.map { Pair(topic.id, it) })
         }
         if (!tags.isNullOrEmpty()) {
-            Dao.bgmDao().upsertBlogTagMapping(tags.map { Pair(topic.id, it) })
+            Dao.bgmDao.upsertBlogTagMapping(tags.map { Pair(topic.id, it) })
         }
     }
 

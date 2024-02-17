@@ -12,6 +12,7 @@ import moe.nyamori.bgm.git.GitHelper.getWalkBetweenCommitInReverseOrder
 import moe.nyamori.bgm.git.GitHelper.hasCouplingArchiveRepo
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper
 import moe.nyamori.bgm.util.TopicJsonHelper
@@ -21,7 +22,6 @@ import moe.nyamori.bgm.util.TopicJsonHelper.getPostListFromTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
 import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
-import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 
@@ -67,6 +67,7 @@ object JsonToDbProcessor {
             val sidNameMappingSet = mutableSetOf<SpaceNameMappingData>()
             var everFailed = false
 
+            // FIXME
             while (prev != null) {
                 if (realPrevPersistedCommitForCheck == prev) {
                     break
@@ -81,10 +82,10 @@ object JsonToDbProcessor {
                         LOGGER.warn("Commit $cur has been iterated twice! Repo: ${jsonRepo.simpleName()}")
                         return@breakable
                     }
-                    val curCommitId = ObjectId.toString(cur)
+                    val curCommitId = cur.sha1Str()
                     val curCommitFullMsg = cur.fullMessage
                     if (curCommitFullMsg.startsWith("META", ignoreCase = true)) {
-                        Dao.bgmDao().updatePrevPersistedCommitId(jsonRepo, curCommitId)
+                        Dao.bgmDao.updatePrevPersistedCommitId(jsonRepo, curCommitId)
                         prev = cur
                         return@outer
                     }
@@ -95,7 +96,7 @@ object JsonToDbProcessor {
                         LOGGER.info("Path ${jsonRepo.simpleName()}/$path")
                         var jsonStr = "NOT READY YET"
                         runCatching {
-                            jsonStr = jsonRepo.getFileContentAsStringInACommit(ObjectId.toString(cur.id), path)
+                            jsonStr = jsonRepo.getFileContentAsStringInACommit(cur.sha1Str(), path)
                             val topicUnmod = GSON.fromJson(jsonStr, Topic::class.java)
 
                             if (!isValidTopic(topicUnmod)) return@inner
@@ -104,11 +105,11 @@ object JsonToDbProcessor {
                             val spaceTypeId = topic.space!!.type.id
                             val topicId = topic.id
                             // val topicListFromDb =
-                            //    Dao.bgmDao().getTopicListByTypeAndTopicId(spaceTypeId, topicId)
+                            //    Dao.bgmDao.getTopicListByTypeAndTopicId(spaceTypeId, topicId)
                             // val postListFromDb =
-                            //    Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
-                            val likeListFromDb = Dao.bgmDao().getLikeListByTypeAndTopicId(spaceTypeId, topicId)
-                            val likeRevListFromDb = Dao.bgmDao().getLikeRevListByTypeAndTopicId(spaceTypeId, topicId)
+                            //    Dao.bgmDao.getPostListByTypeAndTopicId(spaceTypeId, topicId)
+                            val likeListFromDb = Dao.bgmDao.getLikeListByTypeAndTopicId(spaceTypeId, topicId)
+                            val likeRevListFromDb = Dao.bgmDao.getLikeRevListByTypeAndTopicId(spaceTypeId, topicId)
                             // LOGGER.debug("topic {}", topicListFromDb)
                             // LOGGER.debug("post {}", postListFromDb)
                             LOGGER.debug("like {}", likeListFromDb)
@@ -125,12 +126,12 @@ object JsonToDbProcessor {
                             val (processedLikeRevList, constructedUser) =
                                 calLikeRev(likeRevUsernameFromFile, likeRevListFromDb, topic.isEmptyTopic())
 
-                            Dao.bgmDao().batchUpsertUser(userListFromFile)
-                            Dao.bgmDao().batchUpsertUser(constructedUser)
-                            Dao.bgmDao().batchUpsertLikes(processedLikeList)
-                            Dao.bgmDao().batchUpsertLikesRev(processedLikeRevList)
-                            Dao.bgmDao().batchUpsertPost(spaceTypeId, topic.getSid(), postListFromFile)
-                            Dao.bgmDao().batchUpsertTopic(spaceTypeId, listOf(topic))
+                            Dao.bgmDao.batchUpsertUser(userListFromFile)
+                            Dao.bgmDao.batchUpsertUser(constructedUser)
+                            Dao.bgmDao.batchUpsertLikes(processedLikeList)
+                            Dao.bgmDao.batchUpsertLikesRev(processedLikeRevList)
+                            Dao.bgmDao.batchUpsertPost(spaceTypeId, topic.getSid(), postListFromFile)
+                            Dao.bgmDao.batchUpsertTopic(spaceTypeId, listOf(topic))
 
                             specialHandlingForSpaceNameMapping(
                                 space,
@@ -140,11 +141,11 @@ object JsonToDbProcessor {
                                 postListFromFile,
                                 sidNameMappingSet
                             )
-                            Dao.bgmDao().upsertSidAlias(sidNameMappingSet)
+                            Dao.bgmDao.upsertSidAlias(sidNameMappingSet)
                             sidNameMappingSet.clear()
                         }.onFailure {
                             LOGGER.error(
-                                "Ex when checking content of $path at commit ${ObjectId.toString(cur)}, repo - ${jsonRepo.simpleName()}",
+                                "Ex when checking content of $path at commit ${cur.sha1Str()}, repo - ${jsonRepo.simpleName()}",
                                 it
                             )
                             LOGGER.error("Json Str: $jsonStr")
@@ -152,14 +153,14 @@ object JsonToDbProcessor {
                         }
                     }
 
-                    Dao.bgmDao().updatePrevPersistedCommitId(jsonRepo, curCommitId)
+                    Dao.bgmDao.updatePrevPersistedCommitId(jsonRepo, curCommitId)
                     prev = cur
                 }
-                Dao.bgmDao().handleNegativeUid()
+                Dao.bgmDao.handleNegativeUid()
             }
             LOGGER.info(
                 "Persisted last commit for repo ${jsonRepo.simpleName()}: ${
-                    Dao.bgmDao().getPrevPersistedCommitId(jsonRepo)
+                    Dao.bgmDao.getPrevPersistedCommitId(jsonRepo)
                 }"
             )
             if (everFailed) {
@@ -181,9 +182,9 @@ object JsonToDbProcessor {
             TopicJsonHelper.handleBlogTagAndRelatedSubject(topic)
 
             val postListFromDb =
-                Dao.bgmDao().getPostListByTypeAndTopicId(spaceTypeId, topicId)
+                Dao.bgmDao.getPostListByTypeAndTopicId(spaceTypeId, topicId)
             val calDeletedBlogPost = calDeletedBlogPostRow(postListFromFile, postListFromDb)
-            Dao.bgmDao().batchUpsertPostRow(calDeletedBlogPost)
+            Dao.bgmDao.batchUpsertPostRow(calDeletedBlogPost)
 
             if (!topic.isEmptyTopic()) {
                 runCatching {
@@ -314,7 +315,7 @@ object JsonToDbProcessor {
 
         if (userWithoutIdList.isEmpty()) return emptyList()
 
-        val userRowFromDb = Dao.bgmDao().getUserRowByUsernameList(userWithoutIdList.map { it.username }.distinct())
+        val userRowFromDb = Dao.bgmDao.getUserRowByUsernameList(userWithoutIdList.map { it.username }.distinct())
         val groupByUsername = userRowFromDb.groupBy { it.username }
         userWithoutIdList.forEach {
             if (it.username !in groupByUsername) {

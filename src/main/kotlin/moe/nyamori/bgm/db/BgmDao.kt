@@ -1,9 +1,11 @@
 package moe.nyamori.bgm.db
 
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
-import moe.nyamori.bgm.model.*
-import moe.nyamori.bgm.util.StringHashingHelper
+import moe.nyamori.bgm.model.Like
+import moe.nyamori.bgm.model.Post
+import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.model.User
+import moe.nyamori.bgm.util.StringHashingHelper.hashedAbsolutePathWithoutGitId
 import org.eclipse.jgit.lib.Repository
 import org.jdbi.v3.sqlobject.customizer.Bind
 import org.jdbi.v3.sqlobject.customizer.BindBean
@@ -62,16 +64,92 @@ interface BgmDao : Transactional<BgmDao> {
     ): Int {
         return upsertMetaData(
             Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID
-                    + StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit()), prevPersistRevId
+                    + repo.hashedAbsolutePathWithoutGitId(), prevPersistRevId
         )
     }
+
 
     fun getPrevPersistedCommitId(repo: Repository): String {
         return getMetaData(
             Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID
-                    + StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
+                    + repo.hashedAbsolutePathWithoutGitId()
         ) ?: ""
     }
+
+    fun getPrevCachedCommitId(repo: Repository): String? {
+        return getMetaData(
+            Config.BGM_ARCHIVE_DB_META_KEY_PREV_CACHED_COMMIT_REV_ID
+                    + repo.hashedAbsolutePathWithoutGitId()
+        )
+    }
+
+    fun updatePrevCachedCommitId(
+        repo: Repository,
+        prevCachedCommitId: String
+    ): Int {
+        return upsertMetaData(
+            Config.BGM_ARCHIVE_DB_META_KEY_PREV_CACHED_COMMIT_REV_ID
+                    + repo.hashedAbsolutePathWithoutGitId(), prevCachedCommitId
+        )
+    }
+
+    @SqlBatch(
+        """
+         insert into ba_cache_file_relative_path (file_relative_path) values (:t)
+         on conflict do nothing;
+     """
+    )
+    @Transaction
+    // WARN: No generated key back from sqlite jdbc driver
+    fun batchUpsertFileRelativePathForCache(@Bind("t") fileRelativePaths: List<String>): IntArray
+//    {
+//        return Dao.bgmDao.withHandle<List<Long>, Exception> {
+//            val batch = it.prepareBatch(
+//                """
+//                insert into ba_cache_file_relative_path (file_relative_path) values (?)
+//                on conflict do nothing;
+//        """.trimIndent()
+//            );
+//            fileRelativePaths.forEach { batch.add(it) }
+//            val res = batch.executePreparedBatch("id")
+//            return@withHandle res.mapTo(Long::class.java).list()
+//        }
+//    }
+
+    @SqlUpdate(
+        """
+        insert into ba_cache_repo_commit (repo_id, commit_id) values (:repoId, :commitId)
+        on conflict do nothing;
+    """
+    )
+    @Transaction
+    fun insertRepoCommitForCache(@Bind("repoId") repoId: Long, @Bind("commitId") commitId: String): Int
+
+    @SqlBatch(
+        """
+        insert into ba_cache_file_commit (fid, cid) values (
+         (select id from ba_cache_file_relative_path where file_relative_path = :frp ), 
+        (select id from ba_cache_repo_commit where repo_id = :rid and commit_id = :cid))
+        on conflict do nothing;
+    """
+    )
+    @Transaction
+    fun batchUpsertFileCommitForCache(
+        @Bind("frp") frp: Iterable<String>,
+        @Bind("rid") rid: Long,
+        @Bind("cid") cid: String
+    ): IntArray
+
+    @SqlQuery(
+        """
+            select bcrc.repo_id, bcrc.commit_id
+            from ba_cache_file_commit bcfc
+                     inner join ba_cache_file_relative_path bcfrp on bcfc.fid = bcfrp.id
+                     inner join ba_cache_repo_commit bcrc on bcfc.cid = bcrc.id
+            where bcfrp.file_relative_path = :frp
+    """
+    )
+    fun queryRepoCommitForCacheByFileRelativePath(@Bind("frp") frp: String): List<RepoIdCommitId>
 
 
     @SqlBatch(
@@ -80,7 +158,7 @@ interface BgmDao : Transactional<BgmDao> {
             :id,
             :username,
             :nickname
-        ) on conflict(id) do update set username = :username, nickname = coalesce(:nickname, nickname) 
+        ) on conflict(id) do update set username = :username, nickname = coalesce(:nickname, nickname)
         """
     )
     @Transaction

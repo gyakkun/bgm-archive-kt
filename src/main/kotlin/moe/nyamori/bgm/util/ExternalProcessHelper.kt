@@ -7,6 +7,7 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
+import kotlin.text.Charsets.UTF_8
 
 private val log = LoggerFactory.getLogger("ExternalProcessHelper")
 
@@ -22,7 +23,7 @@ fun Process.blockAndPrintProcessResults(
     listOf(this.errorStream, this.inputStream).forEach { out ->
         thread {
             out.use { outUsing ->
-                InputStreamReader(outUsing).use { isr ->
+                InputStreamReader(outUsing, UTF_8).use { isr ->
                     if (!toLines) result.add(isr.readText())
                     else
                         BufferedReader(isr).use { reader ->

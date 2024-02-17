@@ -71,7 +71,7 @@ object DbPurgeAllMetaHandler : Handler {
 
         try {
             if (HttpHelper.DB_WRITE_LOCK.tryLock(10, TimeUnit.SECONDS)) {
-                val result = Dao.bgmDao()._TRUNCATE_ALL_META()
+                val result = Dao.bgmDao._TRUNCATE_ALL_META()
                 LOGGER.error("Truncate all meta. Lines deleted: $result")
                 ctx.result(
                     """
