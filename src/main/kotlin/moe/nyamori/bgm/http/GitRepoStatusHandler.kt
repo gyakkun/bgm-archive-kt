@@ -13,9 +13,6 @@ import moe.nyamori.bgm.http.HumanReadable.toHumanReadableBytes
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.math.BigDecimal
-import java.math.RoundingMode
-import java.text.DecimalFormat
 import java.util.*
 import kotlin.math.absoluteValue
 
@@ -59,50 +56,40 @@ object HumanReadable {
         )
     )
 
-    fun Int.toHumanReadableBytes(
-        bound: Long = -1L,
-        commaEvery3Digit: Boolean = false,
-        keepDecimal: Boolean = true
-    ) = this.toLong().toHumanReadableBytes(bound, commaEvery3Digit, keepDecimal)
+    fun Int.toHumanReadableBytes(bound: Long = -1L, commaEvery3Digit: Boolean = false) =
+        this.toLong().toHumanReadableBytes(bound, commaEvery3Digit)
 
-    fun Long.toHumanReadableBytes(
-        bound: Long = -1L,
-        commaEvery3Digit: Boolean = false,
-        keepDecimal: Boolean = true
-    ) = run {
+    fun Long.toHumanReadableBytes1() =
+        if (this >= 1024L * 1024 * 1024 * 1024 /*TiB*/) "${this / 1024 / 1024 / 1024 / 1024} TiB"
+        else if (this >= 1024L * 1024 * 1024/*GiB*/) "${this / 1024 / 1024} GiB"
+        else if (this >= 1024L * 1024/*MiB*/) "${this / 1024 / 1024} MiB"
+        else if (this >= 1024L/*KiB*/) "${this / 1024} KiB"
+        else "$this Bytes"
+
+    fun Long.toHumanReadableBytes(bound: Long = -1L, commaEvery3Digit: Boolean = false) = run {
         val sign = if (this >= 0L) "" else "-"
         val theBound = if (bound < 0) {
             UnitTable.lastEntry()
         } else UnitTable.ceilingEntry(bound) ?: UnitTable.lastEntry()
         val subTable = UnitTable.subMap(1L, true, theBound.key, true)
         val abs = if (this == Long.MIN_VALUE) Long.MAX_VALUE else this.absoluteValue
-        val (amount, unit) = subTable.floorEntry(abs) ?: subTable.firstEntry()
-        if (this == Long.MIN_VALUE && amount == 1L) {
+        val entry = subTable.floorEntry(abs) ?: subTable.firstEntry()
+        if (this == Long.MIN_VALUE && entry.key == 1L) {
             return if (commaEvery3Digit)
-                "${this.commaFormatted()} $unit"
+                "${this.commaFormatted()} ${entry.value}"
             else
-                "$this $unit"
+                "$this ${entry.value}"
         }
-        if (this == Long.MIN_VALUE && amount == EiB) return "-8 EiB"
-        val absBd = abs.toBigDecimal()
-        val amountBd = amount.toBigDecimal()
-        val numberPart = (if (commaEvery3Digit && keepDecimal)
-            "$sign${absBd.divide(amountBd, 99, RoundingMode.HALF_EVEN).commaFormatted()}"
-        else if (commaEvery3Digit)
-            "$sign${(abs / amount).commaFormatted()}"
-        else if (keepDecimal)
-            "$sign${absBd.divide(amountBd, 3, RoundingMode.FLOOR)}"
+        if (this == Long.MIN_VALUE && entry.key == EiB) return "-8 EiB"
+        val divider = entry.key
+        val unit = entry.value
+        if (commaEvery3Digit)
+            "$sign${(abs / divider).commaFormatted()} $unit"
         else
-            "$sign${abs / amount}")
-            .dropLastWhile { it == '0' }
-            .dropLastWhile { it == '.' }
-
-        "$numberPart $unit"
+            "$sign${abs / divider} $unit"
     }
 
     fun Long.commaFormatted() = "%,d".format(this)
-    fun Double.commaFormatted() = "%,.3f".format(this)
-    fun BigDecimal.commaFormatted() = DecimalFormat("#,###.000").format(this)
 }
 
 
@@ -122,8 +109,7 @@ fun main() {
     System.err.println((Long.MIN_VALUE).toHumanReadableBytes())
     System.err.println((Long.MIN_VALUE).toHumanReadableBytes(KiB, true))
     System.err.println((Long.MIN_VALUE).toHumanReadableBytes(1, commaEvery3Digit = true))
-    System.err.println(105000000000.toHumanReadableBytes(MiB, true, keepDecimal = true))
-    System.err.println(105000000000.toHumanReadableBytes(MiB, false, keepDecimal = true))
+    System.err.println(105000000000.toHumanReadableBytes(MiB, true))
 }
 
 fun Context.prettyJson(res: Any?, printLog: Boolean = true) {
