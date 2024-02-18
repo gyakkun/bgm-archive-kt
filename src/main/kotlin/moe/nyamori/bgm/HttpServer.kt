@@ -44,8 +44,8 @@ object HttpServer {
                     it.html(RangeHelper.checkHolesForType(SpaceType.valueOf(spaceType.uppercase())).joinToString("\n"))
                 }
                 get("/health") {
-                    val holes = SpaceType.values().associateWith { RangeHelper.checkHolesForType(it) }
-                    it.json(object {
+                    val holes = SpaceType.entries.associateWith { RangeHelper.checkHolesForType(it) }
+                    it.prettyJson(object {
                         val isHealthy = holes[SpaceType.BLOG]!!.isEmpty()
                         val holes = holes
                     })

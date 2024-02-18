@@ -59,12 +59,15 @@ object AppStatusHandler : Handler {
                 }
             }
         }
-        val jm = ctx.jsonMapper()
-        if (jm is JavalinJackson) {
-            ctx.json(
-                jm.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(res)
-                    .also { LoggerFactory.getLogger(object {}.javaClass).warn("\n" + it) })
-        } else ctx.json(res)
-        return
+        ctx.prettyJson(res)
     }
+}
+
+fun Context.prettyJson(res: Any) {
+    val jm = this.jsonMapper()
+    if (jm is JavalinJackson) {
+        this.json(
+            jm.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(res)
+                .also { LoggerFactory.getLogger(object {}.javaClass).warn("\n" + it) })
+    } else this.json(res)
 }
