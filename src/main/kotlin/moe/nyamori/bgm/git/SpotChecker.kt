@@ -203,7 +203,7 @@ object SpotChecker {
         return getBitsetFromLongPlaintextFile(maskFile)
     }
 
-    private fun getBitsetFromLongPlaintextFile(maskFile: File): BitSet {
+    fun getBitsetFromLongPlaintextFile(maskFile: File): BitSet {
         val maskStr = maskFile.readText(Charsets.UTF_8)
         return getBitsetFromLongListStr(maskStr)
     }

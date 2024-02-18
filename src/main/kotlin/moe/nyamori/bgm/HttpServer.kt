@@ -15,6 +15,7 @@ import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.StringHashingHelper
+import java.io.File
 import java.util.*
 
 object HttpServer {
@@ -81,7 +82,15 @@ object HttpServer {
                     }
                 }
                 get("/health") {
-                    val holes = SpaceType.entries.associateWith { RangeHelper.checkHolesForType(it) }
+                    val holes = SpaceType.entries.associateWith {
+                        val res = RangeHelper.checkHolesForType(it)
+                        runCatching {
+                            val holesMaskFile = File(System.getProperty("user.home"))
+                                .resolve("source/bgm-archive-holes/${it.name.lowercase()}.txt")
+                            val masked = SpotChecker.getBitsetFromLongPlaintextFile(holesMaskFile)
+                            res.filter { !masked.get(it) }
+                        }.getOrDefault(res)
+                    }
                     val blogHealth = holes[SpaceType.BLOG]!!.isEmpty()
 
                     // In case we have other fields counted in isAvailable
@@ -89,7 +98,7 @@ object HttpServer {
                     val resIsHealthy = blogHealth
                     it.prettyJson(object {
                         val isAvailable = resIsHealthy
-                        val holes = holes
+                        val holes = holes.filter { it.value.isNotEmpty() }
                     }, printLog = !resIsHealthy)
                 }
                 path("/history") {
