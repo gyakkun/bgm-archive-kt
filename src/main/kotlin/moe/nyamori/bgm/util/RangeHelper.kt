@@ -46,10 +46,13 @@ object RangeHelper {
     }
 
     fun checkHolesForType(st: SpaceType): List<Int> {
-        val list = Dao.bgmDao.getAllTopicIdByType(st.id).toSet()
-        val max = list.max()
-        val fake = (1..max).toMutableSet()
-        fake.removeAll(list.toSet())
+        var allTopicId: List<Int>? = Dao.bgmDao.getAllTopicIdByType(st.id)
+        val max = allTopicId!!.max()
+        val real = HashSet<Int>().apply { allTopicId!!.forEach { add(it) } }
+        allTopicId = null // help gc?
+        System.gc()
+        val fake = HashSet<Int>().apply { (1..max).forEach { add(it) } }
+        fake.removeAll(real)
         val result = summaryRanges(fake.toList().sorted())
         val ng = mutableListOf<Int>()
         result.forEach { topicId ->
