@@ -10,10 +10,12 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
+import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.StringHashingHelper
+import java.util.*
 
 object HttpServer {
 
@@ -35,13 +37,48 @@ object HttpServer {
             config.router.apiBuilder {
                 get("/status", AppStatusHandler)
                 get("/holes") { it.redirect("/holes/blog") }
-                get("/holes/{spaceType}") {
-                    val spaceType = it.pathParam("spaceType")
-                    if (spaceType.uppercase() !in SpaceType.entries.map { it.name }) {
-                        it.redirect("/holes/blog")
-                        return@get
+                path("/holes") {
+                    get("/{spaceType}") {
+                        val spaceTypeParam = it.pathParam("spaceType")
+                        if (spaceTypeParam.uppercase() !in SpaceType.entries.map { it.name }) {
+                            it.redirect("/holes/blog")
+                            return@get
+                        }
+                        val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
+                        it.html(
+                            RangeHelper.checkHolesForType(spaceType).joinToString("\n")
+                        )
                     }
-                    it.html(RangeHelper.checkHolesForType(SpaceType.valueOf(spaceType.uppercase())).joinToString("\n"))
+                    post("/{spaceType}") {
+                        val spaceTypeParam = it.pathParam("spaceType")
+                        if (spaceTypeParam.uppercase() !in SpaceType.entries.map { it.name }) {
+                            throw HttpResponseException(HttpStatus.BAD_REQUEST)
+                        }
+                        val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
+                        val body = it.body()
+                        val bs = SpotChecker.getBitsetFromLongListStr(body)
+                        val holes = RangeHelper.checkHolesForType(spaceType)
+                        if (holes.isEmpty()) {
+                            it.html("0"); return@post
+                        }
+                        val res = holes.filter { !bs.get(it) }.joinToString("\n")
+                        it.html(res)
+                    }
+                    get("/{spaceType}/mask") {
+                        val spaceTypeParam = it.pathParam("spaceType")
+                        if (spaceTypeParam.uppercase() !in SpaceType.entries.map { it.name }) {
+                            it.redirect("/holes/blog/mask")
+                            return@get
+                        }
+                        val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
+                        val holes = RangeHelper.checkHolesForType(spaceType)
+                        if (holes.isEmpty()) {
+                            it.html("0"); return@get
+                        }
+                        val bs = BitSet(holes.max()).apply { holes.forEach { set(it) } }
+                        val res = bs.toLongArray().joinToString("\n")
+                        it.html(res)
+                    }
                 }
                 get("/health") {
                     val holes = SpaceType.entries.associateWith { RangeHelper.checkHolesForType(it) }
@@ -59,6 +96,7 @@ object HttpServer {
                     get("/status") { it.redirect("/status", HttpStatus.PERMANENT_REDIRECT) }
                     path("/{spaceType}") {
                         get("/latest_topic_list", LatestTopicListWrapper)
+                        get("/latest-topic-list", LatestTopicListWrapper)
                         path("/{topicId}") {
                             get(FileHistoryWrapper)
                             get("/link", LinkHandlerWrapper)
@@ -124,6 +162,7 @@ object HttpServer {
                 path("/forum-enhance") {
                     post("/query", ForumEnhanceHandler)
                     get("/deleted_post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
+                    get("/deleted-post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
                 }
                 get("/*") { // redirect all
                     it.redirect("https://bgm.tv" + it.path())

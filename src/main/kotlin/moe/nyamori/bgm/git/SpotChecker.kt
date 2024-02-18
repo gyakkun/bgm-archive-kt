@@ -205,8 +205,16 @@ object SpotChecker {
 
     private fun getBitsetFromLongPlaintextFile(maskFile: File): BitSet {
         val maskStr = maskFile.readText(Charsets.UTF_8)
+        return getBitsetFromLongListStr(maskStr)
+    }
+
+    fun getBitsetFromLongListStr(maskStr: String): BitSet {
         val longList = mutableListOf<Long>()
-        maskStr!!.lines().mapNotNull { it.toLongOrNull() }.forEach { longList.add(it) }
+        maskStr.lines().mapNotNull { it.toLongOrNull() }.forEach { longList.add(it) }
+        return getBitsetFromLongList(longList)
+    }
+
+    private fun getBitsetFromLongList(longList: MutableList<Long>): BitSet {
         val longArr = longList.toLongArray()
         return BitSet.valueOf(longArr)
     }
