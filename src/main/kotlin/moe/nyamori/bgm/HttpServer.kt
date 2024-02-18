@@ -36,7 +36,10 @@ object HttpServer {
                 }
             }
             config.router.apiBuilder {
-                get("/status", AppStatusHandler)
+                get("/status", GitRepoStatusHandler)
+                get("/status/git", GitRepoStatusHandler)
+                get("/status/jvm", JvmStatusHandler)
+                get("/status/db", DbStatusHandler)
                 get("/holes") { it.redirect("/holes/blog") }
                 path("/holes") {
                     get("/{spaceType}") {
@@ -102,7 +105,7 @@ object HttpServer {
                     }, printLog = !resIsHealthy)
                 }
                 path("/history") {
-                    get("/status") { it.redirect("/status", HttpStatus.PERMANENT_REDIRECT) }
+                    get("/status", GitRepoStatusHandler)
                     path("/{spaceType}") {
                         get("/latest_topic_list", LatestTopicListWrapper)
                         get("/latest-topic-list", LatestTopicListWrapper)
@@ -114,7 +117,6 @@ object HttpServer {
                                 get("/html", FileOnCommitWrapper(isHtml = true))
                             }
                         }
-
                     }
                 }
                 path("/info") {
