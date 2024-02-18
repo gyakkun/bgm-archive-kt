@@ -13,6 +13,7 @@ import moe.nyamori.bgm.http.HumanReadable.commaFormatted
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadableBytes
 import org.slf4j.LoggerFactory
 import java.lang.management.ManagementFactory
+import java.net.InetAddress
 import java.sql.Timestamp
 import kotlin.math.abs
 
@@ -22,7 +23,8 @@ object JvmStatusHandler : Handler {
     private const val STRING_THRESHOLD = 100
     private val USER_HOME = System.getProperty("user.home")
     private val USER_NAME = System.getProperty("user.name")
-    private val TO_MASKED_FIELDS = setOf(USER_NAME, USER_HOME)
+    private val HOSTNAME = runCatching { InetAddress.getLocalHost().hostName }.getOrDefault("localhost")
+    private val TO_MASKED_FIELDS = setOf(USER_NAME, USER_HOME, HOSTNAME)
     private val customJackson = JavalinJackson().updateMapper {
         it.enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
         it.enable(SerializationFeature.INDENT_OUTPUT)
