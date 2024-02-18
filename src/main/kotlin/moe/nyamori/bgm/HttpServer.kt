@@ -45,10 +45,15 @@ object HttpServer {
                 }
                 get("/health") {
                     val holes = SpaceType.entries.associateWith { RangeHelper.checkHolesForType(it) }
+                    val blogHealth = holes[SpaceType.BLOG]!!.isEmpty()
+
+                    // In case we have other fields counted in isAvailable
+                    @Suppress("UnnecessaryVariable", "RedundantSuppression")
+                    val resIsHealthy = blogHealth
                     it.prettyJson(object {
-                        val isHealthy = holes[SpaceType.BLOG]!!.isEmpty()
+                        val isAvailable = resIsHealthy
                         val holes = holes
-                    })
+                    }, printLog = !resIsHealthy)
                 }
                 path("/history") {
                     get("/status") { it.redirect("/status", HttpStatus.PERMANENT_REDIRECT) }

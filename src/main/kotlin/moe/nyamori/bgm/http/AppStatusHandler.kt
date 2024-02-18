@@ -7,7 +7,6 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_SQLITE_FILE
 import moe.nyamori.bgm.db.DSProvider
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
-import org.flywaydb.core.api.logging.LogFactory
 import org.slf4j.LoggerFactory
 import java.io.File
 
@@ -63,11 +62,11 @@ object AppStatusHandler : Handler {
     }
 }
 
-fun Context.prettyJson(res: Any) {
+fun Context.prettyJson(res: Any?, printLog: Boolean = true) {
     val jm = this.jsonMapper()
     if (jm is JavalinJackson) {
         this.json(
             jm.mapper.writerWithDefaultPrettyPrinter().writeValueAsString(res)
-                .also { LoggerFactory.getLogger(object {}.javaClass).warn("\n" + it) })
-    } else this.json(res)
+                .also { if (printLog) LoggerFactory.getLogger(object {}.javaClass).warn("\n" + it) })
+    } else this.json(res ?: "null")
 }

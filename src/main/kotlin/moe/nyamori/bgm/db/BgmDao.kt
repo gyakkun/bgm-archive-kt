@@ -909,7 +909,10 @@ interface BgmDao : Transactional<BgmDao> {
 
 
     @SqlQuery("select id from ba_topic where type = ?")
-    fun getAllTopicIdByType(type: Int): List<Int>
+    fun getAllTopicIdByType(type: Int): ArrayList<Int>
+
+    @SqlQuery("select max(id) from ba_topic where type = ?")
+    fun getMaxTopicIdByType(type: Int): Int
 
     @SqlUpdate("delete from meta_data")
     @Transaction

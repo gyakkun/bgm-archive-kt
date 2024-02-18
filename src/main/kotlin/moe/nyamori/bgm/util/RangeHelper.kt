@@ -5,7 +5,7 @@ import moe.nyamori.bgm.model.SpaceType
 
 object RangeHelper {
     fun summaryRanges(nums: List<Int>): List<IntArray> {
-        val result: MutableList<IntArray> = ArrayList()
+        val result = mutableListOf<IntArray>()
         if (nums.isEmpty()) return result
         var prev = nums[0]
         var rangeLeft = nums[0] // the left side of the range interval (inclusive)
@@ -46,14 +46,19 @@ object RangeHelper {
     }
 
     fun checkHolesForType(st: SpaceType): List<Int> {
-        var allTopicId: List<Int>? = Dao.bgmDao.getAllTopicIdByType(st.id)
-        val max = allTopicId!!.max()
-        val real = HashSet<Int>().apply { allTopicId!!.forEach { add(it) } }
+        // Concrete type for better performance?
+        var allTopicId: ArrayList<Int>? = Dao.bgmDao.getAllTopicIdByType(st.id)
+        val max = Dao.bgmDao.getMaxTopicIdByType(st.id)
+        var real: HashSet<Int>? = HashSet<Int>(allTopicId!!.size).apply { allTopicId!!.forEach { add(it) } }
+        allTopicId!!.clear();
         allTopicId = null // help gc?
         System.gc()
-        val fake = HashSet<Int>().apply { (1..max).forEach { add(it) } }
-        fake.removeAll(real)
-        val result = summaryRanges(fake.toList().sorted())
+        val fake = HashSet<Int>().apply { for (c in 1..max) add(c) }
+        fake.removeAll(real!!)
+        real.clear()
+        real = null
+        System.gc()
+        val result = summaryRanges(fake.sorted())
         val ng = mutableListOf<Int>()
         result.forEach { topicId ->
             if (topicId.size == 1) {
