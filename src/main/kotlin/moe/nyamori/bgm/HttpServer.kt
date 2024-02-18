@@ -34,6 +34,14 @@ object HttpServer {
             }
             config.router.apiBuilder {
                 get("/status", AppStatusHandler)
+                get("/holes/{spaceType}") {
+                    val spaceType = it.pathParam("spaceType")
+                    if (spaceType.uppercase() !in SpaceType.entries.map { it.name }) {
+                        it.redirect("/holes/blog")
+                        return@get
+                    }
+                    it.html(RangeHelper.checkHolesForType(SpaceType.valueOf(spaceType.uppercase())).joinToString("\n"))
+                }
                 get("/health") {
                     val holes = SpaceType.values().associateWith { RangeHelper.checkHolesForType(it) }
                     it.json(object {
