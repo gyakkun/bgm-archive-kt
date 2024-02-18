@@ -34,6 +34,7 @@ object HttpServer {
             }
             config.router.apiBuilder {
                 get("/status", AppStatusHandler)
+                get("/holes") { it.redirect("/holes/blog") }
                 get("/holes/{spaceType}") {
                     val spaceType = it.pathParam("spaceType")
                     if (spaceType.uppercase() !in SpaceType.entries.map { it.name }) {
