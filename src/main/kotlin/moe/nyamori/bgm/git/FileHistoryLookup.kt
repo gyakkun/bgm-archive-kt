@@ -7,6 +7,7 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
+import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getRevCommitById
 import moe.nyamori.bgm.model.SpaceType
@@ -33,6 +34,7 @@ object FileHistoryLookup {
     }
 
     data class CommitHashAndTimestampAndMsg(
+        val repoFolder: String,
         val hash: String,
         val commitTimeEpochMs: Long,
         val authorTimeEpochMs: Long,
@@ -43,23 +45,28 @@ object FileHistoryLookup {
         Caffeine.newBuilder()
             .maximumSize(100)
             .scheduler(Scheduler.systemScheduler())
-            .expireAfterAccess(Duration.ofMinutes(30))
-            .expireAfterWrite(Duration.ofMinutes(30))
+            .expireAfterAccess(Duration.ofMinutes(12))
+            .expireAfterWrite(Duration.ofMinutes(12))
             .build { (repo, relPath) ->
                 getTimestampCommitMapFromRevCommitList(repo, repo.getRevCommitList(relPath))
             }
-
+    // private val repoPathToRevCommitCache = object {
+    //     fun get(p: Pair<Repository, String>): TreeMap<Long, CommitHashAndTimestampAndMsg> {
+    //         val (repo, relPath) = p
+    //         return getTimestampCommitMapFromRevCommitList(repo, repo.getRevCommitList(relPath))
+    //     }
+    // }
 
     fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> =
-        allJsonRepoListSingleton.parallelStream().map {
-                    repoPathToRevCommitCache.get(Pair(it, relativePathToRepoFolder))
+        allJsonRepoListSingleton.parallelStream().map { repo ->
+            repoPathToRevCommitCache.get(repo to relativePathToRepoFolder)
                         .keys
         }.flatMap { it.stream() }.sorted().toList()
 
     fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> =
         allArchiveRepoListSingleton.parallelStream().map outerMap@{ repo ->
             val interm: TreeMap<Long, CommitHashAndTimestampAndMsg> =
-                repoPathToRevCommitCache.get(Pair(repo, relativePathToRepoFolder))
+                repoPathToRevCommitCache.get(repo to relativePathToRepoFolder)
             if (repo.isJsonRepo()) return@outerMap interm.keys
             return@outerMap runCatching {
                 return@outerMap extractExactTimestampFromMetaTs(relativePathToRepoFolder, interm, repo)
@@ -75,12 +82,25 @@ object FileHistoryLookup {
         repo: Repository
     ): List<Long> {
         val spaceType = relativePathToRepoFolder.split("/").first()
+        val jsonChatamTsHintSet = run {
+            if (!relativePathToRepoFolder.endsWith("html")) null
+            else {
+                val jsonRelPath = relativePathToRepoFolder.replace("html", "json")
+                val jsonTsCache = allJsonRepoListSingleton.map { repo ->
+                    repoPathToRevCommitCache.get(repo to jsonRelPath).values.map { it.timestampHint() }
+                }.flatten().toSet()
+                jsonTsCache
+            }
+        }
         if (spaceType.uppercase() !in SpaceType.entries.map { it.name })
             throw IllegalStateException("Not a valid path for space-typed file: $relativePathToRepoFolder")
         val topicIdStr = relativePathToRepoFolder.split("/").last().split(".").first()
         if (topicIdStr.toIntOrNull() == null)
             throw IllegalStateException("Not a valid topic path: $relativePathToRepoFolder")
-        val tsList = interm.values.map innerMap@{ commitHashAndTimestampAndMsg ->
+        val tsList = interm
+            .values
+            .filter { jsonChatamTsHintSet?.contains(it.timestampHint()) ?: true }
+            .map innerMap@{ commitHashAndTimestampAndMsg ->
             val metaTs = repo.getFileContentAsStringInACommit(
                 commitHashAndTimestampAndMsg.hash,
                 "$spaceType/meta_ts.txt",
@@ -120,6 +140,7 @@ object FileHistoryLookup {
                 .map { this.getRevCommitById(it.commitId) }
                 .map {
                     CommitHashAndTimestampAndMsg(
+                        this.folderName(),
                         it.sha1Str(),
                         it.committerIdent.whenAsInstant.toEpochMilli(),
                         it.authorIdent.whenAsInstant.toEpochMilli(),
@@ -162,6 +183,7 @@ object FileHistoryLookup {
                 .call()
             commitList.map {
                 CommitHashAndTimestampAndMsg(
+                    this.folderName(),
                     it.sha1Str(),
                     it.committerIdent.whenAsInstant.toEpochMilli(),
                     it.authorIdent.whenAsInstant.toEpochMilli(),
@@ -188,7 +210,8 @@ object FileHistoryLookup {
         val cmd = "git --no-pager log --pretty=\\\"%H|%ct|%at|%s\\\" -- $relativePathToRepoFolder"
         val gitProcess = Runtime.getRuntime()
             .exec(cmd, null, gitRepoDir)
-        val cmdOut = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = true, printAtStdErr = false)
+        val cmdOut =
+            gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = true, printAtStdErr = false, logCmd = false)
         return cmdOut
             .map { it.replace("\\", "").replace("\"", "") }
             .map {
@@ -213,6 +236,7 @@ object FileHistoryLookup {
                 val authorTimeEpochSec =
                     it.substring(secVerticalBarIdx + 1, thirdVerticalBarIdx).toLongOrNull() ?: return@map null
                 CommitHashAndTimestampAndMsg(
+                    this.folderName(),
                     it.substring(0, firstVerticalBarIdx),
                     commitTimeEpochSec * 1000,
                     authorTimeEpochSec * 1000,
@@ -245,17 +269,17 @@ object FileHistoryLookup {
         timestamp: Long
     ): CommitHashAndTimestampAndMsg {
         val m: Map<Long, CommitHashAndTimestampAndMsg> =
-            repoPathToRevCommitCache.get(Pair(repo, relativePathToRepoFolder))
+            repoPathToRevCommitCache.get(repo to relativePathToRepoFolder)
         if (!m.containsKey(timestamp)) throw IllegalArgumentException("Timestamp $timestamp not in commit history")
         return m[timestamp]!!
     }
 
     fun getArchiveFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): String {
         // Align with json timestamp
-        allArchiveRepoListSingleton.forEach {
-            val timestampRevCommitTreeMap = repoPathToRevCommitCache.get(Pair(it, relativePath))
+        allArchiveRepoListSingleton.forEach { repo ->
+            val timestampRevCommitTreeMap = repoPathToRevCommitCache.get(repo to relativePath)
             if (timestampRevCommitTreeMap[timestamp] != null) {
-                return it.getFileContentAsStringInACommit(timestampRevCommitTreeMap[timestamp]!!.hash, relativePath)
+                return repo.getFileContentAsStringInACommit(timestampRevCommitTreeMap[timestamp]!!.hash, relativePath)
             }
         }
 
@@ -263,17 +287,28 @@ object FileHistoryLookup {
         // extracted from meta_ts.txt
         // For a same scrapy, Json timestamp is always larger than the html exact timestamp
         // So we use `ceilingEntry` here to determine the most near json timestamp by a given exact html timestamp
-        return allArchiveRepoListSingleton.mapNotNull {
-            val timestampRevCommitTreeMap = repoPathToRevCommitCache.get(Pair(it, relativePath))
+        return allArchiveRepoListSingleton.mapNotNull { repo ->
+            val timestampRevCommitTreeMap = repoPathToRevCommitCache.get(repo to relativePath)
             val ent = timestampRevCommitTreeMap.ceilingEntry(timestamp)
             if (ent == null) null
-            else ent.value to it
+            else ent.value to repo
         }
             .minByOrNull { (chatam, _) -> chatam.timestampHint() - timestamp }
             ?.let { (chatam, repo) ->
                 val diffMs = chatam.timestampHint() - timestamp
                 val diffSec = diffMs / 1000
-                log.info("Given timestamp of $relativePath is $timestamp, selected timestamp is ${chatam.timestampHint()}, diff(res-given) = ${diffSec / 60}m${diffSec % 60}s / ${diffMs / 1000}s / ${diffMs}ms")
+                log.info(
+                    "Queried timestamp of $relativePath is ${
+                        Timestamp(timestamp / 1000 * 1000).toInstant()
+                    }, res is ${
+                        Timestamp(chatam.timestampHint() / 1000 * 1000).toInstant()
+                    } at [${chatam.repoFolder}@${
+                        chatam.hash.substring(
+                            0,
+                            8
+                        )
+                    }], diff(res-q) = ${diffSec / 60}m${diffSec % 60}s"
+                )
                 repo.getFileContentAsStringInACommit(chatam.hash, relativePath)
             }
             ?:
@@ -287,10 +322,10 @@ object FileHistoryLookup {
     }
 
     fun getJsonFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): String {
-        allJsonRepoListSingleton.forEach {
-            val timestampRevCommitMap = repoPathToRevCommitCache.get(Pair(it, relativePath))
+        allJsonRepoListSingleton.forEach { repo ->
+            val timestampRevCommitMap = repoPathToRevCommitCache.get(repo to relativePath)
             if (timestampRevCommitMap[timestamp] != null) {
-                return it.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!.hash, relativePath)
+                return repo.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!.hash, relativePath)
             }
         }
 

@@ -14,9 +14,10 @@ private val log = LoggerFactory.getLogger("ExternalProcessHelper")
 fun Process.blockAndPrintProcessResults(
     cmd: String? = null,
     toLines: Boolean = true,
-    printAtStdErr: Boolean = true
+    printAtStdErr: Boolean = true,
+    logCmd: Boolean = true
 ): List<String> {
-    cmd?.let { log.info("Running external process: $it") }
+    cmd?.let { if(logCmd) log.info("Running external process: $it") }
     val result = CopyOnWriteArrayList<String?>()
     val latch = CountDownLatch(2)
     // Here actually block the process

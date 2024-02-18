@@ -4,12 +4,15 @@ import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.ContentType
 import io.javalin.http.Context
+import io.javalin.http.HttpResponseException
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.http.*
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.StringHashingHelper
 
 object HttpServer {
@@ -19,6 +22,10 @@ object HttpServer {
         val app = Javalin.create { config ->
             config.useVirtualThreads = true
             config.http.brotliAndGzipCompression()
+            // Global json pretty
+            // config.jsonMapper(JavalinJackson().updateMapper{
+            //     it.enable(SerializationFeature.INDENT_OUTPUT)
+            // })
             config.bundledPlugins.enableCors { cors ->
                 cors.addRule {
                     it.allowHost("bgm.tv", "bangumi.tv", "chii.in")
@@ -26,7 +33,16 @@ object HttpServer {
                 }
             }
             config.router.apiBuilder {
+                get("/status", AppStatusHandler)
+                get("/health") {
+                    val holes = SpaceType.values().associateWith { RangeHelper.checkHolesForType(it) }
+                    it.json(object {
+                        val isHealthy = holes[SpaceType.BLOG]!!.isEmpty()
+                        val holes = holes
+                    })
+                }
                 path("/history") {
+                    get("/status") { it.redirect("/status", HttpStatus.PERMANENT_REDIRECT) }
                     path("/{spaceType}") {
                         get("/latest_topic_list", LatestTopicListWrapper)
                         path("/{topicId}") {
@@ -39,14 +55,15 @@ object HttpServer {
                         }
 
                     }
-                    get("/status", RepoStatusHandler)
                 }
                 path("/info") {
-                    get("/meta") {
+                    before("/*") {
                         if (!it.isLocalhost()) {
-                            it.status(HttpStatus.NOT_FOUND)
-                            return@get
+                            it.status(HttpStatus.FORBIDDEN)
+                            throw HttpResponseException(HttpStatus.FORBIDDEN)
                         }
+                    }
+                    get("/meta") {
                         it.result(
                             GitHelper.GSON.toJson(
                                 Dao.bgmDao.getAllMetaData().associate { it.k to it.v }
@@ -55,10 +72,6 @@ object HttpServer {
                     }
                     path("/repo") {
                         get("/html") {
-                            if (!it.isLocalhost()) {
-                                it.status(HttpStatus.NOT_FOUND)
-                                return@get
-                            }
                             it.result(
                                 GitHelper.GSON.toJson(
                                     GitHelper.allArchiveRepoListSingleton.mapIndexed { idx, repo ->
@@ -71,10 +84,6 @@ object HttpServer {
                             )
                         }
                         get("/json") {
-                            if (!it.isLocalhost()) {
-                                it.status(HttpStatus.NOT_FOUND)
-                                return@get
-                            }
                             it.result(
                                 GitHelper.GSON.toJson(
                                     GitHelper.allJsonRepoListSingleton.mapIndexed { idx, repo ->

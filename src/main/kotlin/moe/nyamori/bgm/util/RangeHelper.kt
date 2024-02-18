@@ -35,26 +35,32 @@ object RangeHelper {
 
     @JvmStatic
     fun main(argv: Array<String>) {
-        val st = if (argv.isNotEmpty()) kotlin.runCatching {  SpaceType.valueOf(argv[0].uppercase()) }.getOrDefault(SpaceType.BLOG)
-                 else SpaceType.BLOG
+        val spaceType = if (argv.isNotEmpty()) kotlin.runCatching { SpaceType.valueOf(argv[0].uppercase()) }
+            .getOrDefault(SpaceType.BLOG) else SpaceType.BLOG
+        val ng = checkHolesForType(spaceType)
+        for (i in ng) {
+            System.err.println(i)
+            println(i)
+        }
+        System.err.println("Size: ${ng.size}")
+    }
+
+    fun checkHolesForType(st: SpaceType): List<Int> {
         val list = Dao.bgmDao.getAllTopicIdByType(st.id).toSet()
         val max = list.max()
         val fake = (1..max).toMutableSet()
         fake.removeAll(list.toSet())
         val result = summaryRanges(fake.toList().sorted())
         val ng = mutableListOf<Int>()
-        result.forEach {
-            if (it.size == 1) {
-                System.err.println(it[0])
-                ng.add(it[0])
+        result.forEach { topicId ->
+            if (topicId.size == 1) {
+                ng.add(topicId[0])
             } else {
-                (it[0]..it[1]).forEach {
-                    println(it)
-                    System.err.println(it)
+                (topicId[0]..topicId[1]).forEach {
                     ng.add(it)
                 }
             }
         }
-        System.err.println("Size: ${ng.size}")
+        return ng
     }
 }

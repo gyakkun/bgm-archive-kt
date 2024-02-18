@@ -272,8 +272,8 @@ object GitHelper {
         val cmd = "git --no-pager show $commitId:$relativePathToRepoFolder"
         val gitProcess = Runtime.getRuntime()
             .exec(cmd, null, gitRepoDir)
-        val msgList = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = false, printAtStdErr = false)
-        log.info("msgListLen = ${msgList.size}")
+        val msgList = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = false, printAtStdErr = false, logCmd = false)
+        if (msgList.size > 2) log.info("msgListLen = ${msgList.size}")
         if (msgList.last().isBlank()) return msgList.take(msgList.size - 1).joinToString("\n")
         return msgList.joinToString("\n")
     }
@@ -305,6 +305,8 @@ object GitHelper {
 
     fun Repository.absolutePathWithoutDotGit() =
         this.directory.path.split(File.separator).filter { it != DOT_GIT }.joinToString(File.separator)
+
+    fun Repository.folderName() = this.absolutePathWithoutDotGit().split(File.separator).last()
 
     fun Repository.simpleName() =
         this.directory.path.split(File.separator).last { it != DOT_GIT }

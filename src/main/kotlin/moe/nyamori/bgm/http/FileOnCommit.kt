@@ -38,6 +38,12 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
             val ts = TreeSet<Long>().apply {
                 addAll(timestampList)
             }
+            if (ts.isEmpty()) {
+                ctx.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                ctx.html("""<html><body><p>No content found for ${spaceType.name.lowercase()}/$topicId (yet).</p></body>
+                    <style type="text/css">@media (prefers-color-scheme: dark) {body {color: #eee;background: #121212;}</style></html>""".trimMargin())
+                return
+            }
             if (!ts.contains(timestamp)) {
                 var floorTimestamp = ts.floor(timestamp)
                 if (floorTimestamp == null) {
