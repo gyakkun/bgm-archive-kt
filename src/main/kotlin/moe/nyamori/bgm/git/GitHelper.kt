@@ -191,87 +191,94 @@ object GitHelper {
     val notLogRelPathSuffix = setOf("meta_ts.txt")
 
     fun Repository.getFileContentAsStringInACommit(
-        commitId: String, relativePathToRepoFolder: String,
+        commitId: String,
+        relPath: String,
         forceJgit: Boolean = false
-    )
-            : String = runCatching {
+    ): String = runCatching {
         val timing = System.currentTimeMillis()
         val res = if (Config.BGM_ARCHIVE_PREFER_JGIT || forceJgit) {
-            this.getFileContentAsStringInACommitJgit(commitId, relativePathToRepoFolder)
+            this.getFileContentAsStringInACommitJgit(commitId, relPath)
         } else {
-            this.getFileContentAsStringInACommitExtGit(commitId, relativePathToRepoFolder)
+            this.getFileContentAsStringInACommitExtGit(commitId, relPath)
         }
-        if (notLogRelPathSuffix.none { relativePathToRepoFolder.endsWith(it) }) {
+        if (notLogRelPathSuffix.none { relPath.endsWith(it) }) {
             val elapsed = System.currentTimeMillis() - timing
             if (elapsed >= 100) {
                 log.warn(
                     "$this ${
                         if (Config.BGM_ARCHIVE_PREFER_JGIT) "jgit" else "external git"
-                    } get file content: ${elapsed}ms. RelPath: $relativePathToRepoFolder"
+                    } get file content: ${elapsed}ms. RelPath: $relPath"
                 )
             }
         }
         return res
     }.onFailure {
-        log.error("$this Failed to get file content as string at $relativePathToRepoFolder: ", it)
+        log.error("$this Failed to get file content as string at $relPath: ", it)
     }.getOrElse {
-        return this.getFileContentAsStringInACommitJgit(commitId, relativePathToRepoFolder)
+        return this.getFileContentAsStringInACommitJgit(commitId, relPath)
     }
 
-    private fun Repository.getFileContentAsStringInACommitJgit(commitId: String, relativePathToRepoFolder: String)
-            : String = this.use outerUse@{ repo ->
-        val revCommit = repo.parseCommit(ObjectId.fromString(commitId))
+    private fun Repository.getFileContentAsStringInACommitJgit(
+        commitId: String,
+        relPath: String
+    ): String = this.use outerUse@{ repo ->
+        val revCommit = runCatching { repo.parseCommit(ObjectId.fromString(commitId)) }
+            .onFailure {
+                log.error(
+                    "Seems the commit id not exist. repo=${repo.folderName()}, commit id=$commitId : ",
+                    it
+                )
+            }
+            .getOrNull()
         if (revCommit == null) {
             log.error("Failed to parse commit id: $commitId at $repo")
-            return ""
+            return@outerUse ""
         }
-        TreeWalk.forPath(repo, relativePathToRepoFolder, revCommit.tree).use innerUse1@{ treeWalk ->
-            if (treeWalk == null) {
-                if (notLogRelPathSuffix.none { relativePathToRepoFolder.endsWith(it) }) {
-                    log.error("null tree walk for $this - commit - $commitId - path - $relativePathToRepoFolder")
-                }
-                return@innerUse1 ""
+        runCatching { TreeWalk.forPath(repo, relPath, revCommit.tree) }
+            .onFailure {
+                log.error(
+                    "Looks like nothing found in commit for this path.Repo=${
+                        repo.folderName()
+                    }, commit=$commitId, path=$relPath"
+                )
             }
-            val blobId: ObjectId = treeWalk.getObjectId(0)
-            repo.newObjectReader().use innerUse2@{ objectReader ->
-                val objectLoader: ObjectLoader = objectReader.open(blobId)
-                val bytes = objectLoader.bytes
-                val cd = CharsetDetector()
-                cd.setText(bytes)
-                cd.enableInputFilter(true)
-                val cm = cd.detect()
-                val charsetName: String = if (cm == null) {
-                    StandardCharsets.UTF_8.name()
-                } else {
-                    if (cm.name != StandardCharsets.UTF_8.name()) {
-                        log.warn("Select charset ${cm.name} for $relativePathToRepoFolder at commit ${revCommit.shortMessage}")
+            .getOrNull()
+            .use innerUse1@{ treeWalk ->
+                if (treeWalk == null) {
+                    if (notLogRelPathSuffix.none { relPath.endsWith(it) }) {
+                        log.error("null tree walk for $this - commit - $commitId - path - $relPath")
                     }
-                    cm.name
+                    return@outerUse ""
                 }
-                val selectedCharset = charset(charsetName)
-                return@outerUse String(bytes, selectedCharset)
+                val blobId: ObjectId = treeWalk.getObjectId(0) ?: return@outerUse ""
+                repo.newObjectReader().use innerUse2@{ objectReader ->
+                    val objectLoader: ObjectLoader = objectReader.open(blobId)
+                    val bytes = objectLoader.bytes
+                    val cd = CharsetDetector()
+                    cd.setText(bytes)
+                    cd.enableInputFilter(true)
+                    val cm = cd.detect()
+                    val charsetName: String = if (cm == null) {
+                        StandardCharsets.UTF_8.name()
+                    } else {
+                        if (cm.name != StandardCharsets.UTF_8.name()) {
+                            log.warn("Select charset ${cm.name} for $relPath at commit ${revCommit.shortMessage}")
+                        }
+                        cm.name
+                    }
+                    val selectedCharset = charset(charsetName)
+                    return@outerUse String(bytes, selectedCharset)
+                }
             }
-        }
     }
 
-    private fun Repository.getFileContentAsStringInACommitExtGit(commitId: String, relativePathToRepoFolder: String)
-            : String {
-        var gitRepoDir = this.directory
-        if (gitRepoDir.isFile) throw IllegalStateException("Git repo directory should not be a file!")
-        if (gitRepoDir.name == DOT_GIT) {
-            log.debug(
-                "{} is a bare repository?={}. Locating parent work tree folder: {}",
-                this,
-                this.isBare,
-                gitRepoDir.parentFile
-            )
-            gitRepoDir = gitRepoDir.parentFile
-        } else {
-            log.warn("$this is a bare repository. Will use it as-is to find commit list to a file ")
-        }
+    private fun Repository.getFileContentAsStringInACommitExtGit(
+        commitId: String,
+        relativePathToRepoFolder: String
+    ): String {
         val cmd = "git --no-pager show $commitId:$relativePathToRepoFolder"
         val gitProcess = Runtime.getRuntime()
-            .exec(cmd, null, gitRepoDir)
+            .exec(cmd, null, File(this.absolutePathWithoutDotGit()))
         val msgList = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = false, printAtStdErr = false, logCmd = false)
         if (msgList.size > 2) log.info("msgListLen = ${msgList.size}")
         if (msgList.last().isBlank()) return msgList.take(msgList.size - 1).joinToString("\n")

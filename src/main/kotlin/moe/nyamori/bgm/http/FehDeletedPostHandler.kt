@@ -6,15 +6,11 @@ import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import io.javalin.http.util.NaiveRateLimit
-import io.javalin.http.util.RateLimitUtil
-import io.javalin.http.util.RateLimiter
 import moe.nyamori.bgm.git.FileHistoryLookup
-import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.util.BinarySearchHelper
-import moe.nyamori.bgm.util.FilePathHelper
 import moe.nyamori.bgm.util.HttpHelper
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import org.slf4j.LoggerFactory
@@ -45,19 +41,18 @@ object FehDeletedPostHandler : Handler {
     }
 
     fun doHandle(ctx: Context) {
-        val type = ctx.pathParam("type")
-        require(type.isNotBlank() && type in SpaceType.entries.map { it.name.lowercase() }) {
+        val typeParam = ctx.pathParam("type")
+        require(typeParam.isNotBlank() && typeParam in SpaceType.entries.map { it.name.lowercase() }) {
             "Type should be within blog, subject and group!"
         }
+        val spaceType = SpaceType.valueOf(typeParam.uppercase())
         val topicId =
             ctx.pathParam("topicId").toIntOrNull() ?: throw IllegalArgumentException("topicId should be a valid number")
         val postId =
             ctx.pathParam("postId").toIntOrNull() ?: throw IllegalArgumentException("postId should be a valid number")
-
-        val jsonPath = "$type/${FilePathHelper.numberToPath(topicId)}.json"
-        val timestampList = FileHistoryLookup.getJsonTimestampList(jsonPath)
+        val timestampList = FileHistoryLookup.getJsonTimestampList(spaceType, topicId).toList()
         if (timestampList.isEmpty()) {
-            LOGGER.info("Empty for topic : $type - $topicId")
+            LOGGER.info("Empty for topic : $spaceType - $topicId")
             ctx.status(HttpStatus.NOT_FOUND)
             return
         }
@@ -66,8 +61,7 @@ object FehDeletedPostHandler : Handler {
             return cache.computeIfAbsent(ts) {
                 GSON.fromJson(
                     FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
-                        ts,
-                        jsonPath
+                        spaceType, topicId, ts
                     ), Topic::class.java
                 )
             }
@@ -79,7 +73,7 @@ object FehDeletedPostHandler : Handler {
             val topic = topicAtTs(ts)
             topic.getAllPosts().any { it.id == postId }
         } ?: run {
-            LOGGER.info("Empty for post : $type - $topicId - $postId")
+            LOGGER.info("Empty for post : $spaceType - $topicId - $postId")
             ctx.status(HttpStatus.NOT_FOUND)
             return
         }
@@ -91,7 +85,7 @@ object FehDeletedPostHandler : Handler {
             val post = topic.getAllPosts().first { it.id == postId }
             !post.isDeleted() && !post.isAdminDeleted()
         } ?: run {
-            LOGGER.info("All iterated but still not found : $type - $topicId - $postId")
+            LOGGER.info("All iterated but still not found : $spaceType - $topicId - $postId")
             ctx.status(HttpStatus.NOT_FOUND)
             return
         }

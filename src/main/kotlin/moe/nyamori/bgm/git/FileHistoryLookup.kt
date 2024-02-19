@@ -11,7 +11,8 @@ import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getRevCommitById
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.util.GitCommitIdHelper.isJsonRepo
+import moe.nyamori.bgm.model.lowercaseName
+import moe.nyamori.bgm.util.FilePathHelper
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.StringHashingHelper.hashedAbsolutePathWithoutGitId
@@ -19,6 +20,7 @@ import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants.DOT_GIT
 import org.eclipse.jgit.lib.Repository
+import org.eclipse.jgit.revwalk.RevCommit
 import org.slf4j.LoggerFactory
 import java.sql.Timestamp
 import java.time.Duration
@@ -34,146 +36,199 @@ object FileHistoryLookup {
     }
 
     data class CommitHashAndTimestampAndMsg(
-        val repoFolder: String,
+        val repo: Repository,
         val hash: String,
         val commitTimeEpochMs: Long,
         val authorTimeEpochMs: Long,
         val msg: String
     )
 
-    private val repoPathToRevCommitCache: LoadingCache<Pair<Repository, String>, TreeMap<Long, CommitHashAndTimestampAndMsg>> =
-        Caffeine.newBuilder()
+    private val spaceTypeTopicIdPairToChatamPairCache: LoadingCache<
+            Pair<SpaceType, Int/*topicId*/>,
+            TreeMap<Long, ChatamPair>
+            > = Caffeine.newBuilder()
             .maximumSize(100)
             .scheduler(Scheduler.systemScheduler())
             .expireAfterAccess(Duration.ofMinutes(12))
             .expireAfterWrite(Duration.ofMinutes(12))
-            .build { (repo, relPath) ->
-                getTimestampCommitMapFromRevCommitList(repo, repo.getRevCommitList(relPath))
-            }
-    // private val repoPathToRevCommitCache = object {
-    //     fun get(p: Pair<Repository, String>): TreeMap<Long, CommitHashAndTimestampAndMsg> {
-    //         val (repo, relPath) = p
-    //         return getTimestampCommitMapFromRevCommitList(repo, repo.getRevCommitList(relPath))
-    //     }
-    // }
+        .build { (spaceType, topicId) ->
+            getExactTimestampToChatamMapByTopicTypeAndId(spaceType, topicId)
+        }
 
-    fun getJsonTimestampList(relativePathToRepoFolder: String): List<Long> =
-        allJsonRepoListSingleton.parallelStream().map { repo ->
-            repoPathToRevCommitCache.get(repo to relativePathToRepoFolder)
-                        .keys
-        }.flatMap { it.stream() }.sorted().toList()
 
-    fun getArchiveTimestampList(relativePathToRepoFolder: String): List<Long> =
-        allArchiveRepoListSingleton.parallelStream().map outerMap@{ repo ->
-            val interm: TreeMap<Long, CommitHashAndTimestampAndMsg> =
-                repoPathToRevCommitCache.get(repo to relativePathToRepoFolder)
-            if (repo.isJsonRepo()) return@outerMap interm.keys
-            return@outerMap runCatching {
-                return@outerMap extractExactTimestampFromMetaTs(relativePathToRepoFolder, interm, repo)
-            }.onFailure {
-                log.error("Try to extract exact timestamp for html $relativePathToRepoFolder but got: ", it)
-            }.getOrDefault(interm.keys)
-            // .keys
-        }.flatMap { it.stream() }.sorted().toList()
+    fun getExactTimestampToChatamMapByTopicTypeAndId(spaceType: SpaceType, topicId: Int): TreeMap<Long, ChatamPair> {
+        val jsonRelPath = topicId.toJsonRelPath(spaceType)
+        val htmlRelPath = topicId.toHtmlRelPath(spaceType)
+        val jsonCommitList = getAllChatamByRelativePath(jsonRelPath)
+        val htmlCommitList = getAllChatamByRelativePath(htmlRelPath)
+        val etfmt = extractExactTimestampFromMetaTs(spaceType, topicId, jsonCommitList, htmlCommitList)
+        return etfmt
+    }
+
+    data class ChatamPair(
+        val spaceType: SpaceType,
+        val topicId: Int,
+        val json: CommitHashAndTimestampAndMsg,
+        val html: CommitHashAndTimestampAndMsg
+    )
 
     private fun extractExactTimestampFromMetaTs(
-        relativePathToRepoFolder: String,
-        interm: TreeMap<Long, CommitHashAndTimestampAndMsg>,
-        repo: Repository
-    ): List<Long> {
-        val spaceType = relativePathToRepoFolder.split("/").first()
-        val jsonChatamTsHintSet = run {
-            if (!relativePathToRepoFolder.endsWith("html")) null
-            else {
-                val jsonRelPath = relativePathToRepoFolder.replace("html", "json")
-                val jsonTsCache = allJsonRepoListSingleton.map { repo ->
-                    repoPathToRevCommitCache.get(repo to jsonRelPath).values.map { it.timestampHint() }
-                }.flatten().toSet()
-                jsonTsCache
-            }
-        }
-        if (spaceType.uppercase() !in SpaceType.entries.map { it.name })
-            throw IllegalStateException("Not a valid path for space-typed file: $relativePathToRepoFolder")
-        val topicIdStr = relativePathToRepoFolder.split("/").last().split(".").first()
-        if (topicIdStr.toIntOrNull() == null)
-            throw IllegalStateException("Not a valid topic path: $relativePathToRepoFolder")
-        val tsList = interm
-            .values
-            .filter { jsonChatamTsHintSet?.contains(it.timestampHint()) ?: true }
-            .map innerMap@{ commitHashAndTimestampAndMsg ->
-            val metaTs = repo.getFileContentAsStringInACommit(
-                commitHashAndTimestampAndMsg.hash,
-                "$spaceType/meta_ts.txt",
-                forceJgit = true
-            )
-            if (metaTs.trim().isBlank()) return@innerMap commitHashAndTimestampAndMsg.timestampHint()
-            val exactTs: Long = metaTs.lines()
-                .filter { it.isNotBlank() }
-                .map { it.split(":") }
-                .filter {
+        spaceType: SpaceType,
+        topicId: Int,
+        jsonCommitList: List<CommitHashAndTimestampAndMsg>,
+        archiveCommitList: List<CommitHashAndTimestampAndMsg>
+    ): TreeMap<Long, ChatamPair> {
+        val jsonChatamByTs = jsonCommitList.associateBy { it.timestampHint() }
+        val tsList = archiveCommitList.filter { jsonChatamByTs.contains(it.timestampHint()) }
+            .associate { htmlChatam ->
+                val thePairedJsonChatam = jsonChatamByTs.get(htmlChatam.timestampHint())!!
+                val metaTs = htmlChatam.repo.getFileContentAsStringInACommit(
+                    htmlChatam.hash, "${spaceType.lowercaseName()}/meta_ts.txt", forceJgit = true
+                )
+                if (metaTs.trim().isBlank()) return@associate htmlChatam.timestampHint() to ChatamPair(
+                    spaceType,
+                    topicId,
+                    thePairedJsonChatam,
+                    htmlChatam
+                )
+                val exactTs: Long = metaTs.lines().filter { it.isNotBlank() }.map { it.split(":") }.filter {
                     if (it.size != 2) {
                         log.warn(
-                            "Invalid meta_ts line: $repo - commit - ${
-                                commitHashAndTimestampAndMsg.hash
+                            "Invalid meta_ts line: ${htmlChatam.repo.folderName()} - commit - ${
+                                htmlChatam.hash
                             } - line - $it"
                         )
                         return@filter false
                     } else return@filter true
+                }.associate { it[0] to it[1] }.get(topicId.toString())?.toLongOrNull() ?: run {
+                    log.error(
+                        "Topic id not found in this meta_ts file: ${htmlChatam.repo.folderName()} - commit - ${
+                            htmlChatam.hash
+                        } - type - ${spaceType.lowercaseName()} - topicId - $topicId"
+                    )
+                    htmlChatam.timestampHint()
                 }
-                .associate { it[0] to it[1] }
-                .get(topicIdStr)?.toLongOrNull() ?: throw IllegalStateException(
-                "Topic id not found in this meta_ts file: $repo - commit - ${
-                    commitHashAndTimestampAndMsg.hash
-                } - relative path - $relativePathToRepoFolder - type - $spaceType - topicId - $topicIdStr"
-            )
-            return@innerMap exactTs
-        }
-        return tsList
+                return@associate exactTs to ChatamPair(
+                    spaceType,
+                    topicId,
+                    thePairedJsonChatam, htmlChatam
+                )
+            }
+        return TreeMap<Long, ChatamPair>().apply { putAll(tsList) }
     }
 
     val notLogRelPathSuffix = setOf("meta_ts.txt")
 
-    fun Repository.getRevCommitList(relativePathToRepoFolder: String): List<CommitHashAndTimestampAndMsg> =
+    fun getAllChatamByRelativePath(
+        relPath: String,
+        forceNotDbCache: Boolean = false,
+        forceJgit: Boolean = false
+    ): List<CommitHashAndTimestampAndMsg> = runCatching {
+        if (forceNotDbCache) throw RuntimeException("Force opt out db cache!")
+        val isHtml = relPath.endsWith("html", ignoreCase = true)
+        val isJson = relPath.endsWith("json", ignoreCase = true)
+        if (!isJson && !isHtml) {
+            throw UnsupportedOperationException("Not support get chatam from db cache for non-json and non-html file!")
+        }
+        val repoIdToCommitIdList = Dao.bgmDao.queryRepoCommitForCacheByFileRelativePath(relPath).groupBy { it.repoId }
+        val repoList = if (isHtml) allArchiveRepoListSingleton else allJsonRepoListSingleton
+        val repoIdToRepo = repoList.associateBy { it.hashedAbsolutePathWithoutGitId().toLong() }
+        val res = repoIdToRepo.mapNotNull { (k, repo) ->
+            repoIdToCommitIdList[k]
+                ?.mapNotNull { runCatching { repo.getRevCommitById(it.commitId) }.getOrNull() }
+                ?.map { it.toChatam(repo) }
+        }.flatten()
+        res
+    }.onFailure {
+        log.error("Failed to get all chatam by relPath=$relPath, fallback to git way: ", it)
+    }.getOrNull() ?: runCatching {
+        val timing = System.currentTimeMillis()
+        val isHtml = relPath.endsWith("html", ignoreCase = true)
+        val isJson = relPath.endsWith("json", ignoreCase = true)
+        val repoList = if (isHtml) allArchiveRepoListSingleton
+        else if (isJson) allJsonRepoListSingleton
+        else listOf(allArchiveRepoListSingleton, allJsonRepoListSingleton).flatten()
+
+        val res = if (Config.BGM_ARCHIVE_PREFER_JGIT || forceJgit) {
+            repoList.parallelStream().map {
+                runCatching {
+                    it.getRevCommitListJgit(relPath)
+                }.onFailure {
+                    log.error(
+                        "Failed to get rev commit list from jgit for path=$relPath. Try fallback to ext git. ",
+                        it
+                    )
+                }.getOrNull() ?: runCatching {
+                    it.getRevCommitListExtGit(relPath)
+                }.onFailure {
+                    log.error("Even failed to get rev commit list from ext git for path=$relPath. Will throw ex", it)
+                }.getOrThrow()
+            }.flatMap { it.stream() }.toList()
+        } else repoList.parallelStream().map {
+            runCatching {
+                it.getRevCommitListExtGit(relPath)
+            }.onFailure {
+                log.error("Even failed to get rev commit list from ext git for path=$relPath. Will throw ex", it)
+            }.getOrThrow()
+        }.flatMap { it.stream() }.toList()
+        if (notLogRelPathSuffix.none { relPath.endsWith(it) }) {
+            val elapsed = System.currentTimeMillis() - timing
+            if (elapsed >= 100) {
+                log.warn(
+                    "$this ${
+                        if (Config.BGM_ARCHIVE_PREFER_JGIT) "jgit" else "external git"
+                    } get log timing: ${elapsed}ms. RelPath: $relPath"
+                )
+            }
+        }
+        res
+    }.onFailure {
+        log.error("Ex when getting all chatam by relPath=$relPath using git: ", it)
+    }.getOrDefault(emptyList())
+
+    fun RevCommit.toChatam(repo: Repository) = CommitHashAndTimestampAndMsg(
+        repo,
+        this.sha1Str(),
+        this.committerIdent.whenAsInstant.toEpochMilli(),
+        this.authorIdent.whenAsInstant.toEpochMilli(),
+        this.fullMessage
+    )
+
+    fun Repository.getRevCommitList(relPath: String): List<CommitHashAndTimestampAndMsg> =
         runCatching {
-            val repoIdCommitIdList = Dao.bgmDao.queryRepoCommitForCacheByFileRelativePath(relativePathToRepoFolder)
+            val repoIdCommitIdList = Dao.bgmDao.queryRepoCommitForCacheByFileRelativePath(relPath)
             repoIdCommitIdList.filter { it.repoId == this.hashedAbsolutePathWithoutGitId().toLong() }
                 .map { this.getRevCommitById(it.commitId) }
-                .map {
-                    CommitHashAndTimestampAndMsg(
-                        this.folderName(),
-                        it.sha1Str(),
-                        it.committerIdent.whenAsInstant.toEpochMilli(),
-                        it.authorIdent.whenAsInstant.toEpochMilli(),
-                        it.fullMessage
-                    )
-                }
-        }.onFailure { }.getOrNull() ?:
+                .map { it.toChatam(this) }
+        }.onFailure {
+            log.error("Failed to get commit list for $relPath by db query: ", it)
+        }.getOrNull() ?:
         runCatching {
             val timing = System.currentTimeMillis()
             val res = if (Config.BGM_ARCHIVE_PREFER_JGIT) {
-                this.getRevCommitListJgit(relativePathToRepoFolder)
+                this.getRevCommitListJgit(relPath)
             } else {
-                this.getRevCommitListExtGit(relativePathToRepoFolder)
+                this.getRevCommitListExtGit(relPath)
             }
-            if (notLogRelPathSuffix.none { relativePathToRepoFolder.endsWith(it) }) {
+            if (notLogRelPathSuffix.none { relPath.endsWith(it) }) {
                 val elapsed = System.currentTimeMillis() - timing
                 if (elapsed >= 100) {
                     log.warn(
                         "$this ${
                             if (Config.BGM_ARCHIVE_PREFER_JGIT) "jgit" else "external git"
-                        } get log timing: ${elapsed}ms. RelPath: $relativePathToRepoFolder"
+                        } get log timing: ${elapsed}ms. RelPath: $relPath"
                     )
                 }
             }
             return res
         }.onFailure {
             log.error(
-                "$this Failed to get rev commit list at $relativePathToRepoFolder by calling external git process: ",
+                "$this Failed to get rev commit list at $relPath by calling external git process: ",
                 it
             )
         }.getOrElse {
-            log.warn("Fall back to jgit get commit history for $relativePathToRepoFolder at $this")
-            return this.getRevCommitListJgit(relativePathToRepoFolder)
+            log.warn("Fall back to jgit get commit history for $relPath at $this")
+            return this.getRevCommitListJgit(relPath)
         }
 
     private fun Repository.getRevCommitListJgit(relativePathToRepoFolder: String): List<CommitHashAndTimestampAndMsg> {
@@ -181,15 +236,7 @@ object FileHistoryLookup {
             val commitList = git.log()
                 .addPath(relativePathToRepoFolder)
                 .call()
-            commitList.map {
-                CommitHashAndTimestampAndMsg(
-                    this.folderName(),
-                    it.sha1Str(),
-                    it.committerIdent.whenAsInstant.toEpochMilli(),
-                    it.authorIdent.whenAsInstant.toEpochMilli(),
-                    it.fullMessage
-                )
-            }
+            commitList.map { it.toChatam(this) }
         }
     }
 
@@ -236,7 +283,7 @@ object FileHistoryLookup {
                 val authorTimeEpochSec =
                     it.substring(secVerticalBarIdx + 1, thirdVerticalBarIdx).toLongOrNull() ?: return@map null
                 CommitHashAndTimestampAndMsg(
-                    this.folderName(),
+                    this,
                     it.substring(0, firstVerticalBarIdx),
                     commitTimeEpochSec * 1000,
                     authorTimeEpochSec * 1000,
@@ -246,74 +293,24 @@ object FileHistoryLookup {
     }
 
 
-    private fun getTimestampCommitMapFromRevCommitList(
-        repo: Repository,
-        revCommitIdList: List<CommitHashAndTimestampAndMsg>
-    ): TreeMap<Long, CommitHashAndTimestampAndMsg/*commit id*/> {
-        val result = TreeMap<Long, CommitHashAndTimestampAndMsg>()
-        revCommitIdList.forEach {
-            if (it.msg.startsWith("META") || it.msg.startsWith("init")) return@forEach
-            val ts = it.msg.split("|").last().trim().toLongOrNull() ?: return@forEach
-            result[ts] = it
-        }
-        // Workaround for historical files added in META commit
-        if (result.isEmpty() && revCommitIdList.isNotEmpty()) {
-            result[revCommitIdList.first().timestampHint()] = revCommitIdList.first()
-        }
-        return result
-    }
-
-    fun getCommitAtTimestampByPath(
-        repo: Repository,
-        relativePathToRepoFolder: String,
-        timestamp: Long
-    ): CommitHashAndTimestampAndMsg {
-        val m: Map<Long, CommitHashAndTimestampAndMsg> =
-            repoPathToRevCommitCache.get(repo to relativePathToRepoFolder)
-        if (!m.containsKey(timestamp)) throw IllegalArgumentException("Timestamp $timestamp not in commit history")
-        return m[timestamp]!!
-    }
-
-    fun getArchiveFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): String {
-        // Align with json timestamp
-        allArchiveRepoListSingleton.forEach { repo ->
-            val timestampRevCommitTreeMap = repoPathToRevCommitCache.get(repo to relativePath)
-            if (timestampRevCommitTreeMap[timestamp] != null) {
-                return repo.getFileContentAsStringInACommit(timestampRevCommitTreeMap[timestamp]!!.hash, relativePath)
-            }
-        }
-
-        // Here probably the given timestamp is from a /link page, where the timestamp is an **exact** one
-        // extracted from meta_ts.txt
-        // For a same scrapy, Json timestamp is always larger than the html exact timestamp
-        // So we use `ceilingEntry` here to determine the most near json timestamp by a given exact html timestamp
-        return allArchiveRepoListSingleton.mapNotNull { repo ->
-            val timestampRevCommitTreeMap = repoPathToRevCommitCache.get(repo to relativePath)
-            val ent = timestampRevCommitTreeMap.ceilingEntry(timestamp)
-            if (ent == null) null
-            else ent.value to repo
-        }
-            .minByOrNull { (chatam, _) -> chatam.timestampHint() - timestamp }
-            ?.let { (chatam, repo) ->
-                val diffMs = chatam.timestampHint() - timestamp
-                val diffSec = diffMs / 1000
-                log.info(
-                    "Queried timestamp of $relativePath is ${
-                        Timestamp(timestamp / 1000 * 1000).toInstant()
-                    }, res is ${
-                        Timestamp(chatam.timestampHint() / 1000 * 1000).toInstant()
-                    } at [${chatam.repoFolder}@${
-                        chatam.hash.substring(
-                            0,
-                            8
-                        )
-                    }], diff(res-q) = ${diffSec / 60}m${diffSec % 60}s"
+    fun getArchiveFileContentAsStringAtTimestamp(spaceType: SpaceType, topicId: Int, timestamp: Long): String {
+        val timestampRevCommitMap = spaceTypeTopicIdPairToChatamPairCache.get(spaceType to topicId)
+        if (timestampRevCommitMap[timestamp] != null) {
+            return timestampRevCommitMap[timestamp]!!.let {
+                val diff = it.html.timestampHint() - timestamp
+                val diffSec = diff / 1000
+                val logSec = diffSec % 60
+                val logMin = diffSec / 60
+                log.info("Diff=${logMin}m${logSec}s for html ${topicId.toHtmlRelPath(spaceType)} in ${it.html.repo.folderName()} : ${it.html.hash}")
+                it.html.repo.getFileContentAsStringInACommit(
+                    it.html.hash,
+                    it.topicId.toHtmlRelPath(it.spaceType),
                 )
-                repo.getFileContentAsStringInACommit(chatam.hash, relativePath)
             }
-            ?:
+        }
+
         throw IllegalStateException(
-            "Should get file content for $relativePath at timestamp=$timestamp(${
+            "Should get file content for $spaceType-$topicId at timestamp=$timestamp(${
                 Timestamp(
                     timestamp
                 ).toInstant()
@@ -321,20 +318,42 @@ object FileHistoryLookup {
         )
     }
 
-    fun getJsonFileContentAsStringAtTimestamp(timestamp: Long, relativePath: String): String {
-        allJsonRepoListSingleton.forEach { repo ->
-            val timestampRevCommitMap = repoPathToRevCommitCache.get(repo to relativePath)
-            if (timestampRevCommitMap[timestamp] != null) {
-                return repo.getFileContentAsStringInACommit(timestampRevCommitMap[timestamp]!!.hash, relativePath)
+    fun getJsonFileContentAsStringAtTimestamp(spaceType: SpaceType, topicId: Int, timestamp: Long): String {
+        val timestampRevCommitMap = spaceTypeTopicIdPairToChatamPairCache.get(spaceType to topicId)
+        if (timestampRevCommitMap[timestamp] != null) {
+            return timestampRevCommitMap[timestamp]!!.let {
+                val diff = it.json.timestampHint() - timestamp
+                val diffSec = diff / 1000
+                val logSec = diffSec % 60
+                val logMin = diffSec / 60
+                log.info("Diff=${logMin}m${logSec}s for json ${topicId.toJsonRelPath(spaceType)} in ${it.json.repo.folderName()} : ${it.json.hash}")
+                it.json.repo.getFileContentAsStringInACommit(
+                    it.json.hash,
+                    it.topicId.toJsonRelPath(it.spaceType),
+                )
             }
         }
 
         throw IllegalStateException(
-            "Should get file content for $relativePath at timestamp=$timestamp(${
+            "Should get file content for $spaceType-$topicId at timestamp=$timestamp(${
                 Timestamp(
                     timestamp
                 ).toInstant()
             }) in json and static repos but got nothing!"
         )
     }
+
+    fun getArchiveTimestampList(spaceType: SpaceType, topicId: Int): SortedSet<Long> {
+        return spaceTypeTopicIdPairToChatamPairCache.get(spaceType to topicId).navigableKeySet()
+    }
+
+    fun getJsonTimestampList(spaceType: SpaceType, topicId: Int): SortedSet<Long> {
+        return spaceTypeTopicIdPairToChatamPairCache.get(spaceType to topicId).navigableKeySet()
+    }
 }
+
+fun Int.toJsonRelPath(spaceType: SpaceType) =
+    spaceType.lowercaseName() + "/" + FilePathHelper.numberToPath(this) + ".json"
+
+fun Int.toHtmlRelPath(spaceType: SpaceType) =
+    spaceType.lowercaseName() + "/" + FilePathHelper.numberToPath(this) + ".html"

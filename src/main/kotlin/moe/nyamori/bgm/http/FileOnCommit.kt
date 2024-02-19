@@ -5,7 +5,10 @@ import io.javalin.http.Handler
 import io.javalin.http.Header.CACHE_CONTROL
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.git.FileHistoryLookup
+import moe.nyamori.bgm.git.toHtmlRelPath
+import moe.nyamori.bgm.git.toJsonRelPath
 import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.lowercaseName
 import moe.nyamori.bgm.util.FilePathHelper
 import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
 import moe.nyamori.bgm.util.ParserHelper.getStyleRevNumberFromHtmlString
@@ -28,19 +31,17 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                 if (timestampPathParam == "latest") Long.MAX_VALUE
                 else if (timestampPathParam.toLongOrNull() != null) timestampPathParam.toLong()
                 else -1L
-            val relativePath =
-                spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + if (isHtml) ".html" else ".json"
             val timestampList = if (isHtml) {
-                FileHistoryLookup.getArchiveTimestampList(relativePath)
+                FileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
             } else {
-                FileHistoryLookup.getJsonTimestampList(relativePath)
+                FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
             }
             val ts = TreeSet<Long>().apply {
                 addAll(timestampList)
             }
             if (ts.isEmpty()) {
-                ctx.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                ctx.html("""<html><body><p>No content found for ${spaceType.name.lowercase()}/$topicId (yet).</p></body>
+                ctx.status(HttpStatus.BAD_REQUEST)
+                ctx.html("""<html><body><p>No content found for ${spaceType.lowercaseName()}/$topicId (yet).</p></body>
                     <style type="text/css">@media (prefers-color-scheme: dark) {body {color: #eee;background: #121212;}</style></html>""".trimMargin())
                 return
             }
@@ -62,16 +63,18 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
             ctx.header(CACHE_CONTROL, "max-age=86400")
             if (isHtml) {
                 var html = FileHistoryLookup.getArchiveFileContentAsStringAtTimestamp(
-                    timestamp,
-                    relativePath
+                    spaceType,
+                    topicId,
+                    timestamp
                 )
                 html = htmlModifier(html)
                 ctx.html(html)
             } else {
                 ctx.json(
                     FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
-                        timestamp,
-                        relativePath
+                        spaceType,
+                        topicId,
+                        timestamp
                     )
                 )
             }

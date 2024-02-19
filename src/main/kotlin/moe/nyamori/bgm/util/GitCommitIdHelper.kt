@@ -26,16 +26,16 @@ object GitCommitIdHelper {
         }
     }
 
-    fun FileHistoryLookup.CommitHashAndTimestampAndMsg.timestampHint(): Long {
+    fun FileHistoryLookup.CommitHashAndTimestampAndMsg.timestampHint(safely: Boolean = false): Long {
         val fallback = this.commitTimeEpochMs.coerceAtMost(authorTimeEpochMs)
         val split = this.msg.split("|")
         return if (split.size == 1) {
             if (this.msg.startsWith("META", ignoreCase = true)
                 || this.msg.startsWith("init", ignoreCase = true)
             ) fallback
-            else {
+            else if (!safely) {
                 throw IllegalStateException("Commit message expected to be ended with unix timestamp but got: \"${this.msg}\"")
-            }
+            } else fallback
         } else {
             split.last().trim().toLongOrNull() ?: fallback
         }

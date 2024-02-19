@@ -64,3 +64,5 @@ enum class SpaceType(val id: Int) {
     PERSON(200), // TBC
     CHARACTER(300) // TBC
 }
+
+fun SpaceType.lowercaseName(): String = this.name.lowercase()

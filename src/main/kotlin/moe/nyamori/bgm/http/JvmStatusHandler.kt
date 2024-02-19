@@ -98,7 +98,7 @@ object JvmStatusHandler : Handler {
                                 if (k in skipFields) return@runCatching
                                 super.serializeAsField(bean, gen, prov)
                             }.onFailure {
-                                LOGGER.info(
+                                LOGGER.debug(
                                     "ignoring ${it.javaClass.name} for field ${this.name} of ${bean.javaClass.name} instance."
                                 )
                             }.getOrDefault(Unit)

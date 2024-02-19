@@ -6,7 +6,6 @@ import io.javalin.http.Header.CACHE_CONTROL
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.util.FilePathHelper
 import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
 import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
@@ -23,15 +22,8 @@ class FileHistory(private val spaceType: SpaceType) : Handler {
             }
             val isHtml = ctx.queryParam("isHtml")?.toBooleanStrictOrNull() ?: false
             val topicId = ctx.pathParam("topicId").toInt()
-            val timestampList = if (isHtml) {
-                FileHistoryLookup.getArchiveTimestampList(
-                    spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".html"
-                )
-            } else {
-                FileHistoryLookup.getJsonTimestampList(
-                    spaceType.name.lowercase() + "/" + FilePathHelper.numberToPath(topicId) + ".json"
-                )
-            }
+            val timestampList = if (isHtml) FileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
+            else FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
             ctx.header(CACHE_CONTROL, "max-age=3600")
             ctx.json(timestampList)
         } catch (ex: Exception) {
