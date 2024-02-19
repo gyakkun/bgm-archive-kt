@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory
 import java.lang.management.ManagementFactory
 import java.net.InetAddress
 import java.sql.Timestamp
+import java.time.Instant
 import kotlin.math.abs
 
 
@@ -79,9 +80,10 @@ object JvmStatusHandler : Handler {
                                                 gen.writeStringField(k, Timestamp(v).toInstant().toString())
                                             } else {
                                                 val actualTs = ManagementFactory.getRuntimeMXBean().startTime + v
+                                                val diffNow = System.currentTimeMillis() - actualTs
                                                 gen.writeStringField(
                                                     k,
-                                                    "T+${v.commaFormatted()} ms - "
+                                                    "T-${diffNow.commaFormatted()} ms , T+${v.commaFormatted()} ms - "
                                                             + Timestamp(actualTs).toInstant().toString()
                                                 )
                                             }
