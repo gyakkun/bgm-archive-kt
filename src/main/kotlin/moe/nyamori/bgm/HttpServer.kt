@@ -50,7 +50,7 @@ object HttpServer {
                         }
                         val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
                         it.html(
-                            RangeHelper.checkHolesForType(spaceType).joinToString("\n")
+                            RangeHelper.checkHolesForType(spaceType).joinToString("\n", postfix = "\n")
                         )
                     }
                     post("/{spaceType}") {
@@ -63,9 +63,9 @@ object HttpServer {
                         val bs = SpotChecker.getBitsetFromLongListStr(body)
                         val holes = RangeHelper.checkHolesForType(spaceType)
                         if (holes.isEmpty()) {
-                            it.html("0"); return@post
+                            it.html("0\n"); return@post
                         }
-                        val res = holes.filter { !bs.get(it) }.joinToString("\n")
+                        val res = holes.filter { !bs.get(it) }.joinToString("\n", postfix = "\n")
                         it.html(res)
                     }
                     get("/{spaceType}/mask") {
@@ -77,10 +77,10 @@ object HttpServer {
                         val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
                         val holes = RangeHelper.checkHolesForType(spaceType)
                         if (holes.isEmpty()) {
-                            it.html("0"); return@get
+                            it.html("0\n"); return@get
                         }
                         val bs = BitSet(holes.max()).apply { holes.forEach { set(it) } }
-                        val res = bs.toLongArray().joinToString("\n")
+                        val res = bs.toLongArray().joinToString("\n", postfix = "\n")
                         it.html(res)
                     }
                 }
