@@ -10,12 +10,17 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
+import moe.nyamori.bgm.git.GitHelper.folderName
+import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.StringHashingHelper
 import java.io.File
+import java.time.Duration
+import java.time.Instant
 import java.util.*
 
 object HttpServer {
@@ -49,8 +54,12 @@ object HttpServer {
                             return@get
                         }
                         val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
+                        val holes = RangeHelper.checkHolesForType(spaceType);
+                        if (holes.isEmpty()) {
+                            it.html(""); return@get
+                        }
                         it.html(
-                            RangeHelper.checkHolesForType(spaceType).joinToString("\n", postfix = "\n")
+                            holes.joinToString("\n", postfix = "\n")
                         )
                     }
                     post("/{spaceType}") {
@@ -100,8 +109,31 @@ object HttpServer {
                     @Suppress("UnnecessaryVariable", "RedundantSuppression")
                     val resIsHealthy = blogHealth
                     it.prettyJson(object {
-                        val isAvailable = resIsHealthy
+                        var isAvailable = resIsHealthy
                         val holes = holes.filter { it.value.isNotEmpty() }
+
+                        @Transient
+                        private val now = Instant.now()
+                        val lastCommits =
+                            (GitHelper.allJsonRepoListSingleton + GitHelper.allArchiveRepoListSingleton)
+                                .map { it.folderName() to it.getLatestCommitRef() }
+                                .associate { p ->
+                                    p.first to object {
+                                        val commitMsg = p.second.shortMessage.trim()
+
+                                        @Transient
+                                        private val _commitTime = Instant.ofEpochMilli(p.second.timestampHint())
+                                        val commitTime = _commitTime.toString()
+                                        val elapsed = Duration.between(
+                                            _commitTime,
+                                            now
+                                        ).also {
+                                            if ("old" !in p.first && it.minusMinutes(15L).isPositive) {
+                                                isAvailable = false
+                                            }
+                                        }.toString()
+                                    }
+                                }
                     }, printLog = !resIsHealthy)
                 }
                 path("/history") {
