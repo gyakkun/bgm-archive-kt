@@ -70,6 +70,16 @@ object GitHelper {
         }
     }
 
+    val allRepoInDisplayOrder by lazy {
+        allArchiveRepoListSingleton
+            .filter { it.hasCouplingJsonRepo() }
+            .map { listOf(it, it.couplingJsonRepo()!!) }
+            .flatten()
+            .let { cps ->
+                cps + (allArchiveRepoListSingleton + allJsonRepoListSingleton).filter { it !in cps }
+            }
+    }
+
     fun Repository.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(): RevWalk {
         require(hasCouplingJsonRepo()) {
             "It should be an archive repo with coupling json repo!"

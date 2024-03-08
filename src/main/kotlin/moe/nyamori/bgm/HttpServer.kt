@@ -10,9 +10,10 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
+import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
-import moe.nyamori.bgm.git.GitHelper.hasCouplingRepo
+import moe.nyamori.bgm.git.GitHelper.hasCouplingJsonRepo
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.model.SpaceType
@@ -116,23 +117,20 @@ object HttpServer {
                         private val now = Instant.now()
 
                         @Suppress("unused", "NestedLambdaShadowedImplicitParameter")
-                        val lastCommits =
-                            (GitHelper.allJsonRepoListSingleton + GitHelper.allArchiveRepoListSingleton)
-                                .filter { it.hasCouplingRepo() }
-                                // .sortedBy { it.folderName() }
+                        val lastCommits = GitHelper.allRepoInDisplayOrder
                                 .map { it.folderName() to it.getLatestCommitRef() }
-                                .associate { p ->
-                                    p.first to object {
-                                        val commitMsg = p.second.shortMessage.trim()
+                                .associate { (folderName, commit) ->
+                                    folderName to object {
+                                        val commitMsg = commit.shortMessage.trim()
 
                                         @Transient
-                                        private val _commitTime = Instant.ofEpochMilli(p.second.timestampHint())
+                                        private val _commitTime = Instant.ofEpochMilli(commit.timestampHint())
                                         val commitTime = _commitTime.toString()
                                         val elapsed = Duration.between(
                                             _commitTime,
                                             now
                                         ).also {
-                                            if ("old" !in p.first && it.minusMinutes(15L).isPositive) {
+                                            if ("old" !in folderName && it.minusMinutes(15L).isPositive) {
                                                 isAvailable = false
                                             }
                                         }

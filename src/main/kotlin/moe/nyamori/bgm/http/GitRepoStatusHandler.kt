@@ -5,12 +5,15 @@ import io.javalin.http.Handler
 import io.javalin.json.JavalinJackson
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
+import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.folderName
+import moe.nyamori.bgm.git.GitHelper.hasCouplingJsonRepo
 import moe.nyamori.bgm.http.HumanReadable.KiB
 import moe.nyamori.bgm.http.HumanReadable.MiB
 import moe.nyamori.bgm.http.HumanReadable.PiB
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadableBytes
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
+import org.eclipse.jgit.api.Git
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.*
@@ -19,8 +22,7 @@ import kotlin.math.absoluteValue
 object GitRepoStatusHandler : Handler {
     override fun handle(ctx: Context) {
         val res = object {
-            val gitRepositories = listOf(GitHelper.allArchiveRepoListSingleton, GitHelper.allJsonRepoListSingleton)
-                .flatten()
+            val gitRepositories = GitHelper.allRepoInDisplayOrder
                 .associate {
                     it.folderName() to run {
                         val gitProcess = Runtime.getRuntime()
