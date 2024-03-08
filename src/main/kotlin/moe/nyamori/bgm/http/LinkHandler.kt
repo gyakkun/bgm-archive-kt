@@ -44,16 +44,24 @@ object LinkHandler : Handler {
         }
         let cele = document.getElementById("content")
         let ulele = document.createElement("ul")
-        cele.innerHTML = ""
+        cele.innerHTML = "" + timelineJsonArr.length + " capture" 
+                + ( (timelineJsonArr.length > 1) ? "s" : "" ) 
+                + " in total:"
         cele.appendChild(ulele)
-        timelineJsonArr.forEach(element => {
+        for(idx in timelineJsonArr) {
+            let ts = timelineJsonArr[idx]
             let li = document.createElement("li")
             let a = document.createElement("a")
-            a.innerHTML = new Date(element).toLocaleString()
-            a.setAttribute("href", document.location.pathname.replace("/link", "/") + element + "/html")
+            a.innerHTML = new Date(ts).toLocaleString()
+            a.setAttribute("href", document.location.pathname.replace("/link", "/") + ts + "/html")
             li.appendChild(a)
+            if (idx > 0 && new Date(ts).getDate() != new Date(timelineJsonArr[idx-1]).getDate()) {
+                let hrzn = document.createElement("div")
+                hrzn.innerHTML = "---------------------"
+                ulele.appendChild(hrzn)
+            }
             ulele.appendChild(li)
-        });
+        }
 
     }
     go()
