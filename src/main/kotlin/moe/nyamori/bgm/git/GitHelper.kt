@@ -330,4 +330,6 @@ object GitHelper {
     fun Repository.couplingArchiveRepo() = allArchiveRepoListSingleton.firstOrNull { archiveRepo ->
         absolutePathWithoutDotGit() == archiveRepo.absolutePathWithoutDotGit() + "-json"
     }
+
+    fun Repository.hasCouplingRepo() = hasCouplingArchiveRepo() || hasCouplingJsonRepo()
 }

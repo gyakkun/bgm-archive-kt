@@ -12,6 +12,7 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
+import moe.nyamori.bgm.git.GitHelper.hasCouplingRepo
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.model.SpaceType
@@ -104,7 +105,6 @@ object HttpServer {
                         }.getOrDefault(res)
                     }
                     val blogHealth = holes[SpaceType.BLOG]!!.isEmpty()
-
                     // In case we have other fields counted in isAvailable
                     @Suppress("UnnecessaryVariable", "RedundantSuppression")
                     val resIsHealthy = blogHealth
@@ -114,8 +114,12 @@ object HttpServer {
 
                         @Transient
                         private val now = Instant.now()
+
+                        @Suppress("unused", "NestedLambdaShadowedImplicitParameter")
                         val lastCommits =
                             (GitHelper.allJsonRepoListSingleton + GitHelper.allArchiveRepoListSingleton)
+                                .filter { it.hasCouplingRepo() }
+                                // .sortedBy { it.folderName() }
                                 .map { it.folderName() to it.getLatestCommitRef() }
                                 .associate { p ->
                                     p.first to object {
@@ -131,7 +135,23 @@ object HttpServer {
                                             if ("old" !in p.first && it.minusMinutes(15L).isPositive) {
                                                 isAvailable = false
                                             }
-                                        }.toString()
+                                        }
+                                            .toString()
+                                            .replace("PT", "")
+                                            .replace("\\.\\d+".toRegex(), "")
+                                            .replace("[a-zA-Z]".toRegex()) { it.value + " " }
+                                            .replace("\\d+(?=H)".toRegex()) {
+                                                it.value
+                                                    .toIntOrNull()
+                                                    ?.let {
+                                                        val d = it / 24
+                                                        val h = it % 24
+                                                        "${d}D $h".takeIf { d > 0 }
+                                                    }
+                                                    ?: it.value
+                                            }
+                                            .removeSuffix(" ")
+                                            .lowercase()
                                     }
                                 }
                     }, printLog = !resIsHealthy)
