@@ -38,7 +38,7 @@ object LinkHandler : Handler {
 
     const go = async () => {
         let timelineJsonArr = await getTimeline()
-        if (timelineJsonArr.length === 0) {
+        if (timelineJsonArr.length == 0) {
             onNoContent()
             return
         }
@@ -48,43 +48,20 @@ object LinkHandler : Handler {
                 + ( (timelineJsonArr.length > 1) ? "s" : "" ) 
                 + " in total:"
         cele.appendChild(ulele)
-        let dateGroups = Object.groupBy( timelineJsonArr, (ts)=>{ return new Date(ts).toLocaleDateString() } )
-        for(date in dateGroups) {
-            let msg = ""
-            // let msg = dateGroups[date].length + " in " + date
-            let expectLen = 21
-            let remainLen = expectLen - msg.length
-            let dashCountEachSide = remainLen / 2
-            let statLine = ""
-            for(let i=0;i<dashCountEachSide;i++) statLine += "-"
-            statLine += msg
-            for(let i=0;i<dashCountEachSide;i++) statLine += "-"
-            let hrzn = document.createElement("div")
-            hrzn.innerHTML = statLine
-            ulele.appendChild(hrzn)
-            for(ts of dateGroups[date]) {
-                let li = document.createElement("li")
-                let a = document.createElement("a")
-                a.innerHTML = new Date(ts).toLocaleString()
-                a.setAttribute("href", document.location.pathname.replace("/link", "/") + ts + "/html")
-                li.appendChild(a)      
-                ulele.appendChild(li)
+        for(idx in timelineJsonArr) {
+            let ts = timelineJsonArr[idx]
+            let li = document.createElement("li")
+            let a = document.createElement("a")
+            a.innerHTML = new Date(ts).toLocaleString()
+            a.setAttribute("href", document.location.pathname.replace("/link", "/") + ts + "/html")
+            li.appendChild(a)
+            if (idx > 0 && new Date(ts).toLocaleDateString() != new Date(timelineJsonArr[idx-1]).toLocaleDateString()) {
+                let hrzn = document.createElement("div")
+                hrzn.innerHTML = "---------------------"
+                ulele.appendChild(hrzn)
             }
+            ulele.appendChild(li)
         }
-        // for(idx in timelineJsonArr) {
-        //     let ts = timelineJsonArr[idx]
-        //     let li = document.createElement("li")
-        //     let a = document.createElement("a")
-        //     a.innerHTML = new Date(ts).toLocaleString()
-        //     a.setAttribute("href", document.location.pathname.replace("/link", "/") + ts + "/html")
-        //     li.appendChild(a)
-        //     if (idx > 0 && new Date(ts).toLocaleDateString() != new Date(timelineJsonArr[idx-1]).toLocaleDateString()) {
-        //         let hrzn = document.createElement("div")
-        //         hrzn.innerHTML = "---------------------"
-        //         ulele.appendChild(hrzn)
-        //     }
-        //     ulele.appendChild(li)
-        // }
 
     }
     go()
