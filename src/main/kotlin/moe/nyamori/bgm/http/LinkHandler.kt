@@ -27,7 +27,6 @@ object LinkHandler : Handler {
     const getTimeline = async () => {
         let path = document.location.pathname
         let timelineList = []
-        // let jsonListPath = path.replace("/link", "")
         let jsonListPath = path.replace("/link", "?isHtml=true")
         timelineList = await fetch(jsonListPath)
             .then(d => { return d.text() })
@@ -38,7 +37,7 @@ object LinkHandler : Handler {
 
     const go = async () => {
         let timelineJsonArr = await getTimeline()
-        if (timelineJsonArr.length == 0) {
+        if (timelineJsonArr.length === 0) {
             onNoContent()
             return
         }
@@ -55,7 +54,7 @@ object LinkHandler : Handler {
             a.innerHTML = new Date(ts).toLocaleString()
             a.setAttribute("href", document.location.pathname.replace("/link", "/") + ts + "/html")
             li.appendChild(a)
-            if (idx > 0 && new Date(ts).toLocaleDateString() != new Date(timelineJsonArr[idx-1]).toLocaleDateString()) {
+            if (idx > 0 && new Date(ts).toLocaleDateString() !== new Date(timelineJsonArr[idx-1]).toLocaleDateString()) {
                 let hrzn = document.createElement("div")
                 hrzn.innerHTML = "---------------------"
                 ulele.appendChild(hrzn)
