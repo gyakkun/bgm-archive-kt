@@ -55,7 +55,7 @@ object LinkHandler : Handler {
             a.innerHTML = new Date(ts).toLocaleString()
             a.setAttribute("href", document.location.pathname.replace("/link", "/") + ts + "/html")
             li.appendChild(a)
-            if (idx > 0 && new Date(ts).getDate() != new Date(timelineJsonArr[idx-1]).getDate()) {
+            if (idx > 0 && new Date(ts).toLocaleDateString() != new Date(timelineJsonArr[idx-1]).toLocaleDateString()) {
                 let hrzn = document.createElement("div")
                 hrzn.innerHTML = "---------------------"
                 ulele.appendChild(hrzn)
