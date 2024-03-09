@@ -40,7 +40,7 @@ object HttpServer {
                 }
             }
             config.requestLogger.http { ctx, timingMs ->
-                val reqSalt = ctx.attribute("reqSalt") as Long?
+                val reqSalt: Long = ctx.attribute("reqSalt") ?: return@http
                 if (timingMs >= 3000) LOGGER.error(
                     "[{}] Timing {}ms. Super long for req: {}", reqSalt, timingMs.toLong(), ctx.fullUrl()
                 )
@@ -238,6 +238,7 @@ object HttpServer {
             }
         }.beforeMatched {
             if (it.matchedPath() == "/*") return@beforeMatched
+            if (it.isLocalhost()) return@beforeMatched
             val crawlers =
                 listOf("bingbot", "googlebot", "yandexbot", "applebot", "duckduckbot", "spider", "company")
             if (true == it.userAgent()
