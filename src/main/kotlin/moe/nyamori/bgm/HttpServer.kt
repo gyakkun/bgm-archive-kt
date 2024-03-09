@@ -2,31 +2,28 @@ package moe.nyamori.bgm
 
 import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
-import io.javalin.http.ContentType
-import io.javalin.http.Context
-import io.javalin.http.HttpResponseException
-import io.javalin.http.HttpStatus
+import io.javalin.http.*
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
-import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
-import moe.nyamori.bgm.git.GitHelper.hasCouplingJsonRepo
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
+import moe.nyamori.bgm.http.HumanReadable.toHumanReadable
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.StringHashingHelper
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.Duration
 import java.time.Instant
 import java.util.*
 
 object HttpServer {
-
+    private val LOGGER = LoggerFactory.getLogger(HttpServer::class.java)
     @JvmStatic
     fun main(args: Array<String>) {
         val app = Javalin.create { config ->
@@ -42,7 +39,35 @@ object HttpServer {
                     it.allowHost("*.bgm.tv", "*.bangumi.tv", "*.chii.in")
                 }
             }
+            config.requestLogger.http { ctx, timingMs ->
+                val reqSalt = ctx.attribute("reqSalt") as Long?
+                if (timingMs >= 3000) LOGGER.error(
+                    "[{}] Timing {}ms. Super long for req: {}", reqSalt, timingMs.toLong(), ctx.fullUrl()
+                )
+                else if (timingMs >= 1000) LOGGER.warn(
+                    "[{}] Timing {}ms. Pretty long for req: {}", reqSalt, timingMs.toLong(), ctx.fullUrl()
+                )
+                else { /* NOP */
+                }
+                if (ctx.status().isError() && ctx.status() != HttpStatus.IM_A_TEAPOT) {
+                    LOGGER.error("[{}] Req failed with code {}", reqSalt, ctx.statusCode())
+                }
+            }
             config.router.apiBuilder {
+                before {
+                    val crawlers =
+                        listOf("bingbot", "googlebot", "yandexbot", "applebot", "duckduckbot", "spider", "company")
+                    if (true == it.userAgent()
+                            ?.let { ua ->
+                                crawlers.any { crwl -> ua.contains(crwl, true) }
+                            }
+                    ) {
+                        throw ImATeapotResponse()
+                    }
+                    val reqSalt = System.currentTimeMillis() and 2047
+                    it.attribute("reqSalt", reqSalt)
+                    LOGGER.info("[{}] Req: {} {} {}", reqSalt, ip(it), it.method(), it.fullUrl())
+                }
                 get("/status", GitRepoStatusHandler)
                 get("/status/git", GitRepoStatusHandler)
                 get("/status/jvm", JvmStatusHandler)
@@ -133,23 +158,8 @@ object HttpServer {
                                             if ("old" !in folderName && it.minusMinutes(15L).isPositive) {
                                                 isAvailable = false
                                             }
-                                        }
-                                            .toString()
-                                            .replace("PT", "")
-                                            .replace("\\.\\d+".toRegex(), "")
-                                            .replace("[a-zA-Z]".toRegex()) { it.value + " " }
-                                            .replace("\\d+(?=H)".toRegex()) {
-                                                it.value
-                                                    .toIntOrNull()
-                                                    ?.let {
-                                                        val d = it / 24
-                                                        val h = it % 24
-                                                        "${d}D $h".takeIf { d > 0 }
-                                                    }
-                                                    ?: it.value
-                                            }
-                                            .removeSuffix(" ")
-                                            .lowercase()
+                                        }.toHumanReadable()
+
                                     }
                                 }
                     }, printLog = !resIsHealthy)
@@ -226,7 +236,13 @@ object HttpServer {
                     get("/deleted-post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
                 }
                 get("/*") { // redirect all
-                    it.redirect("https://bgm.tv" + it.path())
+                    it.redirect(
+                        "https://bgm.tv" + (
+                                it.queryString()
+                                    ?.let { qs -> "${it.path()}?$qs" }
+                                    ?: it.path()
+                                )
+                    )
                 }
                 after {
                     if (it.res().contentType == ContentType.APPLICATION_JSON.mimeType) {

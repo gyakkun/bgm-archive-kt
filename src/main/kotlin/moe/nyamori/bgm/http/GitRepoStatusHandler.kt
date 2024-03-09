@@ -5,17 +5,15 @@ import io.javalin.http.Handler
 import io.javalin.json.JavalinJackson
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
-import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.folderName
-import moe.nyamori.bgm.git.GitHelper.hasCouplingJsonRepo
 import moe.nyamori.bgm.http.HumanReadable.KiB
 import moe.nyamori.bgm.http.HumanReadable.MiB
 import moe.nyamori.bgm.http.HumanReadable.PiB
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadableBytes
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
-import org.eclipse.jgit.api.Git
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.time.Duration
 import java.util.*
 import kotlin.math.absoluteValue
 
@@ -92,6 +90,24 @@ object HumanReadable {
     }
 
     fun Long.commaFormatted() = "%,d".format(this)
+
+
+    fun Duration.toHumanReadable() = this.toString()
+            .replace("PT", "")
+            .replace("\\.\\d+".toRegex(), "")
+            .replace("[a-zA-Z]".toRegex()) { it.value + " " }
+            .replace("\\d+(?=H)".toRegex()) {
+                it.value
+                    .toIntOrNull()
+                    ?.let {
+                        val d = it / 24
+                        val h = it % 24
+                        "${d}D $h".takeIf { d > 0 }
+                    }
+                    ?: it.value
+            }
+            .removeSuffix(" ")
+            .lowercase()
 }
 
 
