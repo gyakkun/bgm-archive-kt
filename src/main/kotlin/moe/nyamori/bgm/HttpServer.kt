@@ -54,20 +54,6 @@ object HttpServer {
                 }
             }
             config.router.apiBuilder {
-                before {
-                    val crawlers =
-                        listOf("bingbot", "googlebot", "yandexbot", "applebot", "duckduckbot", "spider", "company")
-                    if (true == it.userAgent()
-                            ?.let { ua ->
-                                crawlers.any { crwl -> ua.contains(crwl, true) }
-                            }
-                    ) {
-                        throw ImATeapotResponse()
-                    }
-                    val reqSalt = System.currentTimeMillis() and 2047
-                    it.attribute("reqSalt", reqSalt)
-                    LOGGER.info("[{}] Req: {} {} {}", reqSalt, ip(it), it.method(), it.fullUrl())
-                }
                 get("/status", GitRepoStatusHandler)
                 get("/status/git", GitRepoStatusHandler)
                 get("/status/jvm", JvmStatusHandler)
@@ -250,6 +236,20 @@ object HttpServer {
                     }
                 }
             }
+        }.beforeMatched {
+            if (it.matchedPath() == "/*") return@beforeMatched
+            val crawlers =
+                listOf("bingbot", "googlebot", "yandexbot", "applebot", "duckduckbot", "spider", "company")
+            if (true == it.userAgent()
+                    ?.let { ua ->
+                        crawlers.any { crwl -> ua.contains(crwl, true) }
+                    }
+            ) {
+                throw ImATeapotResponse()
+            }
+            val reqSalt = System.currentTimeMillis() and 2047
+            it.attribute("reqSalt", reqSalt)
+            LOGGER.info("[{}] Req: {} {} {}", reqSalt, ip(it), it.method(), it.fullUrl())
         }.start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
 
         Runtime.getRuntime().addShutdownHook(Thread
