@@ -22,6 +22,7 @@ import org.eclipse.jgit.revwalk.RevCommit
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.file.Path
 import java.util.*
 
 
@@ -107,6 +108,14 @@ object CommitToJsonProcessor {
                         for (pathIdx in changedFilePathList.indices) {
                             val path = changedFilePathList[pathIdx]
                             try {
+                                if (path.endsWith(NO_GOOD_FILE_NAME)) {
+                                    handleNoGoodFile(
+                                        Path.of(archiveRepo.absolutePathWithoutDotGit()).resolve(path),
+                                        archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path),
+                                        noGoodIdTreeSet
+                                    )
+                                    continue
+                                }
                                 if (!path.endsWith("html")) continue
                                 log.warn(
                                     "Cur commit id: ${
@@ -233,6 +242,14 @@ object CommitToJsonProcessor {
             }
         }
     }
+
+    private fun handleNoGoodFile(path: Path, content: String, noGoodIdTreeSet: TreeSet<Int>) = runCatching {
+        val curNgFileLines = path.toFile().readLines().mapNotNull { it.toIntOrNull() }
+        val lineInCommit = content.lines().mapNotNull { it.toIntOrNull() }
+        val fullSet = (curNgFileLines + lineInCommit).toSet()
+        val toAdd = fullSet.filter { it in lineInCommit && it !in curNgFileLines }
+        noGoodIdTreeSet.addAll(toAdd)
+    }.onFailure { log.error("Failed to handle no good file: ", it) }
 
     private fun writeJsonRepoLastCommitId(prevProcessedCommit: RevCommit, jsonRepo: Repository) {
         log.info("Writing last commit id: ${jsonRepo.simpleName()}/$prevProcessedCommit")
