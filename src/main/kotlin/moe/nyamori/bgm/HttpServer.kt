@@ -85,7 +85,7 @@ object HttpServer {
                         val bs = SpotChecker.getBitsetFromLongListStr(body)
                         val holes = RangeHelper.checkHolesForType(spaceType)
                         if (holes.isEmpty()) {
-                            it.html("0\n"); return@post
+                            it.html(""); return@post
                         }
                         val res = holes.filter { !bs.get(it) }.joinToString("\n", postfix = "\n")
                         it.html(res)
