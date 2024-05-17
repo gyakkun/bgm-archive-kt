@@ -47,6 +47,8 @@ object Dao {
 
     private val jdbi: Jdbi = Jdbi.create(DSProvider.ds).apply {
         installPlugins()
+        installPlugin(SqlObjectPlugin())
+        installPlugin(KotlinPlugin())
         // setSqlLogger(Slf4JSqlLogger())
     }
 
