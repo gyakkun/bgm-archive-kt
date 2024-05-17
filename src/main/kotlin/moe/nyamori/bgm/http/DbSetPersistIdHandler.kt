@@ -27,16 +27,14 @@ object DbSetPersistIdHandler : Handler {
         val repo = GitHelper.allJsonRepoListSingleton[idx]
         Thread {
             try {
-                if (HttpHelper.DB_WRITE_LOCK.tryLock(10, TimeUnit.SECONDS)) {
+                if (HttpHelper.tryLockDbMs(10_000)) {
                     val result = Dao.bgmDao.updatePrevPersistedCommitId(repo, commitId)
                     LOGGER.info("Set persist id $commitId result: $result")
                 }
             } catch (ignore: Exception) {
 
             } finally {
-                if (HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread) {
-                    HttpHelper.DB_WRITE_LOCK.unlock()
-                }
+                HttpHelper.tryUnlockDb()
             }
         }.start()
         ctx.status(HttpStatus.OK)

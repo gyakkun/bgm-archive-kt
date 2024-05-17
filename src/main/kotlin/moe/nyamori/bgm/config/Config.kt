@@ -74,6 +74,9 @@ object Config {
     val BGM_ARCHIVE_DISABLE_DB_PERSIST: Boolean =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_DISABLE_DB_PERSIST", "false").toBoolean()
 
+    val BGM_ARCHIVE_DB_IS_ENABLE_WAL: Boolean =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_DB_IS_ENABLE_WAL", "false").toBoolean()
+
     val BGM_ARCHIVE_DB_PERSIST_KEY: String =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_DB_PERSIST_KEY",
             UUID.randomUUID().toString()

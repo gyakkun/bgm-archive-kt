@@ -15,6 +15,7 @@ import org.slf4j.LoggerFactory
 object CommitHistoryCacheHelper {
     private val LOGGER = LoggerFactory.getLogger(CommitHistoryCacheHelper::class.java)
     fun Repository.buildCache() {
+        check(HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread)
         val repo = this
         // require(this.hasCouplingJsonRepo() || this.hasCouplingArchiveRepo())
         var isFreshCacheBuild = false

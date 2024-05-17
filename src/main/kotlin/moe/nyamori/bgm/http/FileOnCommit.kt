@@ -5,12 +5,9 @@ import io.javalin.http.Handler
 import io.javalin.http.Header.CACHE_CONTROL
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.git.FileHistoryLookup
-import moe.nyamori.bgm.git.toHtmlRelPath
-import moe.nyamori.bgm.git.toJsonRelPath
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.lowercaseName
-import moe.nyamori.bgm.util.FilePathHelper
-import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
+import moe.nyamori.bgm.util.HttpHelper
 import moe.nyamori.bgm.util.ParserHelper.getStyleRevNumberFromHtmlString
 import org.slf4j.LoggerFactory
 import java.util.*
@@ -20,69 +17,75 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
     private val log = LoggerFactory.getLogger(FileHistory::class.java)
     override fun handle(ctx: Context) {
         try {
-            if (!GIT_RELATED_LOCK.tryLock(30, TimeUnit.SECONDS)) {
+            // Since we no longer rely on git repo to get commit history
+            // Here should be the db read semaphore
+            if (!HttpHelper.DB_READ_SEMAPHORE.tryAcquire(30, TimeUnit.SECONDS)) {
                 ctx.status(HttpStatus.GATEWAY_TIMEOUT)
                 ctx.html("The server is busy. Please wait and refresh later.")
                 return
             }
-            val topicId = ctx.pathParam("topicId").toInt()
-            val timestampPathParam = ctx.pathParam("timestamp")
-            val timestamp =
-                if (timestampPathParam == "latest") Long.MAX_VALUE
-                else if (timestampPathParam.toLongOrNull() != null) timestampPathParam.toLong()
-                else -1L
-            val timestampList = if (isHtml) {
-                FileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
-            } else {
-                FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
-            }
-            val ts = TreeSet<Long>().apply {
-                addAll(timestampList)
-            }
-            if (ts.isEmpty()) {
-                ctx.status(HttpStatus.BAD_REQUEST)
-                ctx.html("""<html><body><p>No content found for ${spaceType.lowercaseName()}/$topicId (yet).</p></body>
-                    <style type="text/css">@media (prefers-color-scheme: dark) {body {color: #eee;background: #121212;}</style></html>""".trimMargin())
-                return
-            }
-            if (!ts.contains(timestamp)) {
-                var floorTimestamp = ts.floor(timestamp)
-                if (floorTimestamp == null) {
-                    floorTimestamp = ts.first()
+            try {
+                val topicId = ctx.pathParam("topicId").toInt()
+                val timestampPathParam = ctx.pathParam("timestamp")
+                val timestamp =
+                    if (timestampPathParam == "latest") Long.MAX_VALUE
+                    else if (timestampPathParam.toLongOrNull() != null) timestampPathParam.toLong()
+                    else -1L
+                val timestampList = if (isHtml) {
+                    FileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
+                } else {
+                    FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
                 }
-                ctx.redirect(
-                    if (isHtml) {
-                        ctx.path().replace(Regex("/${timestampPathParam}/html"), "/${floorTimestamp}/html")
-                    } else {
-                        ctx.path().replace(Regex("/${timestampPathParam}/*\$"), "/${floorTimestamp}")
+                val ts = TreeSet<Long>().apply {
+                    addAll(timestampList)
+                }
+                if (ts.isEmpty()) {
+                    ctx.status(HttpStatus.BAD_REQUEST)
+                    ctx.html(
+                        """<html><body><p>No content found for ${spaceType.lowercaseName()}/$topicId (yet).</p></body>
+                    <style type="text/css">@media (prefers-color-scheme: dark) {body {color: #eee;background: #121212;}</style></html>""".trimMargin()
+                    )
+                    return
+                }
+                if (!ts.contains(timestamp)) {
+                    var floorTimestamp = ts.floor(timestamp)
+                    if (floorTimestamp == null) {
+                        floorTimestamp = ts.first()
                     }
-                )
-                return
-            }
+                    ctx.redirect(
+                        if (isHtml) {
+                            ctx.path().replace(Regex("/${timestampPathParam}/html"), "/${floorTimestamp}/html")
+                        } else {
+                            ctx.path().replace(Regex("/${timestampPathParam}/*\$"), "/${floorTimestamp}")
+                        }
+                    )
+                    return
+                }
 
-            ctx.header(CACHE_CONTROL, "max-age=86400")
-            if (isHtml) {
-                var html = FileHistoryLookup.getArchiveFileContentAsStringAtTimestamp(
-                    spaceType,
-                    topicId,
-                    timestamp
-                )
-                html = htmlModifier(html)
-                ctx.html(html)
-            } else {
-                ctx.json(
-                    FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
+                ctx.header(CACHE_CONTROL, "max-age=86400")
+                if (isHtml) {
+                    var html = FileHistoryLookup.getArchiveFileContentAsStringAtTimestamp(
                         spaceType,
                         topicId,
                         timestamp
                     )
-                )
+                    html = htmlModifier(html)
+                    ctx.html(html)
+                } else {
+                    ctx.json(
+                        FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
+                            spaceType,
+                            topicId,
+                            timestamp
+                        )
+                    )
+                }
+            } finally {
+                HttpHelper.DB_READ_SEMAPHORE.release()
             }
         } catch (ex: Exception) {
             log.error("Ex: ", ex)
             throw ex
-        } finally {
-            if (GIT_RELATED_LOCK.isHeldByCurrentThread) GIT_RELATED_LOCK.unlock()
         }
     }
 

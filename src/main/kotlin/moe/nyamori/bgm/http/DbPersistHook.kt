@@ -6,7 +6,6 @@ import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.JsonToDbProcessor
 import moe.nyamori.bgm.util.HttpHelper
-import java.util.concurrent.TimeUnit
 
 object DbPersistHook : Handler {
     override fun handle(ctx: Context) {
@@ -19,15 +18,13 @@ object DbPersistHook : Handler {
         val idx = ctx.queryParam("idx")?.toIntOrNull() ?: 0
         Thread {
             try {
-                if (HttpHelper.DB_WRITE_LOCK.tryLock(10, TimeUnit.SECONDS)) {
+                if (HttpHelper.tryLockDbMs(10_000)) {
                     JsonToDbProcessor.job(isAll, idx)
                 }
             } catch (ignore: Exception) {
 
             } finally {
-                if (HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread) {
-                    HttpHelper.DB_WRITE_LOCK.unlock()
-                }
+                HttpHelper.tryUnlockDb()
             }
         }.start()
         ctx.status(HttpStatus.OK)

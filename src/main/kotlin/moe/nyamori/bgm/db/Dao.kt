@@ -46,9 +46,8 @@ object Dao {
     }
 
     private val jdbi: Jdbi = Jdbi.create(DSProvider.ds).apply {
-        installPlugin(SqlObjectPlugin())
-        installPlugin(KotlinPlugin())
-        setSqlLogger(Slf4JSqlLogger())
+        installPlugins()
+        // setSqlLogger(Slf4JSqlLogger())
     }
 
     val bgmDao: BgmDao by lazy {

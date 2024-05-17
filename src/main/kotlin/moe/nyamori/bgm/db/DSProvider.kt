@@ -20,6 +20,7 @@ object DSProvider {
             // isAutoCommit = false
             minimumIdle = 2
             maximumPoolSize = 8
+            if (Config.BGM_ARCHIVE_DB_IS_ENABLE_WAL) connectionInitSql = "PRAGMA journal_mode= WAL;"
         }
         HikariDataSource(hikariConfig)
     }

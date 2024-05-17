@@ -17,26 +17,28 @@ import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
 
 object FehDeletedPostHandler : Handler {
-    val GSON = GsonBuilder()
+    private val GSON = GsonBuilder()
         .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
         .registerTypeAdapterFactory(
             SealedTypeAdapterFactory.of(Space::class)
         ).create()
-    val LOGGER = LoggerFactory.getLogger(FehDeletedPostHandler::class.java)
+    private val LOGGER = LoggerFactory.getLogger(FehDeletedPostHandler::class.java)
     override fun handle(ctx: Context) {
         NaiveRateLimit.requestPerTimeUnit(ctx, 20, TimeUnit.MINUTES)
         try {
-            if (!HttpHelper.GIT_RELATED_LOCK.tryLock(30, TimeUnit.SECONDS)) {
+            if (!HttpHelper.DB_READ_SEMAPHORE.tryAcquire(30, TimeUnit.SECONDS)) {
                 ctx.status(HttpStatus.GATEWAY_TIMEOUT)
                 ctx.html("The server is busy. Please wait and refresh later.")
                 return
             }
-            doHandle(ctx)
+            try {
+                doHandle(ctx)
+            } finally {
+                HttpHelper.DB_READ_SEMAPHORE.release()
+            }
         } catch (ex: Exception) {
             LOGGER.error("Ex: ", ex)
             throw ex
-        } finally {
-            if (HttpHelper.GIT_RELATED_LOCK.isHeldByCurrentThread) HttpHelper.GIT_RELATED_LOCK.unlock()
         }
     }
 

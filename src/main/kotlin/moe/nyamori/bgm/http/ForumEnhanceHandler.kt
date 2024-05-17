@@ -61,7 +61,7 @@ object ForumEnhanceHandler : Handler {
 
     override fun handle(ctx: Context) = runBlocking {
         try {
-            if (!HttpHelper.DB_WRITE_LOCK.tryLock(30, TimeUnit.SECONDS) || !HttpHelper.DB_READ_SEMAPHORE.tryAcquire(
+            if (!HttpHelper.DB_READ_SEMAPHORE.tryAcquire(
                     30,
                     TimeUnit.SECONDS
                 )
@@ -76,7 +76,6 @@ object ForumEnhanceHandler : Handler {
                 // val res = getInfoBySpaceTypeAndUsernameList(spaceType, userList).await()
                 val res = CACHE.getAll(userList.map { spaceType to it }).map { it.key.second to it.value }.toMap()
                 ctx.json(res)
-                HttpHelper.DB_READ_SEMAPHORE.release()
             } catch (innerEx: Exception) {
                 throw innerEx
             } finally {
@@ -85,10 +84,6 @@ object ForumEnhanceHandler : Handler {
         } catch (outerEx: Exception) {
             LOGGER.error("Ex when handling forum enhance: ", outerEx)
             throw outerEx
-        } finally {
-            if (HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread) {
-                HttpHelper.DB_WRITE_LOCK.unlock()
-            }
         }
 
     }

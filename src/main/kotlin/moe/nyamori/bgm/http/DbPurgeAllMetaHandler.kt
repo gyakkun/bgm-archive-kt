@@ -70,7 +70,7 @@ object DbPurgeAllMetaHandler : Handler {
 
 
         try {
-            if (HttpHelper.DB_WRITE_LOCK.tryLock(10, TimeUnit.SECONDS)) {
+            if (HttpHelper.tryLockDbMs(10_000)) {
                 val result = Dao.bgmDao._TRUNCATE_ALL_META()
                 LOGGER.error("Truncate all meta. Lines deleted: $result")
                 ctx.result(
@@ -92,9 +92,7 @@ object DbPurgeAllMetaHandler : Handler {
             ctx.status(HttpStatus.INTERNAL_SERVER_ERROR)
             ctx.result(ex.message ?: "Some error. Please check log.")
         } finally {
-            if (HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread) {
-                HttpHelper.DB_WRITE_LOCK.unlock()
-            }
+            HttpHelper.tryUnlockDb()
         }
 
     }

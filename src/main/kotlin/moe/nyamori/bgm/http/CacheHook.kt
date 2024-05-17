@@ -7,9 +7,10 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.util.CommitHistoryCacheHelper.buildCache
 import moe.nyamori.bgm.util.HttpHelper
-import java.util.concurrent.TimeUnit
+import org.slf4j.LoggerFactory
 
 object CacheHook : Handler {
+    private val LOGGER = LoggerFactory.getLogger(CacheHook::class.java)
     override fun handle(ctx: Context) {
         val keyParam = ctx.queryParam("key")
         if (Config.BGM_ARCHIVE_DISABLE_DB_PERSIST || keyParam != Config.BGM_ARCHIVE_DB_PERSIST_KEY) {
@@ -18,16 +19,16 @@ object CacheHook : Handler {
         }
         Thread {
             try {
-                if (HttpHelper.DB_WRITE_LOCK.tryLock(10, TimeUnit.SECONDS)) {
+                if (HttpHelper.tryLockDbMs(10_000)) {
                     listOf(GitHelper.allJsonRepoListSingleton, GitHelper.allArchiveRepoListSingleton).flatten()
                         .forEach { it.buildCache() }
                 }
-            } catch (ignore: Exception) {
-
-            } finally {
-                if (HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread) {
-                    HttpHelper.DB_WRITE_LOCK.unlock()
+            } catch (th: Throwable) {
+                if (th is IllegalStateException) {
+                    LOGGER.error("Not holding lock before building cache: ", th)
                 }
+            } finally {
+                HttpHelper.tryUnlockDb()
             }
         }.start()
         ctx.status(HttpStatus.OK)
