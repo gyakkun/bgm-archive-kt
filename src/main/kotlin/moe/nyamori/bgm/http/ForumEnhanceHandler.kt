@@ -22,7 +22,9 @@ import java.util.concurrent.TimeUnit
 object ForumEnhanceHandler : Handler {
     private val LOGGER = LoggerFactory.getLogger(ForumEnhanceHandler::class.java)
     private val GSON = Gson()
-    private val STRING_OBJECT_TYPE_TOKEN = object : TypeToken<Map<String, Any>>() {}.type
+    @Suppress("UNCHECKED_CAST")
+    private val STRING_OBJECT_TYPE_TOKEN =
+        TypeToken.getParameterized(Map::class.java, String::class.java, Any::class.java) as TypeToken<Map<String, Any>>
     private val CACHE_DURATION = Duration.ofHours(2)
     private const val CACHE_SIZE = 600L
     private val CACHE =
@@ -90,7 +92,7 @@ object ForumEnhanceHandler : Handler {
 
     fun checkValidReq(ctx: Context): Pair<SpaceType, List<String>>? {
         val bodyStr = ctx.body()
-        val bodyMap = GSON.fromJson<Map<String, Any>>(bodyStr, STRING_OBJECT_TYPE_TOKEN)
+        val bodyMap = GSON.fromJson(bodyStr, STRING_OBJECT_TYPE_TOKEN)
         if (bodyMap["type"] == null || bodyMap["type"] !is String || bodyMap["type"]!! !in SpaceType.entries
                 .map { it.name.lowercase() }
         ) {
