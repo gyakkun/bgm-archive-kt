@@ -92,7 +92,7 @@ object JvmStatusHandler : Handler {
                                         in plainFields -> gen.writeNumberField(k, v)
                                         else -> {
                                             // System.err.println(k)
-                                            gen.writeStringField(k, v.toHumanReadableBytes(commaEvery3Digit = true))
+                                            gen.writeStringField(k, v.toHumanReadableBytes())
                                         }
                                     }
                                     return@runCatching

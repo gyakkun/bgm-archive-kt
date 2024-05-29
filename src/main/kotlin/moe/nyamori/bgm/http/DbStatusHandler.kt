@@ -11,7 +11,7 @@ object DbStatusHandler:Handler {
     override fun handle(ctx: Context) {
         ctx.prettyJson(object {
             val db = object {
-                val dbFileSize = File(Config.BGM_ARCHIVE_SQLITE_FILE).length().toHumanReadableBytes(HumanReadable.MiB, true)
+                val dbFileSize = File(Config.BGM_ARCHIVE_SQLITE_FILE).length().toHumanReadableBytes()
                 val dbTableSize = DSProvider.ds.connection.use { conn ->
                     conn.prepareStatement(
                         """
