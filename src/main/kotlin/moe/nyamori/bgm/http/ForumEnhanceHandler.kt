@@ -7,16 +7,15 @@ import com.google.gson.reflect.TypeToken
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import moe.nyamori.bgm.db.*
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
 import java.time.Duration
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
 object ForumEnhanceHandler : Handler {
@@ -27,6 +26,11 @@ object ForumEnhanceHandler : Handler {
         TypeToken.getParameterized(Map::class.java, String::class.java, Any::class.java) as TypeToken<Map<String, Any>>
     private val CACHE_DURATION = Duration.ofHours(2)
     private const val CACHE_SIZE = 600L
+    private val VT_EXECUTOR = Executors.newThreadPerTaskExecutor(
+        Thread.ofVirtual().name("feh-", 0).factory()
+    )
+
+    // private val VT_DISP = VT_EXECUTOR.asCoroutineDispatcher()
     private val CACHE =
         Caffeine.newBuilder()
             .maximumSize(CACHE_SIZE)
@@ -37,7 +41,7 @@ object ForumEnhanceHandler : Handler {
                     return@runBlocking getInfoBySpaceTypeAndUsernameList(
                         key!!.first,
                         listOf(key.second)
-                    ).await()[key.second]!!
+                    ).get()[key.second]!!
                 }
 
                 override fun loadAll(keys: MutableSet<out Pair<SpaceType, String>>?): MutableMap<out Pair<SpaceType, String>, out UserStat> =
@@ -47,7 +51,7 @@ object ForumEnhanceHandler : Handler {
                             .map {
                                 val type = it.key
                                 val usernameList = it.value
-                                val toMerge = getInfoBySpaceTypeAndUsernameList(type, usernameList).await()
+                                val toMerge = getInfoBySpaceTypeAndUsernameList(type, usernameList).get()
                                     .map { Pair(type, it.key) to it.value }
                                     .toMap()
                                 return@map toMerge
@@ -123,73 +127,74 @@ object ForumEnhanceHandler : Handler {
     fun getInfoBySpaceTypeAndUsernameList(
         spaceType: SpaceType,
         usernameList: List<String>
-    ): Deferred<Map<String, UserStat>> = GlobalScope.async {
-        val allPostCountByTypeAndUsernameList = async {
+    ): Future<Map<String, UserStat>> = VT_EXECUTOR.submit<Map<String, UserStat>> {
+//    ): Deferred<Map<String, UserStat>> = GlobalScope.async {
+        val allPostCountByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllPostCountRow>> {
             timingWrapper("getAllPostCountByTypeAndUsernameList") {
                 Dao.bgmDao.getAllPostCountByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val allTopicCountByTypeAndUsernameList = async {
+        val allTopicCountByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllTopicCountRow>> {
             timingWrapper("getAllTopicCountByTypeAndUsernameList") {
                 Dao.bgmDao.getAllTopicCountByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val likesSumByTypeAndUsernameList = async {
+        val likesSumByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikesSumRow>> {
             timingWrapper("getLikesSumByTypeAndUsernameList") {
                 Dao.bgmDao.getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val likeRevSumByTypeAndUsernameList = async {
+        val likeRevSumByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikesSumRow>> {
             timingWrapper("getLikeRevSumByTypeAndUsernameList") {
                 Dao.bgmDao.getLikeRevSumByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val postCountSpaceByTypeAndUsernameList = async {
+        val postCountSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VPostCountSpaceRow>> {
             timingWrapper("getPostCountSpaceByTypeAndUsernameList") {
                 Dao.bgmDao.getPostCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val topicCountSpaceByTypeAndUsernameList = async {
+        val topicCountSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VTopicCountSpaceRow>> {
             timingWrapper("getTopicCountSpaceByTypeAndUsernameList") {
                 Dao.bgmDao.getTopicCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val userLastReplyTopicByTypeAndUsernameList = async {
+        val userLastReplyTopicByTypeAndUsernameList = VT_EXECUTOR.submit<List<VUserLastReplyTopicRow>> {
             timingWrapper("getUserLastReplyTopicByTypeAndUsernameList") {
                 Dao.bgmDao.getUserLastReplyTopicByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val userLatestCreateTopicAndUsernameList = async {
+        val userLatestCreateTopicAndUsernameList = VT_EXECUTOR.submit<List<VUserLatestCreateTopicRow>> {
             timingWrapper("getUserLatestCreateTopicAndUsernameList") {
                 Dao.bgmDao.getUserLatestCreateTopicAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val likeRevCountForSpaceByTypeAndUsernameList = async {
+        val likeRevCountForSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikeRevCountSpaceRow>> {
             timingWrapper("getLikeRevStatForSpaceByTypeAndUsernameList") {
                 Dao.bgmDao.getLikeRevStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val likeCountForSpaceByTypeAndUsernameList = async {
+        val likeCountForSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikeCountSpaceRow>> {
             timingWrapper("getLikeStatForSpaceByTypeAndUsernameList") {
                 Dao.bgmDao.getLikeStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val userLatestLikeRevByTypeAndUsernameList = async {
+        val userLatestLikeRevByTypeAndUsernameList = VT_EXECUTOR.submit<List<VUserLatestLikeRevRow>> {
             timingWrapper("getUserLatestLikeRevByTypeAndUsernameList") {
                 Dao.bgmDao.getUserLatestLikeRevByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
-        val vAllPostCountRows = allPostCountByTypeAndUsernameList.await()
-        val vAllTopicCountRows = allTopicCountByTypeAndUsernameList.await()
-        val vLikesSumRows = likesSumByTypeAndUsernameList.await()
-        val vLikeRevSumRows = likeRevSumByTypeAndUsernameList.await()
-        val vPostCountSpaceRows = postCountSpaceByTypeAndUsernameList.await()
-        val vTopicCountSpaceRows = topicCountSpaceByTypeAndUsernameList.await()
-        val vUserLastReplyTopicRows = userLastReplyTopicByTypeAndUsernameList.await()
-        val vUserLatestCreateTopicRows = userLatestCreateTopicAndUsernameList.await()
-        val vLikeRevCountSpaceRows = likeRevCountForSpaceByTypeAndUsernameList.await()
-        val vLikeCountSpaceRows = likeCountForSpaceByTypeAndUsernameList.await()
-        val vUserLatestLikeRevRows = userLatestLikeRevByTypeAndUsernameList.await()
+        val vAllPostCountRows = allPostCountByTypeAndUsernameList.get()
+        val vAllTopicCountRows = allTopicCountByTypeAndUsernameList.get()
+        val vLikesSumRows = likesSumByTypeAndUsernameList.get()
+        val vLikeRevSumRows = likeRevSumByTypeAndUsernameList.get()
+        val vPostCountSpaceRows = postCountSpaceByTypeAndUsernameList.get()
+        val vTopicCountSpaceRows = topicCountSpaceByTypeAndUsernameList.get()
+        val vUserLastReplyTopicRows = userLastReplyTopicByTypeAndUsernameList.get()
+        val vUserLatestCreateTopicRows = userLatestCreateTopicAndUsernameList.get()
+        val vLikeRevCountSpaceRows = likeRevCountForSpaceByTypeAndUsernameList.get()
+        val vLikeCountSpaceRows = likeCountForSpaceByTypeAndUsernameList.get()
+        val vUserLatestLikeRevRows = userLatestLikeRevByTypeAndUsernameList.get()
         val res = aggregateResult(
             spaceType,
             usernameList,
@@ -205,7 +210,7 @@ object ForumEnhanceHandler : Handler {
             vLikeCountSpaceRows,
             vUserLatestLikeRevRows
         )
-        return@async res
+        return@submit res
     }
 
     private fun aggregateResult(
