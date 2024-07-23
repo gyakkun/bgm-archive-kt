@@ -60,8 +60,10 @@ object HttpServer {
                 get("/status/db", DbStatusHandler)
                 get("/holes") { it.redirect("/holes/blog") }
                 path("/holes") {
-                    get("/{spaceType}") {
+                    get("/{spaceType}") { // get all holes without filtering
                         val spaceTypeParam = it.pathParam("spaceType")
+                        val maxLineQueryParam = it.queryParam("maxLine")
+                        val maxLine = maxLineQueryParam?.toIntOrNull() ?: 100
                         if (spaceTypeParam.uppercase() !in SpaceType.entries.map { it.name }) {
                             it.redirect("/holes/blog")
                             return@get
@@ -72,11 +74,13 @@ object HttpServer {
                             it.html(""); return@get
                         }
                         it.html(
-                            holes.joinToString("\n", postfix = "\n")
+                            holes.take(maxLine).joinToString("\n", postfix = "\n")
                         )
                     }
-                    post("/{spaceType}") {
+                    post("/{spaceType}") { // Accept a bitset
                         val spaceTypeParam = it.pathParam("spaceType")
+                        val maxLineQueryParam = it.queryParam("maxLine")
+                        val maxLine = maxLineQueryParam?.toIntOrNull() ?: 100
                         if (spaceTypeParam.uppercase() !in SpaceType.entries.map { it.name }) {
                             throw HttpResponseException(HttpStatus.BAD_REQUEST)
                         }
@@ -87,7 +91,7 @@ object HttpServer {
                         if (holes.isEmpty()) {
                             it.html(""); return@post
                         }
-                        val res = holes.filter { !bs.get(it) }.joinToString("\n", postfix = "\n")
+                        val res = holes.filter { !bs.get(it) }.take(maxLine).joinToString("\n", postfix = "\n")
                         it.html(res)
                     }
                     get("/{spaceType}/mask") {
