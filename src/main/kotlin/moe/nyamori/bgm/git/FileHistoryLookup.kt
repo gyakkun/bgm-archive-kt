@@ -24,6 +24,7 @@ import org.eclipse.jgit.revwalk.RevCommit
 import org.slf4j.LoggerFactory
 import java.sql.Timestamp
 import java.time.Duration
+import java.time.Instant
 import java.util.*
 
 
@@ -79,9 +80,29 @@ object FileHistoryLookup {
         archiveCommitList: List<CommitHashAndTimestampAndMsg>
     ): TreeMap<Long, ChatamPair> {
         val jsonChatamByTs = jsonCommitList.associateBy { it.timestampHint() }
-        val tsList = archiveCommitList.filter { jsonChatamByTs.contains(it.timestampHint()) }
+        val tsList = archiveCommitList
+            .filter {
+                jsonChatamByTs.contains(it.timestampHint())
+                        || (jsonChatamByTs.isNotEmpty() && it.msg.startsWith("META"))
+            }
             .associate { htmlChatam ->
-                val thePairedJsonChatam = jsonChatamByTs.get(htmlChatam.timestampHint())!!
+                val thePairedJsonChatam = jsonChatamByTs[htmlChatam.timestampHint()] ?: run {
+                    log.warn(
+                        "Seems we need to do special handling for commit: {} , timestampHint = {}",
+                        htmlChatam.msg.trim(),
+                        Instant.ofEpochMilli(htmlChatam.timestampHint())
+                    )
+                    val tm = TreeMap(jsonChatamByTs)
+                    val res = tm.ceilingEntry(htmlChatam.timestampHint())?.value ?: tm.firstEntry().value
+                    log.warn(
+                        "Html commit {} mapped to json commit {}. Time diff (html-json) = {}",
+                        htmlChatam.msg.trim(),
+                        res.msg.trim(),
+                        Duration.ofMillis(htmlChatam.timestampHint() - res.timestampHint())
+                    )
+                    res
+                }
+
                 val metaTs = htmlChatam.repo.getFileContentAsStringInACommit(
                     htmlChatam.hash, "${spaceType.lowercaseName()}/meta_ts.txt", forceJgit = true
                 )
