@@ -17,7 +17,7 @@
         <kotlin.compiler.jvmTarget>21</kotlin.compiler.jvmTarget>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
-        <kt.major.version>2.0.10</kt.major.version>
+        <kt.major.version>2.0.20</kt.major.version>
         <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
     </properties>
 
@@ -27,7 +27,7 @@
                 <groupId>org.jdbi</groupId>
                 <artifactId>jdbi3-bom</artifactId>
                 <type>pom</type>
-                <version>3.45.3</version>
+                <version>3.45.4</version>
                 <scope>import</scope>
             </dependency>
             <dependency>
@@ -55,13 +55,13 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-engine</artifactId>
-            <version>5.11.0-M2</version>
+            <version>5.11.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
-            <version>5.11.0-M2</version>
+            <version>5.11.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -102,7 +102,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.5.6</version>
+            <version>1.5.7</version>
         </dependency>
 
         <dependency>
@@ -127,25 +127,25 @@
         <dependency>
             <groupId>io.javalin</groupId>
             <artifactId>javalin</artifactId>
-            <version>6.2.0</version>
+            <version>6.3.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>brotli4j</artifactId>
-            <version>1.16.0</version>
+            <version>1.17.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>native-linux-x86_64</artifactId>
-            <version>1.16.0</version>
+            <version>1.17.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>native-windows-x86_64</artifactId>
-            <version>1.16.0</version>
+            <version>1.17.0</version>
         </dependency>
 
         <dependency>
@@ -189,13 +189,13 @@
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.46.0.1</version>
+            <version>3.46.1.0</version>
         </dependency>
 
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>10.17.0</version>
+            <version>10.17.2</version>
         </dependency>
 
     </dependencies>
