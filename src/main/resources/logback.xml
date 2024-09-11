@@ -8,9 +8,7 @@
         <file>${user.dir}/log/bgm-archive-kt.log</file>
         <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
             <fileNamePattern>${user.dir}/log/bgm-archive-kt-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
-            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
-                <maxFileSize>100MB</maxFileSize>
-            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxFileSize>100MB</maxFileSize>
             <maxHistory>14</maxHistory>
             <totalSizeCap>1GB</totalSizeCap>
         </rollingPolicy>
