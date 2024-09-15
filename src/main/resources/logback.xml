@@ -6,7 +6,7 @@
               value="%date{ISO8601, UTC} [%thread] %level{5} %logger{10} - %msg%n%ex{full}%xEx{full}"/>
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${user.dir}/log/bgm-archive-kt.log</file>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>${user.dir}/log/bgm-archive-kt-%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
             <maxFileSize>100MB</maxFileSize>
             <maxHistory>14</maxHistory>
