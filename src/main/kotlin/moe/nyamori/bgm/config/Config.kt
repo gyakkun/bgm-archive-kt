@@ -77,6 +77,9 @@ object Config {
     val BGM_ARCHIVE_DB_IS_ENABLE_WAL: Boolean =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_DB_IS_ENABLE_WAL", "false").toBoolean()
 
+    val BGM_ARCHIVE_DISABLE_DB_PERSIST_KEY: Boolean =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_DISABLE_DB_PERSIST_KEY", "false").toBoolean()
+
     val BGM_ARCHIVE_DB_PERSIST_KEY: String =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_DB_PERSIST_KEY",
             UUID.randomUUID().toString()
@@ -85,8 +88,12 @@ object Config {
                         System.err.println("############ DB PERSIST KEY: $key ############")
                         val dbFile = File(BGM_ARCHIVE_SQLITE_FILE)
                         val folder = dbFile.parentFile
-                        if (folder.exists()) folder.mkdirs()
+                        if (!folder.exists()) folder.mkdirs()
                         val keyfile = folder.resolve("db-persist-key")
+                        if (BGM_ARCHIVE_DISABLE_DB_PERSIST_KEY) {
+                            System.err.println("Will not write db persist keyfile due to env config.")
+                            return@runCatching
+                        }
                         if (!keyfile.exists()) keyfile.createNewFile()
                         FileWriter(keyfile).use { fw ->
                             fw.write(key)
