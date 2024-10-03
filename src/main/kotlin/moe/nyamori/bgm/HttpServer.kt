@@ -124,6 +124,7 @@ object HttpServer {
                     // In case we have other fields counted in isAvailable
                     @Suppress("UnnecessaryVariable", "RedundantSuppression")
                     val resIsHealthy = blogHealth
+                    it.status(if (resIsHealthy) 200 else 500)
                     it.prettyJson(object {
                         var isAvailable = resIsHealthy
                         val holes = holes.filter { it.value.isNotEmpty() }
