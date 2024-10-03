@@ -110,7 +110,7 @@ object HttpServer {
                         it.html(res)
                     }
                 }
-                get("/health") {
+                get("/health") { ctx ->
                     val holes = SpaceType.entries.associateWith {
                         val res = RangeHelper.checkHolesForType(it)
                         runCatching {
@@ -122,17 +122,16 @@ object HttpServer {
                     }
                     val blogHealth = holes[SpaceType.BLOG]!!.isEmpty()
                     // In case we have other fields counted in isAvailable
-                    @Suppress("UnnecessaryVariable", "RedundantSuppression")
                     val resIsHealthy = blogHealth
-                    it.status(if (resIsHealthy) 200 else 500)
-                    it.prettyJson(object {
+                    ctx.status(if (resIsHealthy) 200 else 500)
+                    @Suppress("UnnecessaryVariable", "RedundantSuppression", "unused")
+                    ctx.prettyJson(object {
                         var isAvailable = resIsHealthy
                         val holes = holes.filter { it.value.isNotEmpty() }
 
                         @Transient
                         private val now = Instant.now()
 
-                        @Suppress("unused", "NestedLambdaShadowedImplicitParameter")
                         val lastCommits = GitHelper.allRepoInDisplayOrder
                                 .map { it.folderName() to it.getLatestCommitRef() }
                                 .associate { (folderName, commit) ->
@@ -148,9 +147,9 @@ object HttpServer {
                                         ).also {
                                             if ("old" !in folderName && it.minusMinutes(15L).isPositive) {
                                                 isAvailable = false
+                                                ctx.status(500)
                                             }
                                         }.toHumanReadable()
-
                                     }
                                 }
                     }, printLog = !resIsHealthy)
