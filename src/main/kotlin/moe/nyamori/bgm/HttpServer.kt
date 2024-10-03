@@ -110,50 +110,8 @@ object HttpServer {
                         it.html(res)
                     }
                 }
-                get("/health") { ctx ->
-                    val holes = SpaceType.entries.associateWith {
-                        val res = RangeHelper.checkHolesForType(it)
-                        runCatching {
-                            val holesMaskFile = File(System.getProperty("user.home"))
-                                .resolve("source/bgm-archive-holes/${it.name.lowercase()}.txt")
-                            val masked = SpotChecker.getBitsetFromLongPlaintextFile(holesMaskFile)
-                            res.filter { !masked.get(it) }
-                        }.getOrDefault(res)
-                    }
-                    val blogHealth = holes[SpaceType.BLOG]!!.isEmpty()
-                    // In case we have other fields counted in isAvailable
-                    val resIsHealthy = blogHealth
-                    ctx.status(if (resIsHealthy) 200 else 500)
-                    @Suppress("UnnecessaryVariable", "RedundantSuppression", "unused")
-                    ctx.prettyJson(object {
-                        var isAvailable = resIsHealthy
-                        val holes = holes.filter { it.value.isNotEmpty() }
-
-                        @Transient
-                        private val now = Instant.now()
-
-                        val lastCommits = GitHelper.allRepoInDisplayOrder
-                                .map { it.folderName() to it.getLatestCommitRef() }
-                                .associate { (folderName, commit) ->
-                                    folderName to object {
-                                        val commitMsg = commit.shortMessage.trim()
-
-                                        @Transient
-                                        private val _commitTime = Instant.ofEpochMilli(commit.timestampHint())
-                                        val commitTime = _commitTime.toString()
-                                        val elapsed = Duration.between(
-                                            _commitTime,
-                                            now
-                                        ).also {
-                                            if ("old" !in folderName && it.minusMinutes(15L).isPositive) {
-                                                isAvailable = false
-                                                ctx.status(500)
-                                            }
-                                        }.toHumanReadable()
-                                    }
-                                }
-                    }, printLog = !resIsHealthy)
-                }
+                get("/health", healthHandler())
+                head("/health", healthHandler(true))
                 path("/history") {
                     get("/status", GitRepoStatusHandler)
                     path("/{spaceType}") {
@@ -261,6 +219,50 @@ object HttpServer {
         {
             app.stop()
         })
+    }
+
+    private fun healthHandler(isHead: Boolean = false) = Handler { ctx ->
+        val holes = SpaceType.entries.associateWith {
+            val res = RangeHelper.checkHolesForType(it)
+            runCatching {
+                val holesMaskFile = File(System.getProperty("user.home"))
+                    .resolve("source/bgm-archive-holes/${it.name.lowercase()}.txt")
+                val masked = SpotChecker.getBitsetFromLongPlaintextFile(holesMaskFile)
+                res.filter { !masked.get(it) }
+            }.getOrDefault(res)
+        }
+        val blogHealth = holes[SpaceType.BLOG]!!.isEmpty()
+        // In case we have other fields counted in isAvailable
+        var isAvailable = blogHealth
+        val now = Instant.now()
+        val lastCommits = GitHelper.allRepoInDisplayOrder
+            .map { it.folderName() to it.getLatestCommitRef() }
+            .associate { (folderName, commit) ->
+                @Suppress("unused")
+                folderName to object {
+                    val commitMsg = commit.shortMessage.trim()
+
+                    @Transient
+                    private val _commitTime = Instant.ofEpochMilli(commit.timestampHint())
+                    val commitTime = _commitTime.toString()
+                    val elapsed = Duration.between(
+                        _commitTime,
+                        now
+                    ).also {
+                        if ("old" !in folderName && it.minusMinutes(15L).isPositive) {
+                            isAvailable = false
+                            ctx.status(500)
+                        }
+                    }.toHumanReadable()
+                }
+            }
+        ctx.status(if (isAvailable) 200 else 500)
+        if (isHead) return@Handler
+        ctx.prettyJson(object {
+            var isAvailable = isAvailable
+            val holes = holes.filter { it.value.isNotEmpty() }
+            val lastCommits = lastCommits
+        }, printLog = !isAvailable)
     }
 
     private fun ip(ctx: Context) = ctx.header("X-Forwarded-For")?.split(",")?.get(0) ?: ctx.ip()
