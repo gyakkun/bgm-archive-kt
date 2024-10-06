@@ -265,10 +265,14 @@ object HttpServer {
         lastDownTimestamp = if (isAvailable) Long.MAX_VALUE else System.currentTimeMillis()
         ctx.status(if (should500) 200 else 500)
         if (isHead) return@Handler
+        @Suppress("unused")
         ctx.prettyJson(object {
             var isAvailable = isAvailable
             val holes = holes.filter { it.value.isNotEmpty() }
             val lastCommits = lastCommits
+            val lastDownTimestamp = HttpServer.lastDownTimestamp.let {
+                if (it == Long.MAX_VALUE) "long time ago" else Instant.ofEpochMilli(it).toString()
+            }
         }, printLog = !isAvailable)
     }
 
