@@ -4,6 +4,7 @@ import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.*
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.Config.BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
@@ -221,6 +222,9 @@ object HttpServer {
         })
     }
 
+    @Volatile
+    private var lastDownTimestamp: Long = Long.MAX_VALUE
+
     private fun healthHandler(isHead: Boolean = false) = Handler { ctx ->
         val holes = SpaceType.entries.associateWith {
             val res = RangeHelper.checkHolesForType(it)
@@ -256,7 +260,10 @@ object HttpServer {
                     }.toHumanReadable()
                 }
             }
-        ctx.status(if (isAvailable) 200 else 500)
+        val should500 =
+            !isAvailable && ((System.currentTimeMillis() - lastDownTimestamp) > BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS)
+        lastDownTimestamp = if (isAvailable) Long.MAX_VALUE else System.currentTimeMillis()
+        ctx.status(if (should500) 200 else 500)
         if (isHead) return@Handler
         ctx.prettyJson(object {
             var isAvailable = isAvailable

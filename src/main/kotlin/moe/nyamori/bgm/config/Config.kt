@@ -110,4 +110,9 @@ object Config {
 
     val BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS: Long =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS", "200000").toLongOrNull() ?: 200_000 // 200s
+
+    val BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS: Long =
+        System.getenv().getOrDefault("E_BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS", "1200000").toLongOrNull()
+            ?: 1_200_000 // 20min
+
 }
