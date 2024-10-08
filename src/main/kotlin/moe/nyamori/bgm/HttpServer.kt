@@ -262,7 +262,7 @@ object HttpServer {
             }
         val should500 =
             !isAvailable && ((System.currentTimeMillis() - lastDownTimestamp) > BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS)
-        lastDownTimestamp = if (isAvailable) Long.MAX_VALUE else System.currentTimeMillis()
+        lastDownTimestamp = if (isAvailable) Long.MAX_VALUE else Math.min(System.currentTimeMillis(), lastDownTimestamp)
         ctx.status(if (should500) 500 else 200)
         if (isHead) return@Handler
         @Suppress("unused")
