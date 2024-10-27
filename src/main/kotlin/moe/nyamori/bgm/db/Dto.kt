@@ -95,6 +95,10 @@ data class VPostCountSpaceRow(
 
 typealias VAllTopicCountRow = VAllPostCountRow
 typealias VTopicCountSpaceRow = VPostCountSpaceRow
+typealias VAllTopicCount30dRow = VAllTopicCountRow
+typealias VAllTopicCount7dRow = VAllTopicCountRow
+typealias VAllPostCount30dRow = VAllPostCountRow
+typealias VAllPostCount7dRow = VAllPostCountRow
 
 data class VLikeRevCountSpaceRow(
     val type: Int,

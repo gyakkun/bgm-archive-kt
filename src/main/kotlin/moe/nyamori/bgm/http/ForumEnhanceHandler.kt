@@ -7,7 +7,7 @@ import com.google.gson.reflect.TypeToken
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
-import kotlinx.coroutines.*
+import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.db.*
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.SpaceType
@@ -139,6 +139,28 @@ object ForumEnhanceHandler : Handler {
                 Dao.bgmDao.getAllTopicCountByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
+
+        val allPostCount30dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllPostCountRow>> {
+            timingWrapper("getAllPostCount30dByTypeAndUsernameList") {
+                Dao.bgmDao.getAllPostCount30dByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
+        val allTopicCount30dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllTopicCountRow>> {
+            timingWrapper("getAllTopicCount30dByTypeAndUsernameList") {
+                Dao.bgmDao.getAllTopicCount30dByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
+
+        val allPostCount7dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllPostCountRow>> {
+            timingWrapper("getAllPostCount7dByTypeAndUsernameList") {
+                Dao.bgmDao.getAllPostCount7dByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
+        val allTopicCount7dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllTopicCountRow>> {
+            timingWrapper("getAllTopicCount7dByTypeAndUsernameList") {
+                Dao.bgmDao.getAllTopicCount7dByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
         val likesSumByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikesSumRow>> {
             timingWrapper("getLikesSumByTypeAndUsernameList") {
                 Dao.bgmDao.getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
@@ -154,9 +176,29 @@ object ForumEnhanceHandler : Handler {
                 Dao.bgmDao.getPostCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
+        val postCountSpace30dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VPostCountSpaceRow>> {
+            timingWrapper("getPostCountSpace30dByTypeAndUsernameList") {
+                Dao.bgmDao.getPostCountSpace30dByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
+        val postCountSpace7dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VPostCountSpaceRow>> {
+            timingWrapper("getPostCountSpace7dByTypeAndUsernameList") {
+                Dao.bgmDao.getPostCountSpace7dByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
         val topicCountSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VTopicCountSpaceRow>> {
             timingWrapper("getTopicCountSpaceByTypeAndUsernameList") {
                 Dao.bgmDao.getTopicCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
+        val topicCountSpace30dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VTopicCountSpaceRow>> {
+            timingWrapper("getTopicCountSpace30dByTypeAndUsernameList") {
+                Dao.bgmDao.getTopicCountSpace30dByTypeAndUsernameList(spaceType.id, usernameList)
+            }
+        }
+        val topicCountSpace7dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VTopicCountSpaceRow>> {
+            timingWrapper("getTopicCountSpace7dByTypeAndUsernameList") {
+                Dao.bgmDao.getTopicCountSpace7dByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val userLastReplyTopicByTypeAndUsernameList = VT_EXECUTOR.submit<List<VUserLastReplyTopicRow>> {
@@ -186,10 +228,21 @@ object ForumEnhanceHandler : Handler {
         }
         val vAllPostCountRows = allPostCountByTypeAndUsernameList.get()
         val vAllTopicCountRows = allTopicCountByTypeAndUsernameList.get()
+
+        val vAllPostCount30dRows = allPostCount30dByTypeAndUsernameList.get()
+        val vAllTopicCount30dRows = allTopicCount30dByTypeAndUsernameList.get()
+
+        val vAllPostCount7dRows = allPostCount7dByTypeAndUsernameList.get()
+        val vAllTopicCount7dRows = allTopicCount7dByTypeAndUsernameList.get()
+
         val vLikesSumRows = likesSumByTypeAndUsernameList.get()
         val vLikeRevSumRows = likeRevSumByTypeAndUsernameList.get()
         val vPostCountSpaceRows = postCountSpaceByTypeAndUsernameList.get()
+        val vPostCountSpace30dRows = postCountSpace30dByTypeAndUsernameList.get()
+        val vPostCountSpace7dRows = postCountSpace7dByTypeAndUsernameList.get()
         val vTopicCountSpaceRows = topicCountSpaceByTypeAndUsernameList.get()
+        val vTopicCountSpace30dRows = topicCountSpace30dByTypeAndUsernameList.get()
+        val vTopicCountSpace7dRows = topicCountSpace7dByTypeAndUsernameList.get()
         val vUserLastReplyTopicRows = userLastReplyTopicByTypeAndUsernameList.get()
         val vUserLatestCreateTopicRows = userLatestCreateTopicAndUsernameList.get()
         val vLikeRevCountSpaceRows = likeRevCountForSpaceByTypeAndUsernameList.get()
@@ -200,10 +253,23 @@ object ForumEnhanceHandler : Handler {
             usernameList,
             vAllPostCountRows,
             vAllTopicCountRows,
+
+            vAllPostCount30dRows,
+            vAllTopicCount30dRows,
+            vAllPostCount7dRows,
+            vAllTopicCount7dRows,
+
             vLikesSumRows,
             vLikeRevSumRows,
+
             vPostCountSpaceRows,
+            vPostCountSpace30dRows,
+            vPostCountSpace7dRows,
+
             vTopicCountSpaceRows,
+            vTopicCountSpace30dRows,
+            vTopicCountSpace7dRows,
+
             vUserLastReplyTopicRows,
             vUserLatestCreateTopicRows,
             vLikeRevCountSpaceRows,
@@ -218,33 +284,51 @@ object ForumEnhanceHandler : Handler {
         usernameList: List<String>,
         vAllPostCountRows: List<VAllPostCountRow> = emptyList(),
         vAllTopicCountRows: List<VAllTopicCountRow> = emptyList(),
+        vAllPostCount30dRows: List<VAllPostCountRow>,
+        vAllTopicCount30dRows: List<VAllTopicCountRow>,
+        vAllPostCount7dRows: List<VAllPostCountRow>,
+        vAllTopicCount7dRows: List<VAllTopicCountRow>,
         vLikesSumRows: List<VLikesSumRow> = emptyList(),
         vLikeRevSumRows: List<VLikesSumRow> = emptyList(),
         vPostCountSpaceRows: List<VPostCountSpaceRow> = emptyList(),
+        vPostCountSpace30dRows: List<VPostCountSpaceRow> = emptyList(),
+        vPostCountSpace7dRows: List<VPostCountSpaceRow> = emptyList(),
         vTopicCountSpaceRows: List<VTopicCountSpaceRow> = emptyList(),
+        vTopicCountSpace30dRows: List<VTopicCountSpaceRow> = emptyList(),
+        vTopicCountSpace7dRows: List<VTopicCountSpaceRow> = emptyList(),
         vUserLastReplyTopicRows: List<VUserLastReplyTopicRow> = emptyList(),
         vUserLatestCreateTopicRows: List<VUserLatestCreateTopicRow> = emptyList(),
         vLikeRevCountSpaceRows: List<VLikeRevCountSpaceRow>,
         vLikeCountSpaceRows: List<VLikeCountSpaceRow>,
         vUserLatestLikeRevRows: List<VUserLatestLikeRevRow>
     ): Map<String, UserStat> {
+        val r30dPost = vAllPostCount30dRows.groupBy { it.username }
+        val r7dPost = vAllPostCount7dRows.groupBy { it.username }
+        val r30dTopic = vAllTopicCount30dRows.groupBy { it.username }
+        val r7dTopic = vAllTopicCount7dRows.groupBy { it.username }
         val postStatMap = vAllPostCountRows.groupBy { it.username } // ->poststat
             .map {
+                val (username, _) = it
                 val total = it.value.sumOf { it.count }
+                val r7d = r7dPost[username]?.sumOf { it.count } ?: 0
+                val r30d = r30dPost[username]?.sumOf { it.count } ?: 0
                 val deleted = it.value.filter { it.state.isPostDeleted() }.sumOf { it.count }
                 val adminDeleted = it.value.filter { it.state.isPostAdminDeleted() }.sumOf { it.count }
                 val violative = it.value.filter { it.state.isViolative() }.sumOf { it.count }
                 val collapsed = it.value.filter { it.state.isCollapsed() }.sumOf { it.count }
-                it.key to PostStat(total, deleted, adminDeleted, violative, collapsed)
+                it.key to PostStat(total, r7d, r30d, deleted, adminDeleted, violative, collapsed)
             }.toMap()
         val topicStatMap = vAllTopicCountRows.groupBy { it.username }
             .map {
+                val (username, _) = it
                 val total = it.value.sumOf { it.count }
+                val r7d = r7dTopic[username]?.sumOf { it.count } ?: 0
+                val r30d = r30dTopic[username]?.sumOf { it.count } ?: 0
                 val deleted = it.value.filter { it.state.isTopicDeleted() }.sumOf { it.count }
                 val silent = it.value.filter { it.state.isTopicSilent() }.sumOf { it.count }
                 val closed = it.value.filter { it.state.isTopicClosed() }.sumOf { it.count }
                 val reopen = it.value.filter { it.state.isTopicReopen() }.sumOf { it.count }
-                it.key to TopicStat(total, deleted, silent, closed, reopen)
+                it.key to TopicStat(total, r7d, r30d, deleted, silent, closed, reopen)
             }.toMap()
         val likeStatMap = vLikesSumRows.groupBy { it.username }
             .map {
@@ -254,27 +338,55 @@ object ForumEnhanceHandler : Handler {
             .map {
                 it.key to it.value.associate { it.faceKey to it.count }
             }.toMap()
+        val spacePostStatMap30d = vPostCountSpaceRows.groupBy { it.username }
+        val spacePostStatMap7d = vPostCountSpaceRows.groupBy { it.username }
         val spacePostStatMap = vPostCountSpaceRows.groupBy { it.username }
             .map {
+                val (username, _) = it
+                val r30dOuter = (spacePostStatMap30d.get(username) ?: emptyList())
+                val r30dOuterGroupBySpaceName = r30dOuter.groupBy { it.name }
+                val r7dOuter = spacePostStatMap7d.get(username) ?: emptyList()
+                val r7dOuterGroupBySpaceName = r7dOuter.groupBy { it.name }
                 it.key to it.value.groupBy { it.name }.map {
+                    val spaceName = it.key
                     val total = it.value.sumOf { it.count }
+                    val r30d = r30dOuterGroupBySpaceName.get(spaceName)?.sumOf { it.count } ?: 0
+                    val r7d = r7dOuterGroupBySpaceName.get(spaceName)?.sumOf { it.count } ?: 0
                     val deleted = it.value.filter { it.state.isPostDeleted() }.sumOf { it.count }
                     val adminDeleted = it.value.filter { it.state.isPostAdminDeleted() }.sumOf { it.count }
                     val violative = it.value.filter { it.state.isViolative() }.sumOf { it.count }
                     val collapsed = it.value.filter { it.state.isCollapsed() }.sumOf { it.count }
-                    it.key to PostStat(total, deleted, adminDeleted, violative, collapsed) // boring to (1,2,3,0)
+                    it.key to PostStat(
+                        total,
+                        r7d,
+                        r30d,
+                        deleted,
+                        adminDeleted,
+                        violative,
+                        collapsed
+                    ) // boring to (1,2,3,0)
                 }.sortedBy { -(it.second.total) }
                     .toMap() // sai -> { boring: (1,2,3) }
             }.toMap() // { sai: {boring: (1,2,3)} , trim21: {a:(4,5,6)} }
+        val spaceTopicStatMap30d = vTopicCountSpace30dRows.groupBy { it.username }
+        val spaceTopicStatMap7d = vTopicCountSpace7dRows.groupBy { it.username }
         val spaceTopicStatMap = vTopicCountSpaceRows.groupBy { it.username }
             .map {
+                val (username, _) = it
+                val r30dOuter = (spaceTopicStatMap30d.get(username) ?: emptyList())
+                val r30dOuterGroupBySpaceName = r30dOuter.groupBy { it.name }
+                val r7dOuter = spaceTopicStatMap7d.get(username) ?: emptyList()
+                val r7dOuterGroupBySpaceName = r7dOuter.groupBy { it.name }
                 it.key to it.value.groupBy { it.name }.map {
+                    val spaceName = it.key
                     val total = it.value.sumOf { it.count }
+                    val r30d = r30dOuterGroupBySpaceName.get(spaceName)?.sumOf { it.count } ?: 0
+                    val r7d = r7dOuterGroupBySpaceName.get(spaceName)?.sumOf { it.count } ?: 0
                     val deleted = it.value.filter { it.state.isTopicDeleted() }.sumOf { it.count }
                     val silent = it.value.filter { it.state.isTopicSilent() }.sumOf { it.count }
                     val closed = it.value.filter { it.state.isTopicClosed() }.sumOf { it.count }
                     val reopen = it.value.filter { it.state.isTopicReopen() }.sumOf { it.count }
-                    it.key to TopicStat(total, deleted, silent, closed, reopen) // boring to (1,2,3)
+                    it.key to TopicStat(total, r7d, r30d, deleted, silent, closed, reopen) // boring to (1,2,3)
                 }.sortedBy { -(it.second.total) }
                     .toMap() // sai -> { boring: (1,2,3) }
             }.toMap() // { sai: {boring: (1,2,3)} , trim21: {a:(4,5,6)} }
@@ -444,6 +556,8 @@ object ForumEnhanceHandler : Handler {
 
     data class PostStat(
         val total: Int = 0,
+        val r7d: Int = 0,
+        val r30d: Int = 0,
         val deleted: Int = 0,
         val adminDeleted: Int = 0,
         val violative: Int = 0,
@@ -452,6 +566,8 @@ object ForumEnhanceHandler : Handler {
 
     data class TopicStat(
         val total: Int = 0,
+        val r7d: Int = 0,
+        val r30d: Int = 0,
         val deleted: Int = 0,
         val silent: Int = 0,
         val closed: Int = 0,

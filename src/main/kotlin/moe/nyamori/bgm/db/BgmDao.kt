@@ -615,24 +615,16 @@ interface BgmDao : Transactional<BgmDao> {
 
 
     // View queries
-
     @SqlQuery(
         """
-            select * from ba_v_all_post_count_group_by_type_uid_state where username in (<l>)
+            select * from ba_v_all_post_count_group_by_type_uid_state where type = :t and username in (<l>)
         """
     )
     @RegisterKotlinMapper(VAllPostCountRow::class)
-    fun getAllPostCountByUsernameList(
+    fun getAllPostCountByTypeAndUsernameList(
+        @Bind("t") t: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllPostCountRow>
-
-    fun getAllPostCountByTypeAndUsernameList(
-        t: Int,
-        l: Iterable<String>
-    ): List<VAllPostCountRow> {
-        return getAllPostCountByUsernameList(l)
-            .filter { it.type == t }
-    }
 
     @SqlQuery(
         """
@@ -644,6 +636,52 @@ interface BgmDao : Transactional<BgmDao> {
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllTopicCountRow>
+
+
+    @SqlQuery(
+        """
+            select * from ba_v_all_post_count_30d_group_by_type_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VAllPostCount30dRow::class)
+    fun getAllPostCount30dByTypeAndUsernameList(
+        @Bind("t") t: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VAllPostCount30dRow>
+
+    @SqlQuery(
+        """
+            select * from ba_v_all_topic_count_30d_group_by_type_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VAllTopicCount30dRow::class)
+    fun getAllTopicCount30dByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VAllTopicCount30dRow>
+
+    @SqlQuery(
+        """
+            select * from ba_v_all_post_count_7d_group_by_type_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VAllPostCount7dRow::class)
+    fun getAllPostCount7dByTypeAndUsernameList(
+        @Bind("t") t: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VAllPostCount7dRow>
+
+    @SqlQuery(
+        """
+            select * from ba_v_all_topic_count_7d_group_by_type_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VAllTopicCount7dRow::class)
+    fun getAllTopicCount7dByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VAllTopicCount7dRow>
+
 
     @SqlQuery(
         """
@@ -671,13 +709,7 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select bp.type, bp.uid, bsnm.name, bsnm.display_name, bu.username, bp.state, count(1) count
-                from ba_user bu
-                     inner join ba_post bp on bp.uid = bu.id
-                     inner join ba_space_naming_mapping bsnm on bp.type = bsnm.type and bp.sid = bsnm.sid
-                 where bu.username in (<l>) and bp.type=:t
-                group by bp.type, bp.uid, bp.state, bp.sid;
-
+            select * from ba_v_post_count_group_by_type_space_uid_state where username in (<l>) and type=:t
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
@@ -686,24 +718,64 @@ interface BgmDao : Transactional<BgmDao> {
         @BindList("l") l: Iterable<String>
     ): List<VPostCountSpaceRow>
 
+    @SqlQuery(
+        """
+            select * from ba_v_post_count_30d_group_by_type_space_uid_state where username in (<l>) and type=:t
+        """
+    )
+    @RegisterKotlinMapper(VPostCountSpaceRow::class)
+    fun getPostCountSpace30dByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VPostCountSpaceRow>
 
     @SqlQuery(
         """
-            select * from ba_v_topic_count_group_by_type_space_uid_state where username in (<l>)
+            select * from ba_v_post_count_7d_group_by_type_space_uid_state where username in (<l>) and type=:t
+        """
+    )
+    @RegisterKotlinMapper(VPostCountSpaceRow::class)
+    fun getPostCountSpace7dByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VPostCountSpaceRow>
+
+
+    @SqlQuery(
+        """
+            select * from ba_v_topic_count_group_by_type_space_uid_state where username in (<l>) and type = :t  
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    fun getTopicCountSpaceByUsernameList(
+    fun getTopicCountSpaceByTypeAndUsernameList(
+        @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VTopicCountSpaceRow>
 
-    fun getTopicCountSpaceByTypeAndUsernameList(
-        type: Int,
-        l: Iterable<String>
-    ): List<VTopicCountSpaceRow> {
-        return getTopicCountSpaceByUsernameList(l)
-            .filter { it.type == type }
-    }
+
+    @SqlQuery(
+        """
+            select * from ba_v_topic_count_30d_group_by_type_space_uid_state where type = :t and username in (<l>)
+        """
+    )
+    @RegisterKotlinMapper(VTopicCountSpaceRow::class)
+    fun getTopicCountSpace30dByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VTopicCountSpaceRow>
+
+
+    @SqlQuery(
+        """
+            select * from ba_v_topic_count_7d_group_by_type_space_uid_state where username in (<l>) and type = :t 
+        """
+    )
+    @RegisterKotlinMapper(VTopicCountSpaceRow::class)
+    fun getTopicCountSpace7dByTypeAndUsernameList(
+        @Bind("t") type: Int,
+        @BindList("l") l: Iterable<String>
+    ): List<VTopicCountSpaceRow>
+
 
     @SqlQuery(
         """
@@ -746,9 +818,9 @@ interface BgmDao : Transactional<BgmDao> {
                        inner join ba_topic bt on bu.id = bt.uid
                        inner join ba_post bp on bt.last_post_pid = bp.id and bt.type = bp.type
                        left  join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid 
-              where bt.type = :t
+              where bu.username in (<l>) 
+                and bt.type = :t
                 and bt.state != 1
-                and bu.username in (<l>)
                 and bt.dateline >= ((select unixepoch() - 86400 * 365 * 3)))
         where rank_last_reply <= 10
         """
