@@ -338,8 +338,8 @@ object ForumEnhanceHandler : Handler {
             .map {
                 it.key to it.value.associate { it.faceKey to it.count }
             }.toMap()
-        val spacePostStatMap30d = vPostCountSpaceRows.groupBy { it.username }
-        val spacePostStatMap7d = vPostCountSpaceRows.groupBy { it.username }
+        val spacePostStatMap30d = vPostCountSpace30dRows.groupBy { it.username }
+        val spacePostStatMap7d = vPostCountSpace7dRows.groupBy { it.username }
         val spacePostStatMap = vPostCountSpaceRows.groupBy { it.username }
             .map {
                 val (username, _) = it
