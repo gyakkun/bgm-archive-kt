@@ -169,7 +169,7 @@ object GitHelper {
             ).trim()
         } else {
             return runCatching {
-                jsonRepo.getFileContentAsStringInACommitJgit(
+                jsonRepo.getFileContentAsStringInACommit(
                     jsonRepo.getLastCommitSha1StrExtGit(),
                     BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
                 ).trim()
