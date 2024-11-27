@@ -298,8 +298,7 @@ object GitHelper {
             .exec(cmd, null, File(this.absolutePathWithoutDotGit()))
         val msgList =
             gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = false, printAtStdErr = false, logCmd = false)
-        if (msgList.size > 2) log.warn("msgListLen = ${msgList.size}")
-        return msgList.joinToString().trim()
+        return msgList.filter { it.isNotBlank() }.joinToString(separator = "").trim()
     }
 
     private fun Repository.getFileContentAsStringInACommitExtGit(
