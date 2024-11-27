@@ -1,6 +1,5 @@
 package moe.nyamori.bgm.git
 
-import ch.qos.logback.core.CoreConstants.EMPTY_STRING
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.ibm.icu.text.CharsetDetector
@@ -163,18 +162,18 @@ object GitHelper {
     }
 
     fun getPrevProcessedArchiveCommitRevIdStr(jsonRepo: Repository): String {
-        if (jsonRepo.isBare) {
+//        if (jsonRepo.isBare) {
             return jsonRepo.getFileContentAsStringInACommit(
                 jsonRepo.getLatestCommitRef().sha1Str(),
                 BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
             ).trim()
-        } else {
-            val prevProcessedCommitRevIdFile =
-                File(jsonRepo.absolutePathWithoutDotGit()).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
-            if (!prevProcessedCommitRevIdFile.exists()) return EMPTY_STRING
-            val rawFileStr = prevProcessedCommitRevIdFile.readText(Charsets.UTF_8)
-            return rawFileStr.trim()
-        }
+//        } else {
+//            val prevProcessedCommitRevIdFile =
+//                File(jsonRepo.absolutePathWithoutDotGit()).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+//            if (!prevProcessedCommitRevIdFile.exists()) return EMPTY_STRING
+//            val rawFileStr = prevProcessedCommitRevIdFile.readText(Charsets.UTF_8)
+//            return rawFileStr.trim()
+//        }
     }
 
 
