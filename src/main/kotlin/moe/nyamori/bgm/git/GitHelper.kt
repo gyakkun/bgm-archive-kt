@@ -162,18 +162,29 @@ object GitHelper {
     }
 
     fun getPrevProcessedArchiveCommitRevIdStr(jsonRepo: Repository): String {
-//        if (jsonRepo.isBare) {
+        if (jsonRepo.isBare) {
             return jsonRepo.getFileContentAsStringInACommit(
                 jsonRepo.getLatestCommitRef().sha1Str(),
                 BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
             ).trim()
-//        } else {
-//            val prevProcessedCommitRevIdFile =
-//                File(jsonRepo.absolutePathWithoutDotGit()).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
-//            if (!prevProcessedCommitRevIdFile.exists()) return EMPTY_STRING
-//            val rawFileStr = prevProcessedCommitRevIdFile.readText(Charsets.UTF_8)
-//            return rawFileStr.trim()
-//        }
+        } else {
+            return runCatching {
+                jsonRepo.getFileContentAsStringInACommitJgit(
+                    jsonRepo.getLastCommitSha1StrExtGit(),
+                    BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+                ).trim()
+            }.onFailure {
+                log.error("Failed to get last commit sha1 str using ext git: ", it)
+            }.getOrElse {
+                val prevProcessedCommitRevIdFile =
+                    File(jsonRepo.absolutePathWithoutDotGit()).resolve(
+                        BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+                    )
+                if (!prevProcessedCommitRevIdFile.exists()) return@getOrElse ""
+                val rawFileStr = prevProcessedCommitRevIdFile.readText(Charsets.UTF_8)
+                return@getOrElse rawFileStr.trim()
+            }
+        }
     }
 
 
@@ -279,6 +290,16 @@ object GitHelper {
                     return@outerUse String(bytes, selectedCharset)
                 }
             }
+    }
+
+    private fun Repository.getLastCommitSha1StrExtGit(): String {
+        val cmd = "git rev-parse HEAD"
+        val gitProcess = Runtime.getRuntime()
+            .exec(cmd, null, File(this.absolutePathWithoutDotGit()))
+        val msgList =
+            gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = false, printAtStdErr = false, logCmd = false)
+        if (msgList.size > 2) log.warn("msgListLen = ${msgList.size}")
+        return msgList.joinToString().trim()
     }
 
     private fun Repository.getFileContentAsStringInACommitExtGit(
