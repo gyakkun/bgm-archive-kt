@@ -81,7 +81,8 @@ object Config {
         System.getenv().getOrDefault("E_BGM_ARCHIVE_DISABLE_DB_PERSIST_KEY", "false").toBoolean()
 
     val BGM_ARCHIVE_DB_PERSIST_KEY: String =
-        System.getenv().getOrDefault("E_BGM_ARCHIVE_DB_PERSIST_KEY",
+        System.getenv().getOrDefault(
+            "E_BGM_ARCHIVE_DB_PERSIST_KEY",
             UUID.randomUUID().toString()
                 .also { key ->
                     runCatching {
@@ -109,7 +110,8 @@ object Config {
         System.getenv().getOrDefault("E_BGM_ARCHIVE_HOW_MANY_COMMIT_ON_GITHUB_PER_DAY", "500").toIntOrNull() ?: 500
 
     val BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS: Long =
-        System.getenv().getOrDefault("E_BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS", "200000").toLongOrNull() ?: 200_000 // 200s
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS", "200000").toLongOrNull()
+            ?: 200_000 // 200s
 
     val BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS: Long =
         System.getenv().getOrDefault("E_BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS", "1200000").toLongOrNull()
