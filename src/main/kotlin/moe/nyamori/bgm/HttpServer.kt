@@ -229,7 +229,7 @@ object HttpServer {
         if (Config.BGM_ARCHIVE_ENABLE_CRANKER_CONNECTOR) {
             LOGGER.info("Starting cranker connector")
             val crankerConnector = connector()
-                .withHttpClient(CrankerConnectorBuilder.createHttpClient(false).build())
+                .withHttpClient(CrankerConnectorBuilder.createHttpClient(true).build())
                 .withRoute("*") // catch all
                 .withPreferredProtocols(listOf(CRANKER_PROTOCOL_3, CRANKER_PROTOCOL_1))
                 .withComponentName("bgm-archive-kt")
