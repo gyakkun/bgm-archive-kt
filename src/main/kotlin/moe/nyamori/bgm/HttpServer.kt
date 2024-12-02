@@ -1,5 +1,12 @@
 package moe.nyamori.bgm
 
+import com.hsbc.cranker.connector.CrankerConnectorBuilder
+import com.hsbc.cranker.connector.CrankerConnectorBuilder.CRANKER_PROTOCOL_1
+import com.hsbc.cranker.connector.CrankerConnectorBuilder.CRANKER_PROTOCOL_3
+import com.hsbc.cranker.connector.CrankerConnectorBuilder.connector
+import com.hsbc.cranker.connector.ProxyEventListener
+import com.hsbc.cranker.connector.RouterEventListener
+import com.hsbc.cranker.connector.RouterRegistration
 import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.*
@@ -19,12 +26,15 @@ import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.StringHashingHelper
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.net.URI
 import java.time.Duration
 import java.time.Instant
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 object HttpServer {
     private val LOGGER = LoggerFactory.getLogger(HttpServer::class.java)
+
     @JvmStatic
     fun main(args: Array<String>) {
         val app = Javalin.create { config ->
@@ -216,10 +226,39 @@ object HttpServer {
             LOGGER.info("[{}] Req: {} {} {}", reqSalt, ip(it), it.method(), it.fullUrl())
         }.start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
 
-        Runtime.getRuntime().addShutdownHook(Thread
-        {
-            app.stop()
-        })
+        if (Config.BGM_ARCHIVE_ENABLE_CRANKER_CONNECTOR) {
+            LOGGER.info("Starting cranker connector")
+            val crankerConnector = connector()
+                .withHttpClient(CrankerConnectorBuilder.createHttpClient(false).build())
+                .withRoute("*") // catch all
+                .withPreferredProtocols(listOf(CRANKER_PROTOCOL_3, CRANKER_PROTOCOL_1))
+                .withComponentName("bgm-archive-kt")
+                .withRouterUris { listOf(URI.create(Config.BGM_ARCHIVE_CRANKER_REG_URL)) }
+                .withSlidingWindowSize(5)
+                .withTarget(URI.create("http://${Config.BGM_ARCHIVE_ADDRESS}:${Config.BGM_ARCHIVE_PORT}"))
+                .withRouterRegistrationListener(object : RouterEventListener {
+                    override fun onRegistrationChanged(data: RouterEventListener.ChangeData) {
+                        LOGGER.info(
+                            "on cranker reg changed: added={} , removed={}",
+                            data.added().map { it.registrationUri() },
+                            data.removed().map { it.registrationUri() }
+                        )
+                    }
+
+                    override fun onSocketConnectionError(router: RouterRegistration, exception: Throwable) {
+                        LOGGER.error("err cranker socket conn: {} , ", router.registrationUri(), exception)
+                    }
+                })
+                .start()
+            LOGGER.info("Cranker connector started")
+            Runtime.getRuntime().addShutdownHook(Thread { crankerConnector.stop(1000, TimeUnit.MILLISECONDS) })
+        }
+
+        Runtime.getRuntime().addShutdownHook(
+            Thread
+            {
+                app.stop()
+            })
     }
 
     @Volatile

@@ -117,4 +117,10 @@ object Config {
         System.getenv().getOrDefault("E_BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS", "1200000").toLongOrNull()
             ?: 1_200_000 // 20min
 
+    val BGM_ARCHIVE_ENABLE_CRANKER_CONNECTOR: Boolean =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_ENABLE_CRANKER_CONNECTOR", "false").toBoolean()
+
+    val BGM_ARCHIVE_CRANKER_REG_URL: String =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_CRANKER_REG_URL", "ws://localhost:3000")
+
 }
