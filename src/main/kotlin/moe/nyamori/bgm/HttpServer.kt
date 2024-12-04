@@ -234,7 +234,7 @@ object HttpServer {
                 .withPreferredProtocols(listOf(CRANKER_PROTOCOL_3, CRANKER_PROTOCOL_1))
                 .withComponentName("bgm-archive-kt")
                 .withRouterUris { listOf(URI.create(Config.BGM_ARCHIVE_CRANKER_REG_URL)) }
-                .withSlidingWindowSize(5)
+                .withSlidingWindowSize(Config.BGM_ARCHIVE_CRANKER_SLIDING_WIN)
                 .withTarget(URI.create("http://${Config.BGM_ARCHIVE_ADDRESS}:${Config.BGM_ARCHIVE_PORT}"))
                 .withRouterRegistrationListener(object : RouterEventListener {
                     override fun onRegistrationChanged(data: RouterEventListener.ChangeData) {

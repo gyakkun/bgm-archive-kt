@@ -123,4 +123,6 @@ object Config {
     val BGM_ARCHIVE_CRANKER_REG_URL: String =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_CRANKER_REG_URL", "ws://localhost:3000")
 
+    val BGM_ARCHIVE_CRANKER_SLIDING_WIN: Int =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_CRANKER_SLIDING_WIN", "2").toIntOrNull() ?: 2
 }
