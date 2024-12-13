@@ -301,7 +301,9 @@ object CommitToJsonProcessor {
                     jsonRepo.absolutePathWithoutDotGit()
                 )
             } else {
+                log.warn("Removing json files for commit : {}", archiveCommit.shortMessage)
                 removeJsonFiles(jsonRepo, changedHtmlFilePathList)
+                log.warn("Done removing json files for commit : {}", archiveCommit.shortMessage)
             }
         }
         log.info("Timing: $timing for git add/commit ${archiveCommit.fullMessage}")
