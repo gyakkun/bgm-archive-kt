@@ -103,10 +103,10 @@ object CommitToJsonProcessor {
                             throw IllegalStateException("Not a valid commit message! - ${curCommit.shortMessage}")
                         }
                         if (firstCommitSpaceType == null) firstCommitSpaceType = commitSpaceType
-                        val changedFilePathList = archiveRepo.findChangedFilePaths(prev, curCommit)
+                        val changedHtmlFilePathList = archiveRepo.findChangedFilePaths(prev, curCommit)
 
-                        for (pathIdx in changedFilePathList.indices) {
-                            val path = changedFilePathList[pathIdx]
+                        for (pathIdx in changedHtmlFilePathList.indices) {
+                            val path = changedHtmlFilePathList[pathIdx]
                             try {
                                 if (path.endsWith(NO_GOOD_FILE_NAME)) {
                                     handleNoGoodFile(
@@ -182,7 +182,7 @@ object CommitToJsonProcessor {
                             }
                         }
                         writeJsonRepoLastCommitId(curCommit, jsonRepo)
-                        commitJsonRepo(jsonRepo, commitSpaceType, curCommit, changedFilePathList)
+                        commitJsonRepo(jsonRepo, commitSpaceType, curCommit, changedHtmlFilePathList)
                         prev = curCommit
                         writeNoGoodFile(archiveRepo, noGoodIdTreeSet, commitSpaceType)
                         if (noGoodIdTreeSet.isNotEmpty()) {
@@ -281,26 +281,53 @@ object CommitToJsonProcessor {
         jsonRepo: Repository,
         commitSpaceType: SpaceType,
         archiveCommit: RevCommit,
-        changedFilePathList: List<String>
+        changedHtmlFilePathList: List<String>
     ) {
         var timing = System.currentTimeMillis()
         if (Config.BGM_ARCHIVE_PREFER_JGIT) {
-            jgitCommitJsonRepo(jsonRepo, changedFilePathList, archiveCommit)
+            jgitCommitJsonRepo(jsonRepo, changedHtmlFilePathList, archiveCommit)
         } else {
             if (Config.BGM_ARCHIVE_PREFER_GIT_BATCH_ADD) {
                 commandLineCommitJsonRepoAddFileInBatch(jsonRepo, archiveCommit)
             } else {
-                commandLineCommitJsonRepoAddFileSeparately(jsonRepo, archiveCommit, changedFilePathList)
+                commandLineCommitJsonRepoAddFileSeparately(jsonRepo, archiveCommit, changedHtmlFilePathList)
             }
         }
         timing = System.currentTimeMillis() - timing
+        if (Config.BGM_ARCHIVE_IS_REMOVE_JSON_AFTER_PROCESS) {
+            if (jsonRepo.isBare) {
+                log.error(
+                    "Json repo {} is a bare git repo. Will not remove json files.",
+                    jsonRepo.absolutePathWithoutDotGit()
+                )
+            } else {
+                removeJsonFiles(jsonRepo, changedHtmlFilePathList)
+            }
+        }
         log.info("Timing: $timing for git add/commit ${archiveCommit.fullMessage}")
+    }
+
+    private fun removeJsonFiles(jsonRepo: Repository, changedHtmlFilePathList: List<String>) {
+        val jsonRepoDir = File(jsonRepo.absolutePathWithoutDotGit())
+        val jsonFileList = changedHtmlFilePathList.mapNotNull { path ->
+            if (!path.endsWith("html")) return@mapNotNull null
+            val absolutePathFile = jsonRepoDir.resolve(path.replace("html", "json"))
+            if (!absolutePathFile.exists() || absolutePathFile.isDirectory) {
+                log.debug("Failed to find file ${absolutePathFile.absolutePath}")
+                return@mapNotNull null
+            }
+            return@mapNotNull absolutePathFile
+        }
+        jsonFileList.forEach {
+            val res = it.delete()
+            if (!res) log.error("Failed to delete json file after process commit: {}", it)
+        }
     }
 
     private fun commandLineCommitJsonRepoAddFileSeparately(
         jsonRepo: Repository,
         archiveCommit: RevCommit,
-        changedFilePathList: List<String>
+        changedHtmlFilePathList: List<String>
     ) {
         val commitMsg = archiveCommit.fullMessage
         val jsonRepoDir = File(jsonRepo.absolutePathWithoutDotGit())
@@ -312,10 +339,10 @@ object CommitToJsonProcessor {
         }
         val jsonFileListToGitAdd = StringBuffer(" ")
         // There's a trailing space on each file to add
-        changedFilePathList.forEach { path ->
+        changedHtmlFilePathList.forEach { path ->
             if (!path.endsWith("html")) return@forEach
             val absolutePathFile = jsonRepoDir.resolve(path.replace("html", "json"))
-            if (!absolutePathFile.exists()) {
+            if (!absolutePathFile.exists() || absolutePathFile.isDirectory) {
                 log.error("Failed to find file ${absolutePathFile.absolutePath}")
                 return@forEach
             }

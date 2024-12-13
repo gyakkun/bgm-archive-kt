@@ -74,6 +74,9 @@ object Config {
     val BGM_ARCHIVE_DISABLE_DB_PERSIST: Boolean =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_DISABLE_DB_PERSIST", "false").toBoolean()
 
+    val BGM_ARCHIVE_IS_REMOVE_JSON_AFTER_PROCESS: Boolean =
+        System.getenv().getOrDefault("E_BGM_ARCHIVE_IS_REMOVE_JSON_AFTER_PROCESS", "false").toBoolean()
+
     val BGM_ARCHIVE_DB_IS_ENABLE_WAL: Boolean =
         System.getenv().getOrDefault("E_BGM_ARCHIVE_DB_IS_ENABLE_WAL", "false").toBoolean()
 
