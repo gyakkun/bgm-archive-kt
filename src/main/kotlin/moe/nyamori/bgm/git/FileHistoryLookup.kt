@@ -314,7 +314,14 @@ object FileHistoryLookup {
     }
 
 
-    fun getArchiveFileContentAsStringAtTimestamp(spaceType: SpaceType, topicId: Int, timestamp: Long): String {
+    fun getArchiveFileContentAsStringAtTimestamp(spaceType: SpaceType, topicId: Int, timestamp: Long): String =
+        getArchiveFileHashMsgContentAsStringAtTimestamp(spaceType, topicId, timestamp).second
+
+    fun getArchiveFileHashMsgContentAsStringAtTimestamp(
+        spaceType: SpaceType,
+        topicId: Int,
+        timestamp: Long
+    ): Pair<ChatamPair, String> {
         val timestampRevCommitMap = spaceTypeTopicIdPairToChatamPairCache.get(spaceType to topicId)
         if (timestampRevCommitMap[timestamp] != null) {
             return timestampRevCommitMap[timestamp]!!.let {
@@ -323,7 +330,7 @@ object FileHistoryLookup {
                 val logSec = diffSec % 60
                 val logMin = diffSec / 60
                 log.info("Diff=${logMin}m${logSec}s for html ${topicId.toHtmlRelPath(spaceType)} in ${it.html.repo.folderName()} : ${it.html.hash}")
-                it.html.repo.getFileContentAsStringInACommit(
+                it to it.html.repo.getFileContentAsStringInACommit(
                     it.html.hash,
                     it.topicId.toHtmlRelPath(it.spaceType),
                 )
@@ -339,7 +346,14 @@ object FileHistoryLookup {
         )
     }
 
-    fun getJsonFileContentAsStringAtTimestamp(spaceType: SpaceType, topicId: Int, timestamp: Long): String {
+    fun getJsonFileContentAsStringAtTimestamp(spaceType: SpaceType, topicId: Int, timestamp: Long): String =
+        getJsonFileHashMsgContentAsStringTimestamp(spaceType, topicId, timestamp).second
+
+    fun getJsonFileHashMsgContentAsStringTimestamp(
+        spaceType: SpaceType,
+        topicId: Int,
+        timestamp: Long
+    ): Pair<ChatamPair, String> {
         val timestampRevCommitMap = spaceTypeTopicIdPairToChatamPairCache.get(spaceType to topicId)
         if (timestampRevCommitMap[timestamp] != null) {
             return timestampRevCommitMap[timestamp]!!.let {
@@ -348,7 +362,7 @@ object FileHistoryLookup {
                 val logSec = diffSec % 60
                 val logMin = diffSec / 60
                 log.info("Diff=${logMin}m${logSec}s for json ${topicId.toJsonRelPath(spaceType)} in ${it.json.repo.folderName()} : ${it.json.hash}")
-                it.json.repo.getFileContentAsStringInACommit(
+                it to it.json.repo.getFileContentAsStringInACommit(
                     it.json.hash,
                     it.topicId.toJsonRelPath(it.spaceType),
                 )

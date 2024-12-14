@@ -5,6 +5,7 @@ import io.javalin.http.Handler
 import io.javalin.http.Header.CACHE_CONTROL
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.git.FileHistoryLookup
+import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.lowercaseName
 import moe.nyamori.bgm.util.HttpHelper
@@ -64,21 +65,22 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
 
                 ctx.header(CACHE_CONTROL, "max-age=86400")
                 if (isHtml) {
-                    var html = FileHistoryLookup.getArchiveFileContentAsStringAtTimestamp(
+                    var (cp, html) = FileHistoryLookup.getArchiveFileHashMsgContentAsStringAtTimestamp(
                         spaceType,
                         topicId,
                         timestamp
                     )
+                    fillMetaHeader(ctx, cp)
                     html = htmlModifier(html)
                     ctx.html(html)
                 } else {
-                    ctx.json(
-                        FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
-                            spaceType,
-                            topicId,
-                            timestamp
-                        )
+                    val (cp, jsonStr) = FileHistoryLookup.getJsonFileHashMsgContentAsStringTimestamp(
+                        spaceType,
+                        topicId,
+                        timestamp
                     )
+                    fillMetaHeader(ctx, cp)
+                    ctx.json(jsonStr)
                 }
             } finally {
                 HttpHelper.DB_READ_SEMAPHORE.release()
@@ -87,6 +89,15 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
             log.error("Ex: ", ex)
             throw ex
         }
+    }
+
+    private fun fillMetaHeader(ctx: Context, cp: FileHistoryLookup.ChatamPair) = with(ctx) {
+        header("x-bak-hrn", cp.html.repo.simpleName())
+        header("x-bak-jrn", cp.json.repo.simpleName())
+        header("x-bak-hch", cp.html.hash)
+        header("x-bak-jch", cp.json.hash)
+        header("x-bak-hcm", cp.html.msg)
+        header("x-bak-jcm", cp.json.msg)
     }
 
     private fun htmlModifier(html: String): String {
