@@ -281,7 +281,7 @@ object GitHelper {
                     val charsetName: String = if (cm == null) {
                         StandardCharsets.UTF_8.name()
                     } else {
-                        if (cm.name != StandardCharsets.UTF_8.name()) {
+                        if (cm.name != StandardCharsets.UTF_8.name() && cm.name != "ISO-8859-2") {
                             log.warn("Select charset ${cm.name} for $relPath at commit ${revCommit.shortMessage}")
                         }
                         cm.name
@@ -292,7 +292,7 @@ object GitHelper {
             }
     }
 
-    private fun Repository.getLastCommitSha1StrExtGit(): String {
+    fun Repository.getLastCommitSha1StrExtGit(): String {
         val cmd = "git rev-parse HEAD"
         val gitProcess = Runtime.getRuntime()
             .exec(cmd, null, File(this.absolutePathWithoutDotGit()))
