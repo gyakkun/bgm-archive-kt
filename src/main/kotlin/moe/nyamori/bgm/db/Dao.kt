@@ -41,8 +41,8 @@ object Dao {
                     return "Hi there!"
                 }
             })
-            .load()
-            .migrate()
+            // .load()
+            // .migrate()
     }
 
     private val jdbi: Jdbi = Jdbi.create(DSProvider.ds).apply {
@@ -53,7 +53,7 @@ object Dao {
     }
 
     val bgmDao: BgmDao by lazy {
-        latch.await()
+        // latch.await()
         jdbi.onDemand(BgmDao::class.java)
             ?: throw IllegalStateException("Should get jdbi dao class but got null")
     }
