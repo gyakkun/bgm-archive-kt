@@ -158,7 +158,7 @@ interface BgmDao : Transactional<BgmDao> {
             :id,
             :username,
             :nickname
-        ) on conflict(id) do update set username = :username, nickname = coalesce(:nickname, nickname)
+        ) on conflict(id) do update set username = :username, nickname = coalesce(:nickname, excluded.nickname)
         """
     )
     @Transaction
@@ -177,13 +177,13 @@ interface BgmDao : Transactional<BgmDao> {
             :t.lastPostPid,
             :t.title
         ) on conflict(type,id) do update set
-            uid = coalesce(:t.uid, uid),
-            sid = coalesce(:t.sid, sid),
-            dateline = coalesce(:t.dateline,dateline),
+            uid = coalesce(:t.uid, excluded.uid),
+            sid = coalesce(:t.sid, excluded.sid),
+            dateline = coalesce(:t.dateline,excluded.dateline),
             state = :t.state,
-            top_post_pid = coalesce(:t.topPostPid, top_post_pid),
-            last_post_pid = coalesce(:t.lastPostPid, last_post_pid, -1),
-            title = coalesce(:t.title , title)
+            top_post_pid = coalesce(:t.topPostPid, excluded.top_post_pid),
+            last_post_pid = coalesce(:t.lastPostPid, excluded.last_post_pid, -1),
+            title = coalesce(:t.title , excluded.title)
     """
     )
     @Transaction
@@ -376,11 +376,11 @@ interface BgmDao : Transactional<BgmDao> {
         from ba_space_naming_mapping
         where type = 100
           and name in (select name
-                       from (select type, name, count(*) count
+                       from (select type, name
                              from ba_space_naming_mapping
                              where type = 100
                              group by type, name
-                             having count > 1))
+                             having count(*) > 1))
           and sid < 0;
     """
     )
@@ -465,7 +465,7 @@ interface BgmDao : Transactional<BgmDao> {
     @SqlQuery(
         """
         select type, id
-        from (select bat.*, count(*) c from ba_topic bat where  uid = :t.first  or uid = :t.second  group by type, id having c >= 2)
+        from (select bat.* from ba_topic bat where  uid = :t.first  or uid = :t.second  group by type, id having count(*) >= 2)
     """
     )
     @RegisterKotlinMapper(DeRepetitiveTopicData::class)
@@ -496,7 +496,7 @@ interface BgmDao : Transactional<BgmDao> {
     @SqlQuery(
         """
         select type, id, mid
-        from (select bap.*, count(*) c from ba_post bap where  uid = :t.first or uid = :t.second  group by type, id, mid having c >= 2)
+        from (select bap.* from ba_post bap where  uid = :t.first or uid = :t.second  group by type, id, mid having count(*) >= 2)
     """
     )
     @RegisterKotlinMapper(DeRepetitivePostData::class)
@@ -527,7 +527,7 @@ interface BgmDao : Transactional<BgmDao> {
     @SqlQuery(
         """
         select type, id
-        from (select bat.*, count(*) c from ba_topic bat where type = 100 and ( uid = :t.first or uid = :t.second ) group by type, id, sid having c >= 2)
+        from (select bat.* from ba_topic bat where type = 100 and ( uid = :t.first or uid = :t.second ) group by type, id, sid having count(*) >= 2)
     """
     )
     @RegisterKotlinMapper(DeRepetitiveBlogTopicData::class)
@@ -687,7 +687,6 @@ interface BgmDao : Transactional<BgmDao> {
         """
             select bl.type     as type,
                    bl.value    as face_key,
-                   bl.total    as face_count,
                    bu.username as username,
                    sum(bl.total)  count
             from ba_likes bl -- So far ba_likes is the smallest table
@@ -698,7 +697,7 @@ interface BgmDao : Transactional<BgmDao> {
                   (<l>)
               and bl.type = :t
             group by bl.type, face_key, username
-            having count > 0;
+            having sum(bl.total) > 0;
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
@@ -796,7 +795,7 @@ interface BgmDao : Transactional<BgmDao> {
               and bp.uid in (select bu.id
                           from ba_user bu
                           where bu.username in (<l>)))
-            where rank_reply_asc = 1 and dateline >= ((select unixepoch() - 86400*365*3))
+            where rank_reply_asc = 1 and dateline >= (((select EXTRACT(EPOCH FROM NOW())::bigint) - 86400*365*3))
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
@@ -821,7 +820,7 @@ interface BgmDao : Transactional<BgmDao> {
               where bu.username in (<l>) 
                 and bt.type = :t
                 and bt.state != 1
-                and bt.dateline >= ((select unixepoch() - 86400 * 365 * 3)))
+                and bt.dateline >= (((select EXTRACT(EPOCH FROM NOW())::bigint) - 86400 * 365 * 3)))
         where rank_last_reply <= 10
         """
     )
@@ -871,7 +870,6 @@ interface BgmDao : Transactional<BgmDao> {
         """
             select bl.type     as type,
                    bl.value    as face_key,
-                   bl.total    as face_count,
                    bu.username as username,
                    sum(bl.total)  count
             from  ba_user bu 
@@ -882,7 +880,7 @@ interface BgmDao : Transactional<BgmDao> {
                   (<l>)
               and bl.type = :t
             group by bl.type, face_key, username
-            having count > 0;
+            having sum(bl.total) > 0;
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
@@ -894,21 +892,24 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-        select bl.type           as type,
-               bu.username       as username,
-               bsnm.name         as space_name,
-               bsnm.display_name as space_display_name,
-               sum(bl.total)        count
-        from ba_likes_rev bl -- So far ba_likes is the smallest table
-                 inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
-                 inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
-                 -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
-                 inner join ba_user bu on bl.uid = bu.id
-        where bu.username in
-              (<l>)
-          and bl.type = :t
-        group by bl.type, username, bsnm.name
-        having count > 0;
+            with tmp as (select bl.type             as type,
+                                bu.username         as username,
+                                bsnm.sid            as sid,
+                                sum(bl.total)       as count
+                         from ba_likes_rev bl -- So far ba_likes is the smallest table
+                                  inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
+                                  inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+                             -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
+                                  inner join ba_user bu on bl.uid = bu.id
+                         where bu.username in
+                               (<l>)
+                           and bl.type = :t
+                         group by bl.type, username, bsnm.sid
+                         having sum(bl.total) > 0)
+            select tmp.type as type, tmp.username as username, bsnm2.name as space_name , bsnm2.display_name as space_display_name,  tmp.count as count
+            from tmp
+                     inner join ba_space_naming_mapping bsnm2
+                                on tmp.type = bsnm2.type and tmp.sid = bsnm2.sid;
     """
     )
     @RegisterKotlinMapper(VLikeRevCountSpaceRow::class)
@@ -920,21 +921,26 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            select bl.type           as type,
-                   bu.username       as username,
-                   bsnm.name         as space_name,
-                   bsnm.display_name as space_display_name,
-                   sum(bl.total)        count
-            from ba_likes bl -- So far ba_likes is the smallest table
-                     inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
-                     inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
-                     inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
-                     inner join ba_user bu on bp.uid = bu.id
-            where bu.username in
-                  (<l>)
-              and bl.type = :t
-            group by bl.type, username, bsnm.name
-            having count > 0;
+            with tmp as (select bl.type       as type,
+                                bu.username   as username,
+                                bsnm.sid      as sid,
+                                sum(bl.total) as count
+                         from ba_likes_rev bl -- So far ba_likes is the smallest table
+                                  inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
+                                  inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+                             -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
+                                  inner join ba_user bu on bl.uid = bu.id
+                         where bu.username in
+                               (<l>)
+                           and bl.type = :t
+                         group by bl.type, username, bsnm.sid
+                         having sum(bl.total) > 0)
+            select tmp.*,
+                   bsnm2.display_name as space_display_name,
+                   bsnm2.name         as space_name
+            from tmp
+                     inner join ba_space_naming_mapping bsnm2
+                                on bsnm2.type = tmp.type and bsnm2.sid = tmp.sid;
         """
     )
     @RegisterKotlinMapper(VLikeCountSpaceRow::class)
@@ -970,7 +976,7 @@ interface BgmDao : Transactional<BgmDao> {
                                 where bu.username in (<l>)))
         where 1 = 1
           and rank_like_rev_asc <=5
-          and dateline >= ((select unixepoch() - 86400 * 365 * 3))
+          and dateline >= (((select EXTRACT(EPOCH FROM NOW())::bigint) - 86400 * 365 * 3))
     """
     )
     @RegisterKotlinMapper(VUserLatestLikeRevRow::class)
