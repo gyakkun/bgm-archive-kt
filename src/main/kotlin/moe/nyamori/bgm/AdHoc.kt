@@ -44,16 +44,16 @@ fun main0() {
 
 
 fun main() {
-    DSProvider.ds.connection.use { conn ->
-        conn.createStatement().use { stmt ->
-            stmt.executeQuery("PRAGMA main.journal_mode;").use { rs ->
-                while (rs.next()) {
-                    val res = rs.getString(1)
-                    System.err.println(res)
-                }
-            }
-        }
-    }
+//    DSProvider.ds.connection.use { conn ->
+//        conn.createStatement().use { stmt ->
+//            stmt.executeQuery("PRAGMA main.journal_mode;").use { rs ->
+//                while (rs.next()) {
+//                    val res = rs.getString(1)
+//                    System.err.println(res)
+//                }
+//            }
+//        }
+//    }
 }
 
 fun main1() {

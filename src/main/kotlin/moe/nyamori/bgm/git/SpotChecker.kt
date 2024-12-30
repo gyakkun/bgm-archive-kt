@@ -3,9 +3,10 @@ package moe.nyamori.bgm.git
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.RepoDto
+import moe.nyamori.bgm.config.getCouplingArchiveRepo
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
-import moe.nyamori.bgm.git.GitHelper.couplingArchiveRepo
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLastCommitSha1StrExtGit
 import moe.nyamori.bgm.git.GitHelper.getRevCommitById
@@ -16,7 +17,6 @@ import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.TopicListHelper.getTopicList
-import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.time.Duration
@@ -55,12 +55,12 @@ object SpotChecker {
     }
 
 
-    fun genSpotCheckListFile(archiveRepo: Repository, spaceType: SpaceType) {
+    fun genSpotCheckListFile(archiveRepo: RepoDto, spaceType: SpaceType) {
         if (Config.BGM_ARCHIVE_DISABLE_SPOT_CHECK) return
         LOGGER.info("Generating spot check list file $SPOT_CHECK_BITSET_FILE_NAME for $spaceType.")
         val scList = randomSelectTopicIds(archiveRepo, spaceType)
         val scFile =
-            File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_LIST_FILE_NAME")
+            File(archiveRepo.repo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_LIST_FILE_NAME")
         if (!scFile.exists()) {
             LOGGER.error("Spot check list file for $spaceType not found! Creating one.")
             scFile.createNewFile()
@@ -124,7 +124,7 @@ object SpotChecker {
         return result
     }
 
-    private fun randomSelectTopicIds(archiveRepo: Repository, spaceType: SpaceType): List<Int> {
+    private fun randomSelectTopicIds(archiveRepo: RepoDto, spaceType: SpaceType): List<Int> {
         val result = mutableListOf<Int>()
         val spotCheckedBs = getSpotCheckedTopicMask(archiveRepo, spaceType)
         val hiddenBs = getHiddenTopicMask(archiveRepo, spaceType)
@@ -156,7 +156,7 @@ object SpotChecker {
             LOGGER.info("Writing empty spot check bitset file for $spaceType.")
             writeBitsetToFile(
                 BitSet(),
-                File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
+                File(archiveRepo.repo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
             )
             // Reset the mask file
             LOGGER.info("Going to re generate hidden topic mask file for $spaceType.")
@@ -164,7 +164,7 @@ object SpotChecker {
             return result
         }
         val samplingSize =
-            (fakeTotalCount / (30 * (Config.BGM_ARCHIVE_HOW_MANY_COMMIT_ON_GITHUB_PER_DAY / (2 * (SpaceType.entries.size)))))
+            (fakeTotalCount / (30 * (archiveRepo.expectedCommitPerDay / (2 * (SpaceType.entries.size)))))
                 .coerceAtLeast(MIN_SPOT_CHECK_SIZE).coerceAtMost(MAX_SPOT_CHECK_SIZE)
         val r = Random()
 
@@ -180,16 +180,16 @@ object SpotChecker {
 
         writeBitsetToFile(
             spotCheckedBs,
-            File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
+            File(archiveRepo.repo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
         )
 
         LOGGER.info("Spot check id selected: $spaceType - $result")
         return result
     }
 
-    private fun getSpotCheckedTopicMask(archiveRepo: Repository, spaceType: SpaceType): BitSet {
+    private fun getSpotCheckedTopicMask(archiveRepo: RepoDto, spaceType: SpaceType): BitSet {
         val maskFile =
-            File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
+            File(archiveRepo.repo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
         if (!maskFile.exists()) {
             LOGGER.warn("Spot checked mask bitset file not found for $spaceType. Creating one.")
             return BitSet()
@@ -197,9 +197,9 @@ object SpotChecker {
         return getBitsetFromLongPlaintextFile(maskFile)
     }
 
-    private fun getHiddenTopicMask(archiveRepo: Repository, spaceType: SpaceType): BitSet {
+    private fun getHiddenTopicMask(archiveRepo: RepoDto, spaceType: SpaceType): BitSet {
         val maskFile =
-            File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
+            File(archiveRepo.repo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
         if (!maskFile.exists()) {
             LOGGER.warn("Hidden topic mask file not found for $spaceType. Creating one.")
             genHiddenTopicMaskFile(archiveRepo, spaceType)
@@ -224,7 +224,7 @@ object SpotChecker {
         return BitSet.valueOf(longArr)
     }
 
-    private fun genHiddenTopicMaskFile(archiveRepo: Repository, spaceType: SpaceType) {
+    private fun genHiddenTopicMaskFile(archiveRepo: RepoDto, spaceType: SpaceType) {
         LOGGER.info("Generating hidden topic mask file for $spaceType.")
         val maxId = if (spaceType in listOf(SpaceType.EP, SpaceType.PERSON, SpaceType.CHARACTER)) {
             getMaxIdByVisitingAllFiles(spaceType).coerceAtLeast(getMaxTopicId(spaceType))
@@ -235,11 +235,11 @@ object SpotChecker {
         var newBs = BitSet(maxId + 2).apply { set(maxId + 1) } // Ensure (words in use) of bs is enough
         val visited = BitSet(maxId + 1)
 //        val onceNormal = BitSet(maxId + 2).apply { set(maxId + 1) }
-        walkThroughJson { (repo, relPath, fileContent) ->
+        walkThroughJson { (repoDto, relPath, fileContent) ->
             if (!relPath.contains(spaceType.name.lowercase())) return@walkThroughJson false
             if (!relPath.lowercase().endsWith("json")) return@walkThroughJson false
             if ((relPath.split("/").last().split(".").first().toIntOrNull() ?: -1) > maxId) return@walkThroughJson false
-            if (relPath.hashCode() and 1023 == 1023) LOGGER.info("$relPath is processing at ${repo.simpleName()}")
+            if (relPath.hashCode() and 1023 == 1023) LOGGER.info("$relPath is processing at ${repoDto.repo.simpleName()}")
             val fileStr = fileContent.get()
             val topic = GSON.fromJson(fileStr, Topic::class.java)
             visited.set(topic.id)
@@ -275,7 +275,7 @@ object SpotChecker {
         }
         writeBitsetToFile(
             newBs,
-            File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
+            File(archiveRepo.repo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
         )
     }
 
@@ -323,7 +323,7 @@ object SpotChecker {
 
 
     private fun walkThroughJson(
-        jsonRepoList: List<Repository> = allJsonRepoListSingleton,
+        jsonRepoList: List<RepoDto> = allJsonRepoListSingleton,
         handler: (RelPathAndContentSupp) -> Boolean
     ) {
         val timing = System.currentTimeMillis()
@@ -336,18 +336,18 @@ object SpotChecker {
                 revCommit.authorIdent.whenAsInstant
             }
         }
-        LOGGER.info("Json repo folders: ${workingRepoList.map { it.absolutePathWithoutDotGit() }}")
+        LOGGER.info("Json repo folders: ${workingRepoList.map { it.repo.absolutePathWithoutDotGit() }}")
 
         workingRepoList.forEach outer@{ jsonRepo ->
-            if (jsonRepo.isBare) {
-                LOGGER.error("Not support walking through bare repo: {}", jsonRepo.absolutePathWithoutDotGit())
+            if (jsonRepo.repo.isBare) {
+                LOGGER.error("Not support walking through bare repo: {}", jsonRepo.repo.absolutePathWithoutDotGit())
                 return@outer
             }
             val headSha1 = jsonRepo.getLastCommitSha1StrExtGit()
             LOGGER.info("Last commit sha1 of repo: $headSha1, msg: ${jsonRepo.getRevCommitById(headSha1).shortMessage}")
             val gitLsTree = ProcessBuilder()
                 .command("git", "ls-tree", "-r", "--name-only", "HEAD")
-                .directory(File(jsonRepo.absolutePathWithoutDotGit()))
+                .directory(File(jsonRepo.repo.absolutePathWithoutDotGit()))
                 .redirectError(ProcessBuilder.Redirect.DISCARD)
                 .start()
             gitLsTree.inputStream.use outerUse@{ ins ->
@@ -365,14 +365,14 @@ object SpotChecker {
                                 handler.invoke(RelPathAndContentSupp(jsonRepo, relPath, fileContent))
                             }.onFailure {
                                 LOGGER.error(
-                                    "Ex when walking through ${jsonRepo.absolutePathWithoutDotGit()}${File.separator}${relPath}: ",
+                                    "Ex when walking through ${jsonRepo.repo.absolutePathWithoutDotGit()}${File.separator}${relPath}: ",
                                     it
                                 )
                             }
                         }
                         LOGGER.info(
                             "Finished walking through json folder {}. Timing: {}ms / {}",
-                            jsonRepo.absolutePathWithoutDotGit(),
+                            jsonRepo.repo.absolutePathWithoutDotGit(),
                             System.currentTimeMillis() - innerTiming,
                             Duration.ofMillis(System.currentTimeMillis() - innerTiming)
                         )
@@ -388,7 +388,7 @@ object SpotChecker {
     }
 
     data class RelPathAndContentSupp(
-        val repo: Repository,
+        val repo: RepoDto,
         val relPath: String,
         val fileContent: Supplier<String>
     )
@@ -405,16 +405,16 @@ object SpotChecker {
 //        randomSelectTopicIds(GitHelper.defaultArchiveRepoSingleton, spaceType = SpaceType.EP)
 //        genEmptyTopicMaskFile(SpaceType.EP)
         allJsonRepoListSingleton.forEach {
-            if (it.couplingArchiveRepo() == null) return@forEach
-            if (!it.simpleName().contains("gre")) return@forEach
-            System.err.println(it.simpleName())
-            genHiddenTopicMaskFile(it.couplingArchiveRepo()!!, SpaceType.EP)
+            if (it.getCouplingArchiveRepo() == null) return@forEach
+            if (!it.repo.simpleName().contains("gre")) return@forEach
+            System.err.println(it.repo.simpleName())
+            genHiddenTopicMaskFile(it.getCouplingArchiveRepo()!!, SpaceType.EP)
         }
     }
 
-    private fun checkEmptyTopicMaskBitsetFile(spaceType: SpaceType) {
+    private fun checkEmptyTopicMaskBitsetFile(htmlRepo: RepoDto, spaceType: SpaceType) {
         val bs = getBitsetFromLongPlaintextFile(
-            File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve(spaceType.name.lowercase())
+            File(htmlRepo.repo.absolutePathWithoutDotGit()).resolve(spaceType.name.lowercase())
                 .resolve("empty_topic_has_masked_bs.txt")
         )
         val bsSize = bs.size()

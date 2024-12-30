@@ -1,12 +1,11 @@
 package moe.nyamori.bgm.config
 
+import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.*
-import kotlin.io.path.Path
-import kotlin.io.path.name
-import kotlin.io.path.notExists
+import kotlin.io.path.*
 import kotlin.text.Charsets.UTF_8
 
 private val ConfigLogger = LoggerFactory.getLogger("ConfigInit")
@@ -22,50 +21,75 @@ fun main() {
     ConfigLogger.info("{}", configDto)
 }
 
+fun checkAndGetConfigDto(): ConfigDto {
+    val gson = GsonBuilder().disableHtmlEscaping().create()
+    val envConfigPath = System.getenv("E_BGM_ARCHIVE_CONFIG_PATH")
+    val sysPropConfigPath = System.getProperty("config.path")
+    if (!envConfigPath.isNullOrEmpty()) {
+        return extract("env var", envConfigPath, gson)
+    }
+    if (!sysPropConfigPath.isNullOrEmpty()) {
+        return extract("sys prop", sysPropConfigPath, gson)
+    }
+    return ConfigReadout().toDto()
+}
+
+private fun extract(src: String, envConfigPath: String, gson: Gson): ConfigDto {
+    val p = Path(envConfigPath)
+    if (p.exists() && p.isRegularFile()) {
+        val str = p.readText(UTF_8)
+        val readout = gson.fromJson(str, ConfigReadout::class.java)
+        val dto = readout.toDto()
+        return dto
+    } else throw IllegalArgumentException("config path in $src is invalid: $p")
+}
+
 data class ConfigReadout(
     /**
      * Path start with / (Linux) or X: (Windows) will be treated as absolute path, otherwise will be relative from home folder
      */
-    val homeFolderAbsolutePath: String?,
-    val prevProcessedCommitRevIdFileName: String?,
-    val preferJgit: Boolean?,
-    val preferGitBatchAdd: Boolean?,
-    val disableAllHooks: Boolean?,
+    val homeFolderAbsolutePath: String? = null,
+    val prevProcessedCommitRevIdFileName: String? = null,
+    val preferJgit: Boolean? = null,
+    val preferGitBatchAdd: Boolean? = null,
+    val disableAllHooks: Boolean? = null,
 
-    val httpHost: String?,
-    val httpPort: Int?,
+    val httpHost: String? = null,
+    val httpPort: Int? = null,
 
     // db things
-    val sqliteFilePath: String?,
-    val dbIsEnableWal: Boolean?, // sqlite only
+    val sqliteFilePath: String? = null,
+    val dbIsEnableWal: Boolean? = null, // sqlite only
     /**
      * if jdbc url is empty, then defaults to sqlite file in sqlite file path
      */
-    val jdbcUrl: String?,
-    val jdbcUsername: String?,
-    val jdbcPassword: String?,
-    val hikariMinIdle: Int?,
-    val hikariMaxConn: Int?,
+    val jdbcUrl: String? = null,
+    val jdbcUsername: String? = null,
+    val jdbcPassword: String? = null,
+    val hikariMinIdle: Int? = null,
+    val hikariMaxConn: Int? = null,
 
-    val dbMetaKeyPrevCachedCommitRevId: String?,
-    val dbMetaKeyPrevPersistedJsonCommitRevId: String?,
+    val dbMetaKeyPrevCachedCommitRevId: String? = null,
+    val dbMetaKeyPrevPersistedJsonCommitRevId: String? = null,
 
-    val disableSpotCheck: Boolean?,
-    val disableDbPersist: Boolean?,
-    val disableDbPersistKey: Boolean?,
-    val dbPersistKey: String?,
+    val disableSpotCheck: Boolean? = null,
+    val disableDbPersist: Boolean? = null,
+    val disableDbPersistKey: Boolean? = null,
+    val dbPersistKey: String? = null,
 
-    val spotCheckerTimeoutThresholdMs: Int?,
-    val bgmHealthStatus500TimeoutThresholdMs: Int?,
+    val isRemoveJsonAfterProcess: Boolean? = null,
 
-    val enableCrankerConnector: Boolean?,
-    val crankerRegUrl: String?,
-    val crankerSlidingWin: Int?,
-    val crankerComponent: String?,
+    val spotCheckerTimeoutThresholdMs: Long? = null,
+    val bgmHealthStatus500TimeoutThresholdMs: Long? = null,
+
+    val enableCrankerConnector: Boolean? = null,
+    val crankerRegUrl: String? = null,
+    val crankerSlidingWin: Int? = null,
+    val crankerComponent: String? = null,
 
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
-    val repoMutexTimeoutMs: Int?,
-    val repoList: List<RepoLike>?,
+    val repoMutexTimeoutMs: Long? = null,
+    val repoList: List<RepoLike>? = null,
 )
 
 data class RepoLike(
@@ -127,8 +151,10 @@ fun ConfigReadout.toDto(): ConfigDto {
         emptyList()
     } else {
         val res = mutableListOf<RepoDto>()
+        val idUsed = mutableSetOf<Int>()
         for (r in repoList) {
             if (r.id == null) throw IllegalArgumentException("repo id should not be null")
+            if (!idUsed.add(r.id)) throw IllegalArgumentException("duplicated repo id ${r.id}")
             if (r.path.isNullOrEmpty()) throw IllegalArgumentException("repo path should not be null")
             val finRepoPath = r.path.toAbsPath(finHome)
             if (Path(finRepoPath).notExists()) throw IllegalArgumentException("repo path doesn't exist: $finRepoPath")
@@ -142,14 +168,20 @@ fun ConfigReadout.toDto(): ConfigDto {
                     r.optExpectedCommitPerDay ?: 150,
                     r.optFriendlyName ?: Path(finRepoPath).name,
                     r.optIsStatic ?: true,
-                    r.optRepoIdCouplingWith
+                    r.optRepoIdCouplingWith,
+                    this.repoMutexTimeoutMs ?: 5_000L
                 )
             )
         }
+
         for (r in res) {
             if (r.optRepoIdCouplingWith != null) {
-                if (res.none { it.id == r.optRepoIdCouplingWith }) {
+                val count = res.count { it.id == r.optRepoIdCouplingWith }
+                if (count == 0) {
                     throw IllegalArgumentException("coupling repo not found: this = ${r.path}, coupling id = ${r.optRepoIdCouplingWith}")
+                }
+                if (count > 1) {
+                    throw IllegalArgumentException("more than 1 coupling repo for ${r.path}, coupling id = ${r.optRepoIdCouplingWith}")
                 }
             }
         }
@@ -184,6 +216,8 @@ fun ConfigReadout.toDto(): ConfigDto {
         disableDbPersistKey = this.disableDbPersistKey ?: false,
         dbPersistKey = this.dbPersistKey ?: UUID.randomUUID().toString(),
 
+        isRemoveJsonAfterProcess = this.isRemoveJsonAfterProcess ?: false,
+
         spotCheckerTimeoutThresholdMs = this.spotCheckerTimeoutThresholdMs ?: 200_000,
         bgmHealthStatus500TimeoutThresholdMs = this.bgmHealthStatus500TimeoutThresholdMs ?: 1_200_000,
 
@@ -192,7 +226,6 @@ fun ConfigReadout.toDto(): ConfigDto {
         crankerSlidingWin = this.crankerSlidingWin ?: 2,
         crankerComponent = this.crankerComponent ?: "bgm-archive-kt",
 
-        repoMutexTimeoutMs = this.repoMutexTimeoutMs ?: 5_000,
         repoList = finRepoList
     )
 }

@@ -4,14 +4,15 @@ import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.db.Dao
+import moe.nyamori.bgm.db.IBgmDao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
-import java.util.concurrent.TimeUnit
 
-object DbSetPersistIdHandler : Handler {
-    val LOGGER = LoggerFactory.getLogger(DbSetPersistIdHandler.javaClass)
+class DbSetPersistIdHandler(
+    private val bgmDao: IBgmDao
+) : Handler {
+    val LOGGER = LoggerFactory.getLogger(DbSetPersistIdHandler::class.java)
     override fun handle(ctx: Context) {
         val keyParam = ctx.queryParam("key")
         val commitId = ctx.queryParam("id")
@@ -28,7 +29,7 @@ object DbSetPersistIdHandler : Handler {
         Thread {
             try {
                 if (HttpHelper.tryLockDbMs(10_000)) {
-                    val result = Dao.bgmDao.updatePrevPersistedCommitId(repo, commitId)
+                    val result = bgmDao.updatePrevPersistedCommitId(repo, commitId)
                     LOGGER.info("Set persist id $commitId result: $result")
                 }
             } catch (ignore: Exception) {

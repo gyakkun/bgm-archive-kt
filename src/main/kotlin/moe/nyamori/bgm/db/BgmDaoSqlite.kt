@@ -1,12 +1,12 @@
 package moe.nyamori.bgm.db
 
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.RepoDto
 import moe.nyamori.bgm.model.Like
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.model.User
 import moe.nyamori.bgm.util.StringHashingHelper.hashedAbsolutePathWithoutGitId
-import org.eclipse.jgit.lib.Repository
 import org.jdbi.v3.sqlobject.customizer.Bind
 import org.jdbi.v3.sqlobject.customizer.BindBean
 import org.jdbi.v3.sqlobject.customizer.BindList
@@ -20,17 +20,17 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 @JvmDefaultWithCompatibility
-interface BgmDao : Transactional<BgmDao> {
+interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     val LOGGER: Logger
-        get() = LoggerFactory.getLogger(BgmDao::class.java)
+        get() = LoggerFactory.getLogger(BgmDaoSqlite::class.java)
 
     @SqlQuery(
         """
         select 1
     """
     )
-    fun healthCheck(): Int
+    override fun healthCheck(): Int
 
 
     @SqlUpdate(
@@ -39,14 +39,14 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun upsertMetaData(@Bind("k") k: String, @Bind("v") v: String): Int
+    override fun upsertMetaData(@Bind("k") k: String, @Bind("v") v: String): Int
 
     @SqlQuery(
         """
         select v from meta_data where k = :k
         """
     )
-    fun getMetaData(@Bind("k") k: String): String?
+    override fun getMetaData(@Bind("k") k: String): String?
 
     @SqlQuery(
         """
@@ -54,12 +54,10 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(MetaRow::class)
-    fun getAllMetaData(): List<MetaRow>
+    override fun getAllMetaData(): List<MetaRow>
 
-    data class MetaRow(val k: String, val v: String)
-
-    fun updatePrevPersistedCommitId(
-        repo: Repository,
+    override fun updatePrevPersistedCommitId(
+        repo: RepoDto,
         prevPersistRevId: String
     ): Int {
         return upsertMetaData(
@@ -69,22 +67,22 @@ interface BgmDao : Transactional<BgmDao> {
     }
 
 
-    fun getPrevPersistedCommitId(repo: Repository): String {
+    override fun getPrevPersistedCommitId(repo: RepoDto): String {
         return getMetaData(
             Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID
                     + repo.hashedAbsolutePathWithoutGitId()
         ) ?: ""
     }
 
-    fun getPrevCachedCommitId(repo: Repository): String? {
+    override fun getPrevCachedCommitId(repo: RepoDto): String? {
         return getMetaData(
             Config.BGM_ARCHIVE_DB_META_KEY_PREV_CACHED_COMMIT_REV_ID
                     + repo.hashedAbsolutePathWithoutGitId()
         )
     }
 
-    fun updatePrevCachedCommitId(
-        repo: Repository,
+    override fun updatePrevCachedCommitId(
+        repo: RepoDto,
         prevCachedCommitId: String
     ): Int {
         return upsertMetaData(
@@ -101,7 +99,7 @@ interface BgmDao : Transactional<BgmDao> {
     )
     @Transaction
     // WARN: No generated key back from sqlite jdbc driver
-    fun batchUpsertFileRelativePathForCache(@Bind("t") fileRelativePaths: List<String>): IntArray
+    override fun batchUpsertFileRelativePathForCache(@Bind("t") fileRelativePaths: List<String>): IntArray
 //    {
 //        return Dao.bgmDao.withHandle<List<Long>, Exception> {
 //            val batch = it.prepareBatch(
@@ -123,7 +121,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun insertRepoCommitForCache(@Bind("repoId") repoId: Long, @Bind("commitId") commitId: String): Int
+    override fun insertRepoCommitForCache(@Bind("repoId") repoId: Long, @Bind("commitId") commitId: String): Int
 
     @SqlBatch(
         """
@@ -134,7 +132,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun batchUpsertFileCommitForCache(
+    override fun batchUpsertFileCommitForCache(
         @Bind("frp") frp: Iterable<String>,
         @Bind("rid") rid: Long,
         @Bind("cid") cid: String
@@ -149,7 +147,7 @@ interface BgmDao : Transactional<BgmDao> {
             where bcfrp.file_relative_path = :frp
     """
     )
-    fun queryRepoCommitForCacheByFileRelativePath(@Bind("frp") frp: String): List<RepoIdCommitId>
+    override fun queryRepoCommitForCacheByFileRelativePath(@Bind("frp") frp: String): List<RepoIdCommitId>
 
 
     @SqlBatch(
@@ -158,11 +156,11 @@ interface BgmDao : Transactional<BgmDao> {
             :id,
             :username,
             :nickname
-        ) on conflict(id) do update set username = :username, nickname = coalesce(:nickname, excluded.nickname)
+        ) on conflict(id) do update set username = :username, nickname = coalesce(:nickname, nickname)
         """
     )
     @Transaction
-    fun batchUpsertUser(@BindBean userList: Iterable<User>): IntArray
+    override fun batchUpsertUser(@BindBean userList: Iterable<User>): IntArray
 
     @SqlBatch(
         """
@@ -177,17 +175,17 @@ interface BgmDao : Transactional<BgmDao> {
             :t.lastPostPid,
             :t.title
         ) on conflict(type,id) do update set
-            uid = coalesce(:t.uid, excluded.uid),
-            sid = coalesce(:t.sid, excluded.sid),
-            dateline = coalesce(:t.dateline,excluded.dateline),
+            uid = coalesce(:t.uid, uid),
+            sid = coalesce(:t.sid, sid),
+            dateline = coalesce(:t.dateline,dateline),
             state = :t.state,
-            top_post_pid = coalesce(:t.topPostPid, excluded.top_post_pid),
-            last_post_pid = coalesce(:t.lastPostPid, excluded.last_post_pid, -1),
-            title = coalesce(:t.title , excluded.title)
+            top_post_pid = coalesce(:t.topPostPid, top_post_pid),
+            last_post_pid = coalesce(:t.lastPostPid, last_post_pid, -1),
+            title = coalesce(:t.title , title)
     """
     )
     @Transaction
-    fun batchUpsertTopic(@Bind("typeId") typeId: Int, @BindBean("t") topicList: Iterable<Topic>): IntArray
+    override fun batchUpsertTopic(@Bind("typeId") typeId: Int, @BindBean("t") topicList: Iterable<Topic>): IntArray
 
     @SqlBatch(
         """
@@ -204,7 +202,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun batchUpsertPost(
+    override fun batchUpsertPost(
         @Bind("typeId") typeId: Int,
         @Bind("sid") sid: Int?,
         @BindBean("p") postList: Iterable<Post>
@@ -225,7 +223,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun batchUpsertPostRow(
+    override fun batchUpsertPostRow(
         @BindBean("p") postList: Iterable<PostRow>
     ): IntArray
 
@@ -241,7 +239,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun batchUpsertLikes(@BindBean likeList: Iterable<Like>): IntArray
+    override fun batchUpsertLikes(@BindBean likeList: Iterable<Like>): IntArray
 
 
     @SqlQuery(
@@ -255,14 +253,14 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @RegisterKotlinMapper(User::class)
-    fun getNegativeUidUsers(): List<User>
+    override fun getNegativeUidUsers(): List<User>
 
     @SqlQuery(
         """
         select distinct username from ba_user where username in (<l>) and username is not null
     """
     )
-    fun getValidUsernameListFromList(@BindList("l") l: List<String>): List<String>
+    override fun getValidUsernameListFromList(@BindList("l") l: List<String>): List<String>
 
     @SqlBatch(
         """
@@ -273,7 +271,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun updateNegativeUidInTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
+    override fun updateNegativeUidInTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
 
     @SqlBatch(
@@ -285,7 +283,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun updateNegativeUidInPost(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
+    override fun updateNegativeUidInPost(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
     @SqlBatch(
         """
@@ -297,7 +295,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun updateNegativeSidInBlogTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
+    override fun updateNegativeSidInBlogTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
     @SqlBatch(
         """
@@ -305,10 +303,10 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun removeNegativeUidUser(@BindBean("p") userList: Iterable<Pair<Int, Int>>)
+    override fun removeNegativeUidUser(@BindBean("p") userList: Iterable<Pair<Int, Int>>)
 
     @Transaction
-    fun handleNegativeUid(): List<Pair<Int/*TYPE*/, Int /*Mid*/>> {
+    override fun handleNegativeUid(): List<Pair<Int/*TYPE*/, Int /*Mid*/>> {
         val negativeUidUsers = getNegativeUidUsers()
         LOGGER.info("Negative uid list: ${negativeUidUsers.map { Pair(it.username, it.id) }}")
         val userList = negativeUidUsers.groupBy { it.username }.map {
@@ -368,7 +366,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun upsertPositiveSidForBlog():Int
+    override fun upsertPositiveSidForBlog():Int
 
     @SqlUpdate(
         """
@@ -376,16 +374,16 @@ interface BgmDao : Transactional<BgmDao> {
         from ba_space_naming_mapping
         where type = 100
           and name in (select name
-                       from (select type, name
+                       from (select type, name, count(*) count
                              from ba_space_naming_mapping
                              where type = 100
                              group by type, name
-                             having count(*) > 1))
+                             having count > 1))
           and sid < 0;
     """
     )
     @Transaction
-    fun deleteNegativeSidForBlog():Int
+    override fun deleteNegativeSidForBlog():Int
 
     @SqlBatch(
         """
@@ -399,7 +397,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun updateNegativeUidInLikesRev(@BindBean("t") l: List<Triple<Int, Int, DeReplicaLikeRev>>)
+    override fun updateNegativeUidInLikesRev(@BindBean("t") l: List<Triple<Int, Int, DeReplicaLikeRev>>)
 
     @SqlQuery(
         """
@@ -407,7 +405,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @RegisterKotlinMapper(LikeRevRow::class)
-    fun selectLikeRevByUidPair(@BindBean("t") t: Pair<Int, Int>): List<LikeRevRow>
+    override fun selectLikeRevByUidPair(@BindBean("t") t: Pair<Int, Int>): List<LikeRevRow>
 
     @SqlUpdate(
         """
@@ -420,16 +418,9 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun doRemoveConflictInLikesRev(@BindBean("t") t: DeReplicaLikeRev): Int
+    override fun doRemoveConflictInLikesRev(@BindBean("t") t: DeReplicaLikeRev): Int
 
-    data class DeReplicaLikeRev(
-        val type: Int,
-        val mid: Int,
-        val pid: Int,
-        val value: Int
-    )
-
-    fun preRemoveConflictSidInLikesRev(uidPairList: List<Pair<Int/*pos*/, Int/*neg*/>>): List<Triple<Int, Int, DeReplicaLikeRev>> {
+    override fun preRemoveConflictSidInLikesRev(uidPairList: List<Pair<Int/*pos*/, Int/*neg*/>>): List<Triple<Int, Int, DeReplicaLikeRev>> {
         return uidPairList.mapNotNull { i ->
             val deReplicaLikeRev = selectLikeRevByUidPair(i)
                 .groupBy {
@@ -465,13 +456,11 @@ interface BgmDao : Transactional<BgmDao> {
     @SqlQuery(
         """
         select type, id
-        from (select bat.* from ba_topic bat where  uid = :t.first  or uid = :t.second  group by type, id having count(*) >= 2)
+        from (select bat.*, count(*) c from ba_topic bat where  uid = :t.first  or uid = :t.second  group by type, id having c >= 2)
     """
     )
     @RegisterKotlinMapper(DeRepetitiveTopicData::class)
-    fun selectTopicTypeAndIdByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveTopicData>
-
-    data class DeRepetitiveTopicData(val type: Int, val id: Int)
+    override fun selectTopicTypeAndIdByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveTopicData>
 
     @SqlUpdate(
         """
@@ -479,9 +468,9 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun doRemoveConflictTopic(@BindBean("t") t: DeRepetitiveTopicData): Int
+    override fun doRemoveConflictTopic(@BindBean("t") t: DeRepetitiveTopicData): Int
 
-    fun preRemoveConflictTopic(userList: List<Pair<Int, Int>>) {
+    override fun preRemoveConflictTopic(userList: List<Pair<Int, Int>>) {
         for (i in userList) {
             val deRepetitiveTopicData = selectTopicTypeAndIdByUidListAndGroupByPk(i)
             if (deRepetitiveTopicData.isEmpty()) continue
@@ -496,13 +485,11 @@ interface BgmDao : Transactional<BgmDao> {
     @SqlQuery(
         """
         select type, id, mid
-        from (select bap.* from ba_post bap where  uid = :t.first or uid = :t.second  group by type, id, mid having count(*) >= 2)
+        from (select bap.*, count(*) c from ba_post bap where  uid = :t.first or uid = :t.second  group by type, id, mid having c >= 2)
     """
     )
     @RegisterKotlinMapper(DeRepetitivePostData::class)
-    fun selectPostTypeAndIdAndMidByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitivePostData>
-
-    data class DeRepetitivePostData(val type: Int, val id: Int, val mid: Int)
+    override fun selectPostTypeAndIdAndMidByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitivePostData>
 
     @SqlUpdate(
         """
@@ -510,9 +497,9 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun doRemoveConflictPost(@BindBean("t") t: DeRepetitivePostData): Int
+    override fun doRemoveConflictPost(@BindBean("t") t: DeRepetitivePostData): Int
 
-    fun preRemoveConflictPost(userList: List<Pair<Int, Int>>) {
+    override fun preRemoveConflictPost(userList: List<Pair<Int, Int>>) {
         for (i in userList) {
             val deRepetitivePostData = selectPostTypeAndIdAndMidByUidListAndGroupByPk(i)
             if (deRepetitivePostData.isEmpty()) continue
@@ -527,13 +514,11 @@ interface BgmDao : Transactional<BgmDao> {
     @SqlQuery(
         """
         select type, id
-        from (select bat.* from ba_topic bat where type = 100 and ( uid = :t.first or uid = :t.second ) group by type, id, sid having count(*) >= 2)
+        from (select bat.*, count(*) c from ba_topic bat where type = 100 and ( uid = :t.first or uid = :t.second ) group by type, id, sid having c >= 2)
     """
     )
     @RegisterKotlinMapper(DeRepetitiveBlogTopicData::class)
-    fun selectBlogTopicTypeAndIdByUidListAndGroupByTypeIdAndSid(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveBlogTopicData>
-
-    data class DeRepetitiveBlogTopicData(val type: Int, val id: Int)
+    override fun selectBlogTopicTypeAndIdByUidListAndGroupByTypeIdAndSid(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveBlogTopicData>
 
     @SqlUpdate(
         """
@@ -541,8 +526,8 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun doRemoveConflictBlogTopic(@BindBean("t") t: DeRepetitiveBlogTopicData): Int
-    fun preRemoveConflictSidInBlog(userList: List<Pair<Int, Int>>) {
+    override fun doRemoveConflictBlogTopic(@BindBean("t") t: DeRepetitiveBlogTopicData): Int
+    override fun preRemoveConflictSidInBlog(userList: List<Pair<Int, Int>>) {
         for (i in userList) {
             val deRepetitiveBlogTopicData = selectBlogTopicTypeAndIdByUidListAndGroupByTypeIdAndSid(i)
             if (deRepetitiveBlogTopicData.isEmpty()) continue
@@ -565,7 +550,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @Transaction
-    fun upsertSidAlias(@BindBean("t") sidAliasMappingList: Iterable<SpaceNameMappingData>): IntArray
+    override fun upsertSidAlias(@BindBean("t") sidAliasMappingList: Iterable<SpaceNameMappingData>): IntArray
 
     @SqlBatch(
         """
@@ -576,7 +561,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun upsertBlogSubjectIdMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, Int>>)
+    override fun upsertBlogSubjectIdMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, Int>>)
 
     @SqlBatch(
         """
@@ -587,7 +572,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun upsertBlogTagMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, String>>)
+    override fun upsertBlogTagMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, String>>)
 
     @SqlQuery(
         """
@@ -595,7 +580,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @RegisterKotlinMapper(PostRow::class)
-    fun getPostListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<PostRow>
+    override fun getPostListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<PostRow>
 
     @SqlQuery(
         """
@@ -603,7 +588,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @RegisterKotlinMapper(PostRow::class)
-    fun getLikeListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRow>
+    override fun getLikeListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRow>
 
     @SqlQuery(
         """
@@ -611,7 +596,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @RegisterKotlinMapper(PostRow::class)
-    fun getTopicListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<TopicRow>
+    override fun getTopicListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<TopicRow>
 
 
     // View queries
@@ -621,7 +606,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VAllPostCountRow::class)
-    fun getAllPostCountByTypeAndUsernameList(
+    override fun getAllPostCountByTypeAndUsernameList(
         @Bind("t") t: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllPostCountRow>
@@ -632,7 +617,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VAllTopicCountRow::class)
-    fun getAllTopicCountByTypeAndUsernameList(
+    override fun getAllTopicCountByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllTopicCountRow>
@@ -644,7 +629,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VAllPostCount30dRow::class)
-    fun getAllPostCount30dByTypeAndUsernameList(
+    override fun getAllPostCount30dByTypeAndUsernameList(
         @Bind("t") t: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllPostCount30dRow>
@@ -655,7 +640,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VAllTopicCount30dRow::class)
-    fun getAllTopicCount30dByTypeAndUsernameList(
+    override fun getAllTopicCount30dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllTopicCount30dRow>
@@ -666,7 +651,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VAllPostCount7dRow::class)
-    fun getAllPostCount7dByTypeAndUsernameList(
+    override fun getAllPostCount7dByTypeAndUsernameList(
         @Bind("t") t: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllPostCount7dRow>
@@ -677,7 +662,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VAllTopicCount7dRow::class)
-    fun getAllTopicCount7dByTypeAndUsernameList(
+    override fun getAllTopicCount7dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllTopicCount7dRow>
@@ -687,6 +672,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
             select bl.type     as type,
                    bl.value    as face_key,
+                   bl.total    as face_count,
                    bu.username as username,
                    sum(bl.total)  count
             from ba_likes bl -- So far ba_likes is the smallest table
@@ -697,11 +683,11 @@ interface BgmDao : Transactional<BgmDao> {
                   (<l>)
               and bl.type = :t
             group by bl.type, face_key, username
-            having sum(bl.total) > 0;
+            having count > 0;
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
-    fun getLikesSumByTypeAndUsernameList(
+    override fun getLikesSumByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikesSumRow>
@@ -712,7 +698,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
-    fun getPostCountSpaceByTypeAndUsernameList(
+    override fun getPostCountSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VPostCountSpaceRow>
@@ -723,7 +709,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
-    fun getPostCountSpace30dByTypeAndUsernameList(
+    override fun getPostCountSpace30dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VPostCountSpaceRow>
@@ -734,7 +720,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
-    fun getPostCountSpace7dByTypeAndUsernameList(
+    override fun getPostCountSpace7dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VPostCountSpaceRow>
@@ -746,7 +732,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    fun getTopicCountSpaceByTypeAndUsernameList(
+    override fun getTopicCountSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VTopicCountSpaceRow>
@@ -758,7 +744,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    fun getTopicCountSpace30dByTypeAndUsernameList(
+    override fun getTopicCountSpace30dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VTopicCountSpaceRow>
@@ -770,7 +756,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    fun getTopicCountSpace7dByTypeAndUsernameList(
+    override fun getTopicCountSpace7dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VTopicCountSpaceRow>
@@ -795,11 +781,11 @@ interface BgmDao : Transactional<BgmDao> {
               and bp.uid in (select bu.id
                           from ba_user bu
                           where bu.username in (<l>)))
-            where rank_reply_asc = 1 and dateline >= (((select EXTRACT(EPOCH FROM NOW())::bigint) - 86400*365*3))
+            where rank_reply_asc = 1 and dateline >= ((select unixepoch() - 86400*365*3))
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
-    fun getUserLastReplyTopicByTypeAndUsernameList(
+    override fun getUserLastReplyTopicByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VUserLastReplyTopicRow>
@@ -820,12 +806,12 @@ interface BgmDao : Transactional<BgmDao> {
               where bu.username in (<l>) 
                 and bt.type = :t
                 and bt.state != 1
-                and bt.dateline >= (((select EXTRACT(EPOCH FROM NOW())::bigint) - 86400 * 365 * 3)))
+                and bt.dateline >= ((select unixepoch() - 86400 * 365 * 3)))
         where rank_last_reply <= 10
         """
     )
     @RegisterKotlinMapper(VUserLatestCreateTopicRow::class)
-    fun getUserLatestCreateTopicAndUsernameList(
+    override fun getUserLatestCreateTopicAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VUserLatestCreateTopicRow>
@@ -838,7 +824,7 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @RegisterKotlinMapper(UserRow::class)
-    fun getUserRowByUsernameList(
+    override fun getUserRowByUsernameList(
         @BindList("l") l: Iterable<String>
     ): List<UserRow>
 
@@ -848,7 +834,7 @@ interface BgmDao : Transactional<BgmDao> {
     """
     )
     @RegisterKotlinMapper(PostRow::class)
-    fun getLikeRevListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRevRow>
+    override fun getLikeRevListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRevRow>
 
     @SqlBatch(
         """
@@ -863,13 +849,14 @@ interface BgmDao : Transactional<BgmDao> {
         """
     )
     @Transaction
-    fun batchUpsertLikesRev(@BindBean likeList: Iterable<LikeRevRow>): IntArray
+    override fun batchUpsertLikesRev(@BindBean likeList: Iterable<LikeRevRow>): IntArray
 
 
     @SqlQuery(
         """
             select bl.type     as type,
                    bl.value    as face_key,
+                   bl.total    as face_count,
                    bu.username as username,
                    sum(bl.total)  count
             from  ba_user bu 
@@ -880,11 +867,11 @@ interface BgmDao : Transactional<BgmDao> {
                   (<l>)
               and bl.type = :t
             group by bl.type, face_key, username
-            having sum(bl.total) > 0;
+            having count > 0;
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
-    fun getLikeRevSumByTypeAndUsernameList(
+    override fun getLikeRevSumByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikesSumRow>
@@ -892,28 +879,25 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            with tmp as (select bl.type             as type,
-                                bu.username         as username,
-                                bsnm.sid            as sid,
-                                sum(bl.total)       as count
-                         from ba_likes_rev bl -- So far ba_likes is the smallest table
-                                  inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
-                                  inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
-                             -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
-                                  inner join ba_user bu on bl.uid = bu.id
-                         where bu.username in
-                               (<l>)
-                           and bl.type = :t
-                         group by bl.type, username, bsnm.sid
-                         having sum(bl.total) > 0)
-            select tmp.type as type, tmp.username as username, bsnm2.name as space_name , bsnm2.display_name as space_display_name,  tmp.count as count
-            from tmp
-                     inner join ba_space_naming_mapping bsnm2
-                                on tmp.type = bsnm2.type and tmp.sid = bsnm2.sid;
+        select bl.type           as type,
+               bu.username       as username,
+               bsnm.name         as space_name,
+               bsnm.display_name as space_display_name,
+               sum(bl.total)        count
+        from ba_likes_rev bl -- So far ba_likes is the smallest table
+                 inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
+                 inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+                 -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
+                 inner join ba_user bu on bl.uid = bu.id
+        where bu.username in
+              (<l>)
+          and bl.type = :t
+        group by bl.type, username, bsnm.name
+        having count > 0;
     """
     )
     @RegisterKotlinMapper(VLikeRevCountSpaceRow::class)
-    fun getLikeRevStatForSpaceByTypeAndUsernameList(
+    override fun getLikeRevStatForSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikeRevCountSpaceRow>
@@ -921,30 +905,25 @@ interface BgmDao : Transactional<BgmDao> {
 
     @SqlQuery(
         """
-            with tmp as (select bl.type       as type,
-                                bu.username   as username,
-                                bsnm.sid      as sid,
-                                sum(bl.total) as count
-                         from ba_likes_rev bl -- So far ba_likes is the smallest table
-                                  inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
-                                  inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
-                             -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
-                                  inner join ba_user bu on bl.uid = bu.id
-                         where bu.username in
-                               (<l>)
-                           and bl.type = :t
-                         group by bl.type, username, bsnm.sid
-                         having sum(bl.total) > 0)
-            select tmp.*,
-                   bsnm2.display_name as space_display_name,
-                   bsnm2.name         as space_name
-            from tmp
-                     inner join ba_space_naming_mapping bsnm2
-                                on bsnm2.type = tmp.type and bsnm2.sid = tmp.sid;
+            select bl.type           as type,
+                   bu.username       as username,
+                   bsnm.name         as space_name,
+                   bsnm.display_name as space_display_name,
+                   sum(bl.total)        count
+            from ba_likes bl -- So far ba_likes is the smallest table
+                     inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
+                     inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+                     inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
+                     inner join ba_user bu on bp.uid = bu.id
+            where bu.username in
+                  (<l>)
+              and bl.type = :t
+            group by bl.type, username, bsnm.name
+            having count > 0;
         """
     )
     @RegisterKotlinMapper(VLikeCountSpaceRow::class)
-    fun getLikeStatForSpaceByTypeAndUsernameList(
+    override fun getLikeStatForSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikeCountSpaceRow>
@@ -976,24 +955,24 @@ interface BgmDao : Transactional<BgmDao> {
                                 where bu.username in (<l>)))
         where 1 = 1
           and rank_like_rev_asc <=5
-          and dateline >= (((select EXTRACT(EPOCH FROM NOW())::bigint) - 86400 * 365 * 3))
+          and dateline >= ((select unixepoch() - 86400 * 365 * 3))
     """
     )
     @RegisterKotlinMapper(VUserLatestLikeRevRow::class)
-    fun getUserLatestLikeRevByTypeAndUsernameList(
+    override fun getUserLatestLikeRevByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VUserLatestLikeRevRow>
 
 
     @SqlQuery("select id from ba_topic where type = ?")
-    fun getAllTopicIdByType(type: Int): ArrayList<Int>
+    override fun getAllTopicIdByType(type: Int): ArrayList<Int>
 
     @SqlQuery("select max(id) from ba_topic where type = ?")
-    fun getMaxTopicIdByType(type: Int): Int
+    override fun getMaxTopicIdByType(type: Int): Int
 
     @SqlUpdate("delete from meta_data")
     @Transaction
-    fun _TRUNCATE_ALL_META():Int
+    override fun _TRUNCATE_ALL_META():Int
 }
 

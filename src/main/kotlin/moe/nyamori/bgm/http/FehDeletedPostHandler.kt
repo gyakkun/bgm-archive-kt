@@ -16,7 +16,9 @@ import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
 
-object FehDeletedPostHandler : Handler {
+class FehDeletedPostHandler(
+    private val fileHistoryLookup: FileHistoryLookup
+) : Handler {
     private val GSON = GsonBuilder()
         .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
         .registerTypeAdapterFactory(
@@ -52,7 +54,7 @@ object FehDeletedPostHandler : Handler {
             ctx.pathParam("topicId").toIntOrNull() ?: throw IllegalArgumentException("topicId should be a valid number")
         val postId =
             ctx.pathParam("postId").toIntOrNull() ?: throw IllegalArgumentException("postId should be a valid number")
-        val timestampList = FileHistoryLookup.getJsonTimestampList(spaceType, topicId).toList()
+        val timestampList = fileHistoryLookup.getJsonTimestampList(spaceType, topicId).toList()
         if (timestampList.isEmpty()) {
             LOGGER.info("Empty for topic : $spaceType - $topicId")
             ctx.status(HttpStatus.NOT_FOUND)
@@ -62,7 +64,7 @@ object FehDeletedPostHandler : Handler {
         val topicAtTs = fun(ts: Long): Topic {
             return cache.computeIfAbsent(ts) {
                 GSON.fromJson(
-                    FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
+                    fileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
                         spaceType, topicId, ts
                     ), Topic::class.java
                 )

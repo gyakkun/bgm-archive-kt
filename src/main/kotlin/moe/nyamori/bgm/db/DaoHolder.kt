@@ -6,21 +6,22 @@ import org.flywaydb.core.api.callback.Context
 import org.flywaydb.core.api.callback.Event
 import org.jdbi.v3.core.Jdbi
 import org.jdbi.v3.core.kotlin.KotlinPlugin
-import org.jdbi.v3.core.statement.Slf4JSqlLogger
 import org.jdbi.v3.sqlobject.SqlObjectPlugin
 import java.util.concurrent.CountDownLatch
 
-object Dao {
+class DaoHolder(
+    private val dsProvider: DSProvider,
+) {
     private val latch = CountDownLatch(1)
 
-    init {
+    fun runFlyway() {
         Flyway.configure()
-            .dataSource(DSProvider.ds)
+            .dataSource(dsProvider.ds)
             .baselineOnMigrate(true)
             .baselineVersion("0")
             .sqlMigrationPrefix("0")
-            .locations("db/migration")
-            .schemas("main")
+            .locations(if (dsProvider.isSqlite) "db/migration" else "db/postgres")
+            .schemas(if (dsProvider.isSqlite) "main" else "public")
             .table("flyway_schema_history")
             .callbacks(object : Callback {
                 override fun supports(event: Event?, context: Context?): Boolean {
@@ -41,21 +42,25 @@ object Dao {
                     return "Hi there!"
                 }
             })
-            // .load()
-            // .migrate()
+            .load()
+            .migrate()
     }
 
-    private val jdbi: Jdbi = Jdbi.create(DSProvider.ds).apply {
+    private val jdbi: Jdbi = Jdbi.create(dsProvider.ds).apply {
         installPlugins()
         installPlugin(SqlObjectPlugin())
         installPlugin(KotlinPlugin())
         // setSqlLogger(Slf4JSqlLogger())
     }
 
-    val bgmDao: BgmDao by lazy {
-        // latch.await()
-        jdbi.onDemand(BgmDao::class.java)
-            ?: throw IllegalStateException("Should get jdbi dao class but got null")
+    val bgmDao: IBgmDao by lazy {
+        latch.await()
+        val res = if (dsProvider.isSqlite) {
+            jdbi.onDemand(BgmDaoSqlite::class.java)
+        } else {
+            jdbi.onDemand(BgmDaoPg::class.java)
+        }
+        return@lazy res ?: throw IllegalStateException("Should get jdbi dao class but got null")
     }
 
 }

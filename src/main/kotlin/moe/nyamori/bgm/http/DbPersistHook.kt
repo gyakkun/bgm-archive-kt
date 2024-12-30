@@ -7,7 +7,9 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.JsonToDbProcessor
 import moe.nyamori.bgm.util.HttpHelper
 
-object DbPersistHook : Handler {
+class DbPersistHook(
+    private val jsonToDbProcessor: JsonToDbProcessor
+) : Handler {
     override fun handle(ctx: Context) {
         val keyParam = ctx.queryParam("key")
         if (Config.BGM_ARCHIVE_DISABLE_DB_PERSIST || keyParam != Config.BGM_ARCHIVE_DB_PERSIST_KEY) {
@@ -19,7 +21,7 @@ object DbPersistHook : Handler {
         Thread {
             try {
                 if (HttpHelper.tryLockDbMs(10_000)) {
-                    JsonToDbProcessor.job(isAll, idx)
+                    jsonToDbProcessor.job(isAll, idx)
                 }
             } catch (ignore: Exception) {
 

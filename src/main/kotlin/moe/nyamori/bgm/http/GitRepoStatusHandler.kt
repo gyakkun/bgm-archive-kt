@@ -20,9 +20,9 @@ object GitRepoStatusHandler : Handler {
         val res = object {
             val gitRepositories = GitHelper.allRepoInDisplayOrder
                 .associate {
-                    it.folderName() to run {
+                    it.repo.folderName() to run {
                         val gitProcess = Runtime.getRuntime()
-                            .exec("git --no-pager count-objects -vH", null, File(it.absolutePathWithoutDotGit()))
+                            .exec("git --no-pager count-objects -vH", null, File(it.repo.absolutePathWithoutDotGit()))
                         gitProcess.blockAndPrintProcessResults(printAtStdErr = false).map {
                             it.split(":")
                         }.associate { (first, second) ->

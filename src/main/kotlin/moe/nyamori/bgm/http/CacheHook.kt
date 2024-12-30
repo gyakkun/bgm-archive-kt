@@ -4,12 +4,15 @@ import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.db.IBgmDao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.util.CommitHistoryCacheHelper.buildCache
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
 
-object CacheHook : Handler {
+class CacheHook(
+    private val bgmDao: IBgmDao
+) : Handler {
     private val LOGGER = LoggerFactory.getLogger(CacheHook::class.java)
     override fun handle(ctx: Context) {
         val keyParam = ctx.queryParam("key")
@@ -21,7 +24,7 @@ object CacheHook : Handler {
             try {
                 if (HttpHelper.tryLockDbMs(10_000)) {
                     listOf(GitHelper.allJsonRepoListSingleton, GitHelper.allArchiveRepoListSingleton).flatten()
-                        .forEach { it.buildCache() }
+                        .forEach { it.buildCache(bgmDao) }
                 }
             } catch (th: Throwable) {
                 if (th is IllegalStateException) {

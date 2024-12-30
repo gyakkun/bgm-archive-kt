@@ -1,10 +1,7 @@
 package moe.nyamori.bgm
 
 import com.hsbc.cranker.connector.CrankerConnectorBuilder
-import com.hsbc.cranker.connector.CrankerConnectorBuilder.CRANKER_PROTOCOL_1
-import com.hsbc.cranker.connector.CrankerConnectorBuilder.CRANKER_PROTOCOL_3
-import com.hsbc.cranker.connector.CrankerConnectorBuilder.connector
-import com.hsbc.cranker.connector.ProxyEventListener
+import com.hsbc.cranker.connector.CrankerConnectorBuilder.*
 import com.hsbc.cranker.connector.RouterEventListener
 import com.hsbc.cranker.connector.RouterRegistration
 import io.javalin.Javalin
@@ -12,7 +9,12 @@ import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.*
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS
-import moe.nyamori.bgm.db.Dao
+import moe.nyamori.bgm.config.ConfigDto
+import moe.nyamori.bgm.config.checkAndGetConfigDto
+import moe.nyamori.bgm.db.DSProvider
+import moe.nyamori.bgm.db.DaoHolder
+import moe.nyamori.bgm.db.JsonToDbProcessor
+import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.folderName
@@ -24,33 +26,56 @@ import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.StringHashingHelper
+import moe.nyamori.bgm.util.TopicJsonHelper
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.FileWriter
 import java.net.URI
 import java.time.Duration
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.Path
 
 object HttpServer {
     private val LOGGER = LoggerFactory.getLogger(HttpServer::class.java)
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val app = Javalin.create { config ->
-            config.useVirtualThreads = true
-            config.http.brotliAndGzipCompression()
+        // bakt - bgm-archive-kt
+        val baktConfig = checkAndGetConfigDto()
+        Config.setConfigDtoDelegate(baktConfig)
+        val dsProvider = DSProvider(
+            baktConfig.jdbcUrl,
+            baktConfig.jdbcUsername,
+            baktConfig.jdbcPassword,
+            baktConfig.hikariMinIdle,
+            baktConfig.hikariMaxConn,
+            baktConfig.dbIsEnableWal
+        )
+        val daoHolder = DaoHolder(dsProvider)
+        daoHolder.runFlyway()
+        writeDbPersistKeyIfNecessary(baktConfig)
+        val bgmDao = daoHolder.bgmDao
+
+        val rangeHelper = RangeHelper(bgmDao)
+        val fileHistoryLookup = FileHistoryLookup(bgmDao)
+
+
+        val app = Javalin.create { jc ->
+            jc.useVirtualThreads = true
+            jc.http.brotliAndGzipCompression()
             // Global json pretty
             // config.jsonMapper(JavalinJackson().updateMapper{
             //     it.enable(SerializationFeature.INDENT_OUTPUT)
             // })
-            config.bundledPlugins.enableCors { cors ->
+            jc.bundledPlugins.enableCors { cors ->
                 cors.addRule {
                     it.allowHost("bgm.tv", "bangumi.tv", "chii.in")
                     it.allowHost("*.bgm.tv", "*.bangumi.tv", "*.chii.in")
                 }
             }
-            config.requestLogger.http { ctx, timingMs ->
+            jc.requestLogger.http { ctx, timingMs ->
                 val reqSalt: Long = ctx.attribute("reqSalt") ?: return@http
                 if (timingMs >= 3000) LOGGER.error(
                     "[{}] Timing {}ms. Super long for req: {}", reqSalt, timingMs.toLong(), ctx.fullUrl()
@@ -64,11 +89,11 @@ object HttpServer {
                     LOGGER.error("[{}] Req failed with code {}", reqSalt, ctx.statusCode())
                 }
             }
-            config.router.apiBuilder {
+            jc.router.apiBuilder {
                 get("/status", GitRepoStatusHandler)
                 get("/status/git", GitRepoStatusHandler)
                 get("/status/jvm", JvmStatusHandler)
-                get("/status/db", DbStatusHandler)
+                get("/status/db", DbStatusHandler(dsProvider))
                 get("/holes") { it.redirect("/holes/blog") }
                 path("/holes") {
                     get("/{spaceType}") { // get all holes without filtering
@@ -80,7 +105,7 @@ object HttpServer {
                             return@get
                         }
                         val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
-                        val holes = RangeHelper.checkHolesForType(spaceType);
+                        val holes = rangeHelper.checkHolesForType(spaceType);
                         if (holes.isEmpty()) {
                             it.html(""); return@get
                         }
@@ -98,7 +123,7 @@ object HttpServer {
                         val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
                         val body = it.body()
                         val bs = SpotChecker.getBitsetFromLongListStr(body)
-                        val holes = RangeHelper.checkHolesForType(spaceType)
+                        val holes = rangeHelper.checkHolesForType(spaceType)
                         if (holes.isEmpty()) {
                             it.html(""); return@post
                         }
@@ -112,7 +137,7 @@ object HttpServer {
                             return@get
                         }
                         val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
-                        val holes = RangeHelper.checkHolesForType(spaceType)
+                        val holes = rangeHelper.checkHolesForType(spaceType)
                         if (holes.isEmpty()) {
                             it.html("0\n"); return@get
                         }
@@ -121,19 +146,19 @@ object HttpServer {
                         it.html(res)
                     }
                 }
-                get("/health", healthHandler())
-                head("/health", healthHandler(true))
+                get("/health", healthHandler(rangeHelper))
+                head("/health", healthHandler(rangeHelper, true))
                 path("/history") {
                     get("/status", GitRepoStatusHandler)
                     path("/{spaceType}") {
                         get("/latest_topic_list", LatestTopicListWrapper)
                         get("/latest-topic-list", LatestTopicListWrapper)
                         path("/{topicId}") {
-                            get(FileHistoryWrapper)
+                            get(FileHistoryWrapper(fileHistoryLookup))
                             get("/link", LinkHandlerWrapper)
                             path("/{timestamp}") {
-                                get(FileOnCommitWrapper())
-                                get("/html", FileOnCommitWrapper(isHtml = true))
+                                get(FileOnCommitWrapper(isHtml = false, fileHistoryLookup))
+                                get("/html", FileOnCommitWrapper(isHtml = true, fileHistoryLookup))
                             }
                         }
                     }
@@ -148,7 +173,7 @@ object HttpServer {
                     get("/meta") {
                         it.result(
                             GitHelper.GSON.toJson(
-                                Dao.bgmDao.getAllMetaData().associate { it.k to it.v }
+                                daoHolder.bgmDao.getAllMetaData().associate { it.k to it.v }
                             )
                         )
                     }
@@ -156,11 +181,11 @@ object HttpServer {
                         get("/html") {
                             it.result(
                                 GitHelper.GSON.toJson(
-                                    GitHelper.allArchiveRepoListSingleton.mapIndexed { idx, repo ->
+                                    GitHelper.allArchiveRepoListSingleton.mapIndexed { idx, repoDto ->
                                         Pair(
                                             idx,
-                                            StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
-                                        ) to repo.absolutePathWithoutDotGit()
+                                            StringHashingHelper.stringHash(repoDto.repo.absolutePathWithoutDotGit())
+                                        ) to repoDto.repo.absolutePathWithoutDotGit()
                                     }.toMap()
                                 )
                             )
@@ -168,11 +193,11 @@ object HttpServer {
                         get("/json") {
                             it.result(
                                 GitHelper.GSON.toJson(
-                                    GitHelper.allJsonRepoListSingleton.mapIndexed { idx, repo ->
+                                    GitHelper.allJsonRepoListSingleton.mapIndexed { idx, repoDto ->
                                         Pair(
                                             idx,
-                                            StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
-                                        ) to repo.absolutePathWithoutDotGit()
+                                            StringHashingHelper.stringHash(repoDto.repo.absolutePathWithoutDotGit())
+                                        ) to repoDto.repo.absolutePathWithoutDotGit()
                                     }.toMap()
                                 )
                             )
@@ -181,18 +206,19 @@ object HttpServer {
                 }
                 path("/hook") {
                     path("/db") {
-                        get("/persist", DbPersistHook)
-                        get("/reset", DbSetPersistIdHandler)
-                        get("/purge", DbPurgeAllMetaHandler)
+                        get("/persist", DbPersistHook(JsonToDbProcessor(bgmDao, TopicJsonHelper(bgmDao))))
+                        get("/reset", DbSetPersistIdHandler(bgmDao))
+                        get("/purge", DbPurgeAllMetaHandler(bgmDao))
                     }
 
                     get("/commit", CommitHook)
-                    get("/cache", CacheHook)
+                    get("/cache", CacheHook(bgmDao))
                 }
                 path("/forum-enhance") {
-                    post("/query", ForumEnhanceHandler)
-                    get("/deleted_post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
-                    get("/deleted-post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
+                    post("/query", ForumEnhanceHandler(bgmDao))
+                    val fehDeletedPostHandler = FehDeletedPostHandler(fileHistoryLookup)
+                    get("/deleted_post/{type}/{topicId}/{postId}", fehDeletedPostHandler)
+                    get("/deleted-post/{type}/{topicId}/{postId}", fehDeletedPostHandler)
                 }
                 get("/*") { // redirect all
                     it.redirect(
@@ -224,18 +250,18 @@ object HttpServer {
             val reqSalt = System.currentTimeMillis() and 2047
             it.attribute("reqSalt", reqSalt)
             LOGGER.info("[{}] Req: {} {} {}", reqSalt, ip(it), it.method(), it.fullUrl())
-        }.start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
+        }.start(baktConfig.httpHost, baktConfig.httpPort)
 
-        if (Config.BGM_ARCHIVE_ENABLE_CRANKER_CONNECTOR) {
+        if (baktConfig.enableCrankerConnector) {
             LOGGER.info("Starting cranker connector")
             val crankerConnector = connector()
                 .withHttpClient(CrankerConnectorBuilder.createHttpClient(true).build())
                 .withRoute("*") // catch all
                 .withPreferredProtocols(listOf(CRANKER_PROTOCOL_3, CRANKER_PROTOCOL_1))
-                .withComponentName("bgm-archive-kt")
-                .withRouterUris { listOf(URI.create(Config.BGM_ARCHIVE_CRANKER_REG_URL)) }
-                .withSlidingWindowSize(Config.BGM_ARCHIVE_CRANKER_SLIDING_WIN)
-                .withTarget(URI.create("http://${Config.BGM_ARCHIVE_ADDRESS}:${Config.BGM_ARCHIVE_PORT}"))
+                .withComponentName(baktConfig.crankerComponent)
+                .withRouterUris { listOf(URI.create(baktConfig.crankerRegUrl)) }
+                .withSlidingWindowSize(baktConfig.crankerSlidingWin)
+                .withTarget(URI.create("http://${baktConfig.httpHost}:${baktConfig.httpPort}"))
                 .withRouterRegistrationListener(object : RouterEventListener {
                     override fun onRegistrationChanged(data: RouterEventListener.ChangeData) {
                         LOGGER.info(
@@ -261,12 +287,37 @@ object HttpServer {
             })
     }
 
+    private fun writeDbPersistKeyIfNecessary(baktConfig: ConfigDto) {
+        baktConfig.dbPersistKey
+            .also { key ->
+                runCatching {
+                    System.err.println("############ DB PERSIST KEY: $key ############")
+                    val folder = Path(baktConfig.homeFolderAbsolutePath).resolve("bgm-archive-db").toFile()
+                    if (!folder.exists()) folder.mkdirs()
+                    val keyfile = folder.resolve("db-persist-key")
+                    if (baktConfig.disableDbPersistKey) {
+                        System.err.println("Will not write db persist keyfile due to env config.")
+                        return@runCatching
+                    }
+                    if (!keyfile.exists()) keyfile.createNewFile()
+                    FileWriter(keyfile).use { fw ->
+                        fw.write(key)
+                        fw.flush()
+                    }
+                }.onFailure {
+                    System.err.println("Error when writing key file!")
+                    it.printStackTrace()
+                }
+            }
+    }
+
+
     @Volatile
     private var lastDownTimestamp: Long = Long.MAX_VALUE
 
-    private fun healthHandler(isHead: Boolean = false) = Handler { ctx ->
+    private fun healthHandler(rangeHelper: RangeHelper, isHead: Boolean = false) = Handler { ctx ->
         val holes = SpaceType.entries.associateWith {
-            val res = RangeHelper.checkHolesForType(it)
+            val res = rangeHelper.checkHolesForType(it)
             runCatching {
                 val holesMaskFile = File(System.getProperty("user.home"))
                     .resolve("source/bgm-archive-holes/${it.name.lowercase()}.txt")
@@ -279,7 +330,7 @@ object HttpServer {
         var isAvailable = blogHealth
         val now = Instant.now()
         val lastCommits = GitHelper.allRepoInDisplayOrder
-            .map { it.folderName() to it.getLatestCommitRef() }
+            .map { it.repo.folderName() to it.getLatestCommitRef() }
             .associate { (folderName, commit) ->
                 @Suppress("unused")
                 folderName to object {

@@ -2,17 +2,18 @@ package moe.nyamori.bgm.http
 
 import io.javalin.http.Context
 import io.javalin.http.Handler
-import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.DSProvider
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadableBytes
 import java.io.File
 
-object DbStatusHandler:Handler {
+class DbStatusHandler(
+    private val dsProvider: DSProvider
+) : Handler {
     override fun handle(ctx: Context) {
         ctx.prettyJson(object {
-            val db = object {
-                val dbFileSize = File(Config.BGM_ARCHIVE_SQLITE_FILE).length().toHumanReadableBytes()
-                val dbTableSize = DSProvider.ds.connection.use { conn ->
+            val db = if (!dsProvider.isSqlite) null else object {
+                val dbFileSize = File(dsProvider.sqliteFilePathOrNull!!).length().toHumanReadableBytes()
+                val dbTableSize = dsProvider.ds.connection.use { conn ->
                     conn.prepareStatement(
                         """
                     SELECT name,

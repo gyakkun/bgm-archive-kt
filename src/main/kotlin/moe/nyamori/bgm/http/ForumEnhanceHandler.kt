@@ -18,14 +18,20 @@ import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
-object ForumEnhanceHandler : Handler {
+class ForumEnhanceHandler(
+    private val bgmDao: IBgmDao
+) : Handler {
     private val LOGGER = LoggerFactory.getLogger(ForumEnhanceHandler::class.java)
     private val GSON = Gson()
     @Suppress("UNCHECKED_CAST")
     private val STRING_OBJECT_TYPE_TOKEN =
         TypeToken.getParameterized(Map::class.java, String::class.java, Any::class.java) as TypeToken<Map<String, Any>>
     private val CACHE_DURATION = Duration.ofHours(2)
-    private const val CACHE_SIZE = 600L
+
+    companion object {
+        private const val CACHE_SIZE = 600L
+    }
+
     private val VT_EXECUTOR = Executors.newThreadPerTaskExecutor(
         Thread.ofVirtual().name("feh-", 0).factory()
     )
@@ -116,7 +122,7 @@ object ForumEnhanceHandler : Handler {
             return null
         }
         var userList = (bodyMap["users"]!! as List<String>).distinct()
-        userList = Dao.bgmDao.getValidUsernameListFromList(userList)
+        userList = bgmDao.getValidUsernameListFromList(userList)
         if (userList.size > 200) {
             LOGGER.warn("User list too large, take the first 200.")
             userList = userList.take(200)
@@ -131,99 +137,99 @@ object ForumEnhanceHandler : Handler {
 //    ): Deferred<Map<String, UserStat>> = GlobalScope.async {
         val allPostCountByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllPostCountRow>> {
             timingWrapper("getAllPostCountByTypeAndUsernameList") {
-                Dao.bgmDao.getAllPostCountByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getAllPostCountByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val allTopicCountByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllTopicCountRow>> {
             timingWrapper("getAllTopicCountByTypeAndUsernameList") {
-                Dao.bgmDao.getAllTopicCountByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getAllTopicCountByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
 
         val allPostCount30dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllPostCountRow>> {
             timingWrapper("getAllPostCount30dByTypeAndUsernameList") {
-                Dao.bgmDao.getAllPostCount30dByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getAllPostCount30dByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val allTopicCount30dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllTopicCountRow>> {
             timingWrapper("getAllTopicCount30dByTypeAndUsernameList") {
-                Dao.bgmDao.getAllTopicCount30dByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getAllTopicCount30dByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
 
         val allPostCount7dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllPostCountRow>> {
             timingWrapper("getAllPostCount7dByTypeAndUsernameList") {
-                Dao.bgmDao.getAllPostCount7dByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getAllPostCount7dByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val allTopicCount7dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllTopicCountRow>> {
             timingWrapper("getAllTopicCount7dByTypeAndUsernameList") {
-                Dao.bgmDao.getAllTopicCount7dByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getAllTopicCount7dByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likesSumByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikesSumRow>> {
             timingWrapper("getLikesSumByTypeAndUsernameList") {
-                Dao.bgmDao.getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likeRevSumByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikesSumRow>> {
             timingWrapper("getLikeRevSumByTypeAndUsernameList") {
-                Dao.bgmDao.getLikeRevSumByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getLikeRevSumByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val postCountSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VPostCountSpaceRow>> {
             timingWrapper("getPostCountSpaceByTypeAndUsernameList") {
-                Dao.bgmDao.getPostCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getPostCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val postCountSpace30dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VPostCountSpaceRow>> {
             timingWrapper("getPostCountSpace30dByTypeAndUsernameList") {
-                Dao.bgmDao.getPostCountSpace30dByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getPostCountSpace30dByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val postCountSpace7dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VPostCountSpaceRow>> {
             timingWrapper("getPostCountSpace7dByTypeAndUsernameList") {
-                Dao.bgmDao.getPostCountSpace7dByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getPostCountSpace7dByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val topicCountSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VTopicCountSpaceRow>> {
             timingWrapper("getTopicCountSpaceByTypeAndUsernameList") {
-                Dao.bgmDao.getTopicCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getTopicCountSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val topicCountSpace30dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VTopicCountSpaceRow>> {
             timingWrapper("getTopicCountSpace30dByTypeAndUsernameList") {
-                Dao.bgmDao.getTopicCountSpace30dByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getTopicCountSpace30dByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val topicCountSpace7dByTypeAndUsernameList = VT_EXECUTOR.submit<List<VTopicCountSpaceRow>> {
             timingWrapper("getTopicCountSpace7dByTypeAndUsernameList") {
-                Dao.bgmDao.getTopicCountSpace7dByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getTopicCountSpace7dByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val userLastReplyTopicByTypeAndUsernameList = VT_EXECUTOR.submit<List<VUserLastReplyTopicRow>> {
             timingWrapper("getUserLastReplyTopicByTypeAndUsernameList") {
-                Dao.bgmDao.getUserLastReplyTopicByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getUserLastReplyTopicByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val userLatestCreateTopicAndUsernameList = VT_EXECUTOR.submit<List<VUserLatestCreateTopicRow>> {
             timingWrapper("getUserLatestCreateTopicAndUsernameList") {
-                Dao.bgmDao.getUserLatestCreateTopicAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getUserLatestCreateTopicAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likeRevCountForSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikeRevCountSpaceRow>> {
             timingWrapper("getLikeRevStatForSpaceByTypeAndUsernameList") {
-                Dao.bgmDao.getLikeRevStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getLikeRevStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likeCountForSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikeCountSpaceRow>> {
             timingWrapper("getLikeStatForSpaceByTypeAndUsernameList") {
-                Dao.bgmDao.getLikeStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getLikeStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val userLatestLikeRevByTypeAndUsernameList = VT_EXECUTOR.submit<List<VUserLatestLikeRevRow>> {
             timingWrapper("getUserLatestLikeRevByTypeAndUsernameList") {
-                Dao.bgmDao.getUserLatestLikeRevByTypeAndUsernameList(spaceType.id, usernameList)
+                bgmDao.getUserLatestLikeRevByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val vAllPostCountRows = allPostCountByTypeAndUsernameList.get()
