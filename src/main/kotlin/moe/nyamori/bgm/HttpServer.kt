@@ -10,6 +10,7 @@ import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.*
 import moe.nyamori.bgm.config.*
 import moe.nyamori.bgm.config.Config.bgmHealthStatus500TimeoutThresholdMs
+import moe.nyamori.bgm.db.DSProvider
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
@@ -270,18 +271,19 @@ object HttpServer {
 
     private fun writeConfigToConfigFolder(cfg: ConfigDto) {
         val gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
-        val json = gson.toJson(cfg)
+        val cfgJson = gson.toJson(cfg)
         val folder = File(cfg.homeFolderAbsolutePath)
             .resolve("bgm-archive-kt-config")
             .apply { mkdirs() }
-        val cfgJsonFile = folder.resolve("config.json")
+        LOGGER.info("Final loaded config: {}", cfgJson)
+        val cfgJsonFile = folder.resolve("config.output.json")
         if (cfgJsonFile.exists()) {
             LOGGER.error("config file exists: {}", cfgJsonFile.path)
             LOGGER.error("orig config file content: {}", cfgJsonFile.readText())
             LOGGER.error("will overwrite the config file.")
         }
         FileWriter(cfgJsonFile).use {
-            it.write(json)
+            it.write(cfgJson)
             it.flush()
         }
     }
@@ -289,7 +291,9 @@ object HttpServer {
     private fun writeDbPersistKeyIfNecessary(cfg: IConfig) {
         runCatching {
             System.err.println("############ DB PERSIST KEY: ${cfg.dbPersistKey} ############")
-            val dbFolder = File(cfg.homeFolderAbsolutePath).resolve("bgm-archive-db")
+            val dbFolder = if (DSProvider.isSqlite) {
+                File(DSProvider.sqliteFilePathOrNull!!).parentFile
+            } else File(cfg.homeFolderAbsolutePath).resolve("bgm-archive-db")
             val keyfile = dbFolder.resolve("db-persist-key")
             if (cfg.disableDbPersistKey) {
                 System.err.println("Will not write db persist keyfile due to env config.")
