@@ -2,17 +2,20 @@
   "_todo": "Add mutex lock for each repo to perform parse/build cache/etc. jobs",
   "_comment_1": "Path start with / (Linux) or X: (Windows) will be treated as absolute path, otherwise will be relative from home folder",
   "_homeFolderAbsolutePath": "/home/gyakkun/source",
+
   "homeFolderAbsolutePath": null,
   "prevProcessedCommitRevIdFileName": "last_processed_commit_rev_id",
   "preferJgit": false,
   "preferGitBatchAdd": false,
   "disableAllHooks": false,
+
   "httpHost": "localhost",
   "httpPort": 5926,
 
   "_comment_2": "db things",
-  "sqliteFilePath": "bgm-archive-db/bgm-archive.sqlite",
-  "_comment_3": "if jdbc url is empty, then defaults to sqlite file in sqlite file path",
+  "dbIsEnableWal": false,
+
+  "_comment_3": "if jdbc url is empty, then defaults to sqlite file in $home/bgm-archive-db/bgm-archive.sqlite",
   "jdbcUrl": "",
   "jdbcUsername": "",
   "jdbcPassword": "",
@@ -21,16 +24,17 @@
 
   "dbMetaKeyPrevPersistedJsonCommitRevId": "prev_persisted_json_commit_rev_id",
   "dbMetaKeyPrevCachedCommitRevId": "prev_cached_commit_rev_id",
-  "_comment_4": "switch on or off the hooks",
 
+  "_comment_4": "switch on or off the hooks",
   "disableSpotCheck": false,
   "disableDbPersist": false,
-  "dbIsEnableWal": false,
   "disableDbPersistKey": false,
   "dbPersistKey": null,
+
+  "isRemoveJsonAfterProcess": false,
+
   "spotCheckerTimeoutThresholdMs": 200000,
   "bgmHealthStatus500TimeoutThresholdMs": 1200000,
-
 
   "_comment_-1": "cranker things",
   "enableCrankerConnector": false,
@@ -38,59 +42,67 @@
   "crankerSlidingWin": 2,
   "crankerComponent": "bgm-archive-kt",
 
-
   "_comment_-2": "repos",
-  "repoMutexTimeoutMs": 30000,
   "repoList": [
     {
       "id": -146533408,
-      "optFriendlyName": "Old bgm-archive 2211-2307",
       "path": "bgm-archive-old",
       "type": "HTML",
+      "optFriendlyName": "Old bgm-archive 2211-2307",
+      "optExpectedCommitPerDay": 100,
       "optRepoIdCouplingWith": -308731779,
       "optIsStatic": true,
-      "optExpectedCommitPerDay": 100
+      "optMutexTimeoutMs": null
     },
     {
       "id": -308731779,
-      "optFriendlyName": "Old bgm-archive-json 2211-2307",
       "path": "bgm-archive-json-old",
       "type": "JSON",
+      "optFriendlyName": "Old bgm-archive-json 2211-2307",
+      "optExpectedCommitPerDay": 100,
       "optRepoIdCouplingWith": -146533408,
       "optIsStatic": true,
-      "optExpectedCommitPerDay": 100
+      "optMutexTimeoutMs": null
     },
     {
       "id": -710828927,
-      "optFriendlyName": "EP and GROUP html since 2307",
       "path": "bgm-archive-gre",
       "type": "HTML",
+      "optFriendlyName": "EP and GROUP html since 2307",
+      "optExpectedCommitPerDay": 150,
       "optRepoIdCouplingWith": -359375769,
-      "optExpectedCommitPerDay": 150
+      "optIsStatic": false,
+      "optMutexTimeoutMs": 30000
     },
     {
       "id": -359375769,
-      "optFriendlyName": "EP and GROUP json since 2307",
       "path": "bgm-archive-gre-json",
       "type": "JSON",
+      "optFriendlyName": "EP and GROUP json since 2307",
+      "optExpectedCommitPerDay": 150,
       "optRepoIdCouplingWith": -710828927,
-      "optExpectedCommitPerDay": 150
+      "optIsStatic": false,
+      "optMutexTimeoutMs": 30000
     },
     {
       "id": -825560563,
-      "optFriendlyName": "BLOG, SUBJECT, CHARACTER and PERSON html since 2307",
       "path": "bgm-archive-blsm",
       "type": "HTML",
+      "optFriendlyName": "BLOG, SUBJECT, CHARACTER and PERSON html since 2307",
+      "optExpectedCommitPerDay": 150,
       "optRepoIdCouplingWith": -898721628,
-      "optExpectedCommitPerDay": 150
+      "optIsStatic": false,
+      "optMutexTimeoutMs": 30000
     },
     {
       "id": -898721628,
-      "optFriendlyName": "BLOG, SUBJECT, CHARACTER and PERSON json since 2307",
       "path": "bgm-archive-blsm-json",
       "type": "JSON",
+      "optFriendlyName": "BLOG, SUBJECT, CHARACTER and PERSON json since 2307",
+      "optExpectedCommitPerDay": 150,
       "optRepoIdCouplingWith": -825560563,
-      "optExpectedCommitPerDay": 150
+      "optIsStatic": false,
+      "optMutexTimeoutMs": 30000
     }
   ]
 }
