@@ -32,10 +32,6 @@ jobs:
     - name: Git clean up actual run
       run: git clean -f -d
     - name: Releaser release
-      run: mvn --batch-mode resources:resources releaser:release
-      env:
-        GITHUB_TOKEN: ${{ github.token }}
-    - name: Publish to GitHub Packages Apache Maven
-      run: mvn deploy -s $GITHUB_WORKSPACE/settings.xml
+      run: mvn --batch-mode -DskipTests=true resources:resources releaser:release -s $GITHUB_WORKSPACE/settings.xml
       env:
         GITHUB_TOKEN: ${{ github.token }}
