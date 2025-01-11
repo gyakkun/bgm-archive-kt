@@ -1,5 +1,7 @@
 package moe.nyamori.bgm.util
 
+import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.RepoType
 import moe.nyamori.bgm.git.FileHistoryLookup.getRevCommitList
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
@@ -23,10 +25,12 @@ class ParserHelperTest {
 
     // @Test
     fun writeSampleHtml() {
+        // remember to init config first
         val filePath = "blog/" + FilePathHelper.numberToPath(313741) + ".html"
-        val commitList = GitHelper.defaultArchiveRepoSingleton.getRevCommitList(filePath)
+        val archiveRepo = Config.repoList.first { it.type == RepoType.HTML && !it.repo.isBare }.repo
+        val commitList = archiveRepo.getRevCommitList(filePath)
         for (i in commitList) {
-            val htmlString = GitHelper.defaultArchiveRepoSingleton.getFileContentAsStringInACommit(i.hash, filePath)
+            val htmlString = archiveRepo.getFileContentAsStringInACommit(i.hash, filePath)
             val revId = ParserHelper.getStyleRevNumberFromHtmlString(htmlString)
             val htmlFile =
                 File("E:\\SOURCE_ROOT\\bgm-archive-kt\\src\\test\\resources\\html_samples\\blog\\$revId.html")

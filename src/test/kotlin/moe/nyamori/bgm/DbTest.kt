@@ -1,8 +1,7 @@
 package moe.nyamori.bgm
 
 import com.google.gson.*
-import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.config.RepoType
+import moe.nyamori.bgm.config.*
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.db.SpaceNameMappingData
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
@@ -17,6 +16,7 @@ import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
 import moe.nyamori.bgm.util.TopicJsonHelper.handleBlogTagAndRelatedSubject
 import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -37,13 +37,18 @@ class DbTest {
         @Throws(IOException::class)
         @JvmStatic
         fun main(args: Array<String>) {
+            setConfigDelegate(ConfigReadout().toDto())
             Dao.bgmDao.healthCheck()
             val dbTest = DbTest()
             dbTest.readJsonAndUpsert()
 
             dbTest.readJsonUpdateSpaceAliasMapping()
+        }
 
-
+        @BeforeAll
+        @JvmStatic
+        fun setup() {
+            setConfigDelegate(ConfigReadout().toDto())
         }
     }
 

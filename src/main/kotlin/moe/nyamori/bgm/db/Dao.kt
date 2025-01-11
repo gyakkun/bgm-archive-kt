@@ -18,7 +18,7 @@ object Dao {
             .baselineOnMigrate(true)
             .baselineVersion("0")
             .sqlMigrationPrefix("0")
-            .locations(if (DSProvider.isSqlite) "db/migration" else "db/postgres")
+            .locations(if (DSProvider.isSqlite) "db/sqlite" else "db/postgres")
             .schemas(if (DSProvider.isSqlite) "main" else "public")
             .table("flyway_schema_history")
             .callbacks(object : Callback {

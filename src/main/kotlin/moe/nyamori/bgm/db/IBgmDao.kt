@@ -1,6 +1,5 @@
 package moe.nyamori.bgm.db
 
-import moe.nyamori.bgm.config.RepoDto
 import moe.nyamori.bgm.model.Like
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Topic
