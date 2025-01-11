@@ -25,6 +25,9 @@ jobs:
     - run: git config --global user.email "test@example.com"
     - run: git config --global user.name "Github Action"
     - run: echo "M2_HOME=$(dirname $(dirname `which mvn`))" >> $GITHUB_ENV
+    - run: mkdir ~/.m2
+    - run: mv $GITHUB_WORKSPACE/settings.xml ~/.m2
+    - run: mv $GITHUB_WORKSPACE/toolchains.xml ~/.m2
     - name: Verify package
       run: mvn --batch-mode verify
     - name: Git clean up dry run
@@ -32,6 +35,10 @@ jobs:
     - name: Git clean up actual run
       run: git clean -f -d
     - name: Releaser release
-      run: mvn --batch-mode -DskipTests=true resources:resources releaser:release -s $GITHUB_WORKSPACE/settings.xml
+      run: mvn --batch-mode -DskipTests=true resources:resources releaser:release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+    - name: Publish to GitHub Packages Apache Maven
+      run: mvn deploy -s $GITHUB_WORKSPACE/settings.xml
       env:
         GITHUB_TOKEN: ${{ github.token }}
