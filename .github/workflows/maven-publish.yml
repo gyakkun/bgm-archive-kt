@@ -24,7 +24,15 @@ jobs:
         settings-path: ${{ github.workspace }} # location for the settings.xml file
     - run: git config --global user.email "test@example.com"
     - run: git config --global user.name "Github Action"
-    - run: mvn -b releaser:release
+    - run: echo "M2_HOME=$(dirname $(dirname `which mvn`))" >> $GITHUB_ENV
+    - name: Verify package
+      run: mvn --batch-mode verify
+    - name: Run test
+      run: mvn test
+    - name: Releaser release
+      run: mvn --batch-mode resources:resources releaser:release
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
     - name: Publish to GitHub Packages Apache Maven
       run: mvn deploy -s $GITHUB_WORKSPACE/settings.xml
       env:
