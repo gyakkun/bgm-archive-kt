@@ -126,6 +126,7 @@ object SpotChecker {
     }
 
     private fun randomSelectTopicIds(archiveRepo: Repository, spaceType: SpaceType): List<Int> {
+        require(!archiveRepo.isBare) { "bare archive repo can't be applied to spot check" }
         val result = mutableListOf<Int>()
         val spotCheckedBs = getSpotCheckedTopicMask(archiveRepo, spaceType)
         val hiddenBs = getHiddenTopicMask(archiveRepo, spaceType)
@@ -157,7 +158,7 @@ object SpotChecker {
             LOGGER.info("Writing empty spot check bitset file for $spaceType.")
             writeBitsetToFile(
                 BitSet(),
-                File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
+                File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
             )
             // Reset the mask file
             LOGGER.info("Going to re generate hidden topic mask file for $spaceType.")
@@ -181,7 +182,7 @@ object SpotChecker {
 
         writeBitsetToFile(
             spotCheckedBs,
-            File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
+            File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
         )
 
         LOGGER.info("Spot check id selected: $spaceType - $result")
@@ -413,9 +414,10 @@ object SpotChecker {
         }
     }
 
-    private fun checkEmptyTopicMaskBitsetFile(spaceType: SpaceType) {
+    private fun checkEmptyTopicMaskBitsetFile(archiveRepo: Repository, spaceType: SpaceType) {
+        require(!archiveRepo.isBare) { "bare repo not supported" }
         val bs = getBitsetFromLongPlaintextFile(
-            File(Config.BGM_ARCHIVE_GIT_REPO_DIR).resolve(spaceType.name.lowercase())
+            File(archiveRepo.absolutePathWithoutDotGit()).resolve(spaceType.name.lowercase())
                 .resolve("empty_topic_has_masked_bs.txt")
         )
         val bsSize = bs.size()

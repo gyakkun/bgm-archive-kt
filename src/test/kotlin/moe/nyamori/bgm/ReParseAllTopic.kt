@@ -1,9 +1,13 @@
 package moe.nyamori.bgm
 
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.RepoType
 import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
+import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.TopicParserEntrance
+import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 import java.io.BufferedWriter
 import java.io.File
@@ -20,27 +24,28 @@ object ReParseAllTopic {
         walkAllArchiveFolders()
     }
 
-    val jsonRepoFolders = ArrayList<String>()
-    val archiveRepoFolders = ArrayList<String>()
+    val jsonRepoList = mutableListOf<Repository>()
+    val archiveRepoList = mutableListOf<Repository>()
     val ng = mutableSetOf<Pair<SpaceType, Int>>()
 
     init {
-        Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
-            .map {
-                if (it.isNotBlank()) jsonRepoFolders.add(it.trim())
-            }
-        Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
-
-        Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
-            .map {
-                if (it.isNotBlank()) archiveRepoFolders.add(it.trim())
-            }
-        Config.BGM_ARCHIVE_GIT_REPO_DIR.let { archiveRepoFolders.add(it) }
+        // remember to init config first
+        jsonRepoList.addAll(
+            Config.repoList
+                .filter { it.type == RepoType.JSON && !it.repo.isBare }
+                .map { it.repo }
+        )
+        archiveRepoList.addAll(
+            Config.repoList
+                .filter { it.type == RepoType.HTML && !it.repo.isBare }
+                .map { it.repo }
+        )
     }
 
     fun walkAllArchiveFolders() {
-        archiveRepoFolders.forEach outer@{
-            val archiveFolder = File(it)
+        archiveRepoList.forEach outer@{
+            val archiveRepo = it
+            val archiveFolder = File(it.absolutePathWithoutDotGit())
             if (!archiveFolder.exists()) return@outer
             archiveFolder.walkBottomUp().asStream()/*.parallel()*/.forEach inner@{ file ->
                 runCatching {
@@ -67,7 +72,9 @@ object ReParseAllTopic {
                         val jsonPath = file.absolutePath
                             .replace("bgm-archive", "bgm-archive-json")
                             .replace("html", "json")
-                        val jsonFileLoc = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(jsonPath)
+                        val jsonFileLoc = File(
+                            archiveRepo.couplingJsonRepo()!!.absolutePathWithoutDotGit()
+                        ).resolve(jsonPath)
                         val json = GitHelper.GSON.toJson(topic)
                         jsonFileLoc.parentFile.mkdirs()
                         FileOutputStream(jsonFileLoc).use { fos ->

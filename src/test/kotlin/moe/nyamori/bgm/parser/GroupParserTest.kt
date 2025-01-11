@@ -1,7 +1,9 @@
 package moe.nyamori.bgm.parser
 
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.RepoType
 import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.model.Group
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.group.*
@@ -64,7 +66,9 @@ class GroupParserTest {
         val skip2 = setOf(342457, 352892, 371602, 372780, 374301, 374687, 381676, 381750)
         val skip = emptySet<Int>()
         val ng = mutableSetOf<Int>()
-        File(Config.BGM_ARCHIVE_GIT_REPO_DIR).walkBottomUp().asStream().forEach {
+        File(
+            Config.repoList.first { it.type == RepoType.HTML && !it.repo.isBare }.repo.absolutePathWithoutDotGit()
+        ).walkBottomUp().asStream().forEach {
 //            for (i in ids) {
 //            val ins = ParserHelper.javaClass.getResourceAsStream("/html_samples/group/r430/$i.html") ?: continue
             if (it.isDirectory) return@forEach

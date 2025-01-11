@@ -2,9 +2,10 @@ package moe.nyamori.bgm
 
 import com.google.gson.*
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.RepoType
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.db.SpaceNameMappingData
-import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
@@ -16,7 +17,6 @@ import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
 import moe.nyamori.bgm.util.TopicJsonHelper.handleBlogTagAndRelatedSubject
 import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
-import org.eclipse.jgit.lib.ObjectId
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -97,16 +97,12 @@ class DbTest {
 
     // @Test
     fun readJsonAndUpsert() {
-        val jsonRepoFolders = ArrayList<String>()
-        Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
-            .map {
-                jsonRepoFolders.add(it.trim())
-            }
-        Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
+        // remember to init config first
+        val jsonRepoList = Config.repoList.filter { it.type == RepoType.JSON && !it.repo.isBare }
+            .map { it.repo }
 
-
-        jsonRepoFolders.forEach outer@{
-            val folder = File(it)
+        jsonRepoList.forEach outer@{ jsonRepo ->
+            val folder = File(jsonRepo.absolutePathWithoutDotGit())
             val fileStream = folder.walkBottomUp().asStream()//.parallel()
             fileStream.forEach inner@{ file ->
                 runCatching {
@@ -134,23 +130,19 @@ class DbTest {
                     LOGGER.error("Ex when handling $file: ", ex)
                 }
             }
+            Dao.bgmDao.handleNegativeUid()
+            Dao.bgmDao.updatePrevPersistedCommitId(
+                jsonRepo,
+                jsonRepo.getLatestCommitRef().sha1Str()
+            )
         }
-        Dao.bgmDao.handleNegativeUid()
-        Dao.bgmDao.updatePrevPersistedCommitId(
-            GitHelper.defaultJsonRepoSingleton,
-            GitHelper.defaultJsonRepoSingleton.getLatestCommitRef().sha1Str()
-        )
     }
 
 
     // @Test
     fun readJsonUpdateSpaceAliasMapping() {
-        val jsonRepoFolders = ArrayList<String>()
-        Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
-            .map {
-                jsonRepoFolders.add(it.trim())
-            }
-        Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR.let { jsonRepoFolders.add(it) }
+        val jsonRepoFolders = Config.repoList.filter { it.type == RepoType.JSON && !it.repo.isBare }
+            .map { it.repo.absolutePathWithoutDotGit() }
         val sidNameMappingSet = ConcurrentHashMap.newKeySet<SpaceNameMappingData>()
 
         jsonRepoFolders.forEach outer@{

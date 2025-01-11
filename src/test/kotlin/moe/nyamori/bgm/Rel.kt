@@ -1,7 +1,9 @@
 package moe.nyamori.bgm
 
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.RepoType
 import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
@@ -27,7 +29,9 @@ class Rel {
 
         @JvmStatic
         fun main(args: Array<String>) {
-            val groupJsonDir = File(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR).resolve(SpaceType.SUBJECT.name.lowercase())
+            val jsonRepoFolder = Config.repoList.filter { it.type == RepoType.JSON && !it.repo.isBare }
+                .map { it.repo.absolutePathWithoutDotGit() }.first()
+            val groupJsonDir = File(jsonRepoFolder).resolve(SpaceType.SUBJECT.name.lowercase())
             groupJsonDir.walk().asStream().parallel().forEach fileIteration@{ file ->
                 if (file.extension.lowercase() != "json") return@fileIteration
                 val fileContent = file.readText(Charsets.UTF_8)

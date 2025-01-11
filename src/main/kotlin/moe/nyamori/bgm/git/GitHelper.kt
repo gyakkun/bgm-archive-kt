@@ -3,9 +3,10 @@ package moe.nyamori.bgm.git
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.ibm.icu.text.CharsetDetector
-import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.*
 import moe.nyamori.bgm.config.Config.prevProcessedCommitRevIdFileName
 import moe.nyamori.bgm.db.Dao
+import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
@@ -29,44 +30,28 @@ object GitHelper {
     private val log = LoggerFactory.getLogger(GitHelper.javaClass)
     val GSON: Gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
 
-    val defaultJsonRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        getDefaultJsonRepo()
-    }
-
-    val defaultArchiveRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        getDefaultArchiveRepo()
-    }
-
     val jsonStaticRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        if (Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
-        else {
-            Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
-                .map { getRepoByPath(it.trim()) }
-                .toList()
-        }
+        Config.repoList.filter {
+            it.isStatic && it.type == RepoType.JSON
+        }.map { it.repo }
     }
 
     val archiveStaticRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        if (Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
-        else {
-            Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
-                .map { getRepoByPath(it.trim()) }
-                .toList()
-        }
+        Config.repoList.filter {
+            it.isStatic && it.type == RepoType.HTML
+        }.map { it.repo }
     }
 
     val allArchiveRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        mutableListOf<Repository>().apply {
-            add(defaultArchiveRepoSingleton)
-            addAll(archiveStaticRepoListSingleton)
-        }
+        Config.repoList.filter {
+            it.type == RepoType.HTML
+        }.map { it.repo }
     }
 
     val allJsonRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        mutableListOf<Repository>().apply {
-            add(defaultJsonRepoSingleton)
-            addAll(jsonStaticRepoListSingleton)
-        }
+        Config.repoList.filter {
+            it.type == RepoType.JSON
+        }.map { it.repo }
     }
 
     val allRepoInDisplayOrder by lazy {
@@ -198,14 +183,6 @@ object GitHelper {
             .readEnvironment() // scan environment GIT_* variables
             .findGitDir() // scan up the file system tree
             .build()
-    }
-
-    private fun getDefaultJsonRepo(): Repository {
-        return getRepoByPath(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
-    }
-
-    private fun getDefaultArchiveRepo(): Repository {
-        return getRepoByPath(Config.BGM_ARCHIVE_GIT_REPO_DIR)
     }
 
     val notLogRelPathSuffix = setOf("meta_ts.txt")
@@ -349,16 +326,11 @@ object GitHelper {
 
     fun Repository.hasCouplingJsonRepo() = couplingJsonRepo() != null
 
-    fun Repository.couplingJsonRepo() =
-        allJsonRepoListSingleton.firstOrNull { jsonRepo ->
-            absolutePathWithoutDotGit() + "-json" == jsonRepo.absolutePathWithoutDotGit()
-        }
+    fun Repository.couplingJsonRepo() = getCouplingJsonRepo()
 
     fun Repository.hasCouplingArchiveRepo() = couplingArchiveRepo() != null
 
-    fun Repository.couplingArchiveRepo() = allArchiveRepoListSingleton.firstOrNull { archiveRepo ->
-        absolutePathWithoutDotGit() == archiveRepo.absolutePathWithoutDotGit() + "-json"
-    }
+    fun Repository.couplingArchiveRepo() = getCouplingArchiveRepo()
 
     fun Repository.hasCouplingRepo() = hasCouplingArchiveRepo() || hasCouplingJsonRepo()
 }

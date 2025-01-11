@@ -2,6 +2,7 @@ package moe.nyamori.bgm
 
 import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.RepoType
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.FilePathHelper
@@ -43,7 +44,7 @@ object ConsecutiveDetect {
     @JvmStatic
     fun main(args: Array<String>) {
         val spaceType = SpaceType.EP
-        val repoDir = File(Config.BGM_ARCHIVE_GIT_REPO_DIR)
+        val repoDir = File(Config.repoList.first { it.type == RepoType.HTML }.path)
         val ngOrLostList = Vector<Int>()
         // val total = SpotChecker.getMaxId(SpaceType.GROUP)
         val numThread = 6
@@ -86,7 +87,7 @@ object ConsecutiveDetect {
         ngOrLostList.sort()
         val rangeSummary = summaryRanges(ngOrLostList)
         val noGoodFilePath =
-            Config.BGM_ARCHIVE_GIT_REPO_DIR + "/${spaceType.name.lowercase()}/${ngType.name.lowercase()}_ng.txt"
+            repoDir.resolve("/${spaceType.name.lowercase()}/${ngType.name.lowercase()}_ng.txt").path
         val noGoodFile = File(noGoodFilePath)
         FileWriter(noGoodFile).use { fw ->
             BufferedWriter(fw).use { bfw ->

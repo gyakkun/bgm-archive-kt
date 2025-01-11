@@ -126,9 +126,9 @@ data class RepoDto(
 }
 
 val Repository.expectedCommitPerDay: Int
-    get() = getRepoDtoOrThrow().expectedCommitPerDay
+    get() = toRepoDtoOrThrow().expectedCommitPerDay
 
-private fun Repository.getRepoDtoOrThrow(): RepoDto {
+fun Repository.toRepoDtoOrThrow(): RepoDto {
     val that = this
     val dto = checkRepoExist(that) ?: throw IllegalStateException("Repository does not exist: ${that.simpleName()}")
     return dto
@@ -139,23 +139,23 @@ private fun checkRepoExist(repo: Repository): RepoDto? {
 }
 
 fun Repository.hasCouplingJsonRepo(): Boolean {
-    val dto = this.getRepoDtoOrThrow()
+    val dto = this.toRepoDtoOrThrow()
     return dto.type == RepoType.HTML && dto.optRepoIdCouplingWith != null
 }
 
 fun Repository.hasCouplingArchiveRepo(): Boolean {
-    val dto = this.getRepoDtoOrThrow()
+    val dto = this.toRepoDtoOrThrow()
     return dto.type == RepoType.JSON && dto.optRepoIdCouplingWith != null
 }
 
 fun Repository.getCouplingJsonRepo(): Repository? {
-    val dto = this.getRepoDtoOrThrow()
+    val dto = this.toRepoDtoOrThrow()
     if (!hasCouplingJsonRepo()) return null
     return Config.repoList.first { it.id == dto.optRepoIdCouplingWith!! }.repo
 }
 
 fun Repository.getCouplingArchiveRepo(): Repository? {
-    val dto = this.getRepoDtoOrThrow()
+    val dto = this.toRepoDtoOrThrow()
     if (!hasCouplingArchiveRepo()) return null
     return Config.repoList.first { it.id == dto.optRepoIdCouplingWith!! }.repo
 }
