@@ -3,10 +3,12 @@ package moe.nyamori.bgm.git
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.ibm.icu.text.CharsetDetector
-import moe.nyamori.bgm.config.*
+import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.prevProcessedCommitRevIdFileName
+import moe.nyamori.bgm.config.RepoType
+import moe.nyamori.bgm.config.getCouplingArchiveRepo
+import moe.nyamori.bgm.config.getCouplingJsonRepo
 import moe.nyamori.bgm.db.Dao
-import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
@@ -29,18 +31,6 @@ import java.nio.charset.StandardCharsets
 object GitHelper {
     private val log = LoggerFactory.getLogger(GitHelper.javaClass)
     val GSON: Gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
-
-    val jsonStaticRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        Config.repoList.filter {
-            it.isStatic && it.type == RepoType.JSON
-        }.map { it.repo }
-    }
-
-    val archiveStaticRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        Config.repoList.filter {
-            it.isStatic && it.type == RepoType.HTML
-        }.map { it.repo }
-    }
 
     val allArchiveRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
         Config.repoList.filter {
