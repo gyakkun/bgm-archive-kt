@@ -27,6 +27,10 @@ jobs:
     - run: echo "M2_HOME=$(dirname $(dirname `which mvn`))" >> $GITHUB_ENV
     - name: Verify package
       run: mvn --batch-mode verify
+    - name: Git clean up dry run
+      run: git clean --dry-run
+    - name: Git clean up actual run
+      run: git clean -f -d
     - name: Releaser release
       run: mvn --batch-mode resources:resources releaser:release
       env:
