@@ -1,6 +1,6 @@
 # bgm-archive-kt
 
-A backend service for handling of html and json files crawled from bgm-archive-sh.
+A backend service for handling html and json files crawled from bgm-archive-sh.
 
 ## Tips
 
