@@ -9,6 +9,9 @@ import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.*
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.bgmHealthStatus500TimeoutThresholdMs
+import moe.nyamori.bgm.config.IConfig
+import moe.nyamori.bgm.config.checkAndGetConfigDto
+import moe.nyamori.bgm.config.setConfigDelegate
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
@@ -23,6 +26,7 @@ import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.StringHashingHelper
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.io.FileWriter
 import java.net.URI
 import java.time.Duration
 import java.time.Instant
@@ -34,33 +38,9 @@ object HttpServer {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        // TODO read config
-
-
-        // TODO write db persist key if necessary
-        /*
-        runCatching {
-                        System.err.println("############ DB PERSIST KEY: $key ############")
-                        val dbFile = File(BGM_ARCHIVE_SQLITE_FILE)
-                        val folder = dbFile.parentFile
-                        if (!folder.exists()) folder.mkdirs()
-                        val keyfile = folder.resolve("db-persist-key")
-                        if (disableDbPersistKey) {
-                            System.err.println("Will not write db persist keyfile due to env config.")
-                            return@runCatching
-                        }
-                        if (!keyfile.exists()) keyfile.createNewFile()
-                        FileWriter(keyfile).use { fw ->
-                            fw.write(key)
-                            fw.flush()
-                        }
-                    }.onFailure {
-                        System.err.println("Error when writing key file!")
-                        it.printStackTrace()
-                    }
-         */
-
-
+        val cfg = checkAndGetConfigDto()
+        setConfigDelegate(cfg)
+        writeDbPersistKeyIfNecessary(cfg)
 
         val app = Javalin.create { config ->
             config.useVirtualThreads = true
@@ -284,6 +264,26 @@ object HttpServer {
             {
                 app.stop()
             })
+    }
+
+    private fun writeDbPersistKeyIfNecessary(cfg: IConfig) {
+        runCatching {
+            System.err.println("############ DB PERSIST KEY: ${cfg.dbPersistKey} ############")
+            val dbFolder = File(cfg.homeFolderAbsolutePath).resolve("bgm-archive-db")
+            val keyfile = dbFolder.resolve("db-persist-key")
+            if (cfg.disableDbPersistKey) {
+                System.err.println("Will not write db persist keyfile due to env config.")
+                return@runCatching
+            }
+            if (!keyfile.exists()) keyfile.createNewFile()
+            FileWriter(keyfile).use { fw ->
+                fw.write(cfg.dbPersistKey)
+                fw.flush()
+            }
+        }.onFailure {
+            System.err.println("Error when writing key file!")
+            it.printStackTrace()
+        }
     }
 
     @Volatile
