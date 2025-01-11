@@ -103,11 +103,10 @@ data class RepoDto(
     val id: Int,
     val path: String,
     val type: RepoType,
-    val expectedCommitPerDay: Int,
     val friendlyName: String,
-    val isStatic: Boolean,
+    val expectedCommitPerDay: Int,
     val optRepoIdCouplingWith: Int?,
-
+    val isStatic: Boolean,
     val mutexTimeoutMs: Long,
 ) {
     private val lock = ReentrantLock()

@@ -58,7 +58,6 @@ data class ConfigReadout(
     val httpPort: Int? = null,
 
     // db things
-    val sqliteFilePath: String? = null,
     val dbIsEnableWal: Boolean? = null, // sqlite only
     /**
      * if jdbc url is empty, then defaults to sqlite file in sqlite file path
@@ -88,7 +87,6 @@ data class ConfigReadout(
     val crankerComponent: String? = null,
 
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
-    val repoMutexTimeoutMs: Long? = null,
     val repoList: List<RepoReadout>? = null,
 )
 
@@ -96,10 +94,11 @@ data class RepoReadout(
     val id: Int?,
     val path: String?,
     val type: String?,
-    val optRepoIdCouplingWith: Int?,
-    val optExpectedCommitPerDay: Int?,
     val optFriendlyName: String?,
+    val optExpectedCommitPerDay: Int?,
+    val optRepoIdCouplingWith: Int?,
     val optIsStatic: Boolean?,
+    val optMutexTimeoutMs: Long?,
 )
 
 private fun String.toAbsPath(homeFolderAbsolutePath: String): String {
@@ -137,11 +136,7 @@ fun ConfigReadout.toDto(): ConfigDto {
         defHome
     }
     val finJdbcUrl: String = if (jdbcUrl.isNullOrEmpty()) {
-        if (sqliteFilePath.isNullOrEmpty()) {
             "jdbc:sqlite:" + defHome + File.separator + "bgm-archive-db" + File.separator + "bgm-archive.sqlite"
-        } else {
-            "jdbc:sqlite:" + sqliteFilePath.toAbsPath(finHome)
-        }
     } else {
         jdbcUrl
     }
@@ -165,11 +160,12 @@ fun ConfigReadout.toDto(): ConfigDto {
                     r.id,
                     finRepoPath,
                     RepoType.valueOf(r.type.uppercase()),
+                    r.optFriendlyName
+                        ?: Path(finRepoPath).name /* The last part of the name, FIXME what if it's a dot git folder? */,
                     r.optExpectedCommitPerDay ?: 150,
-                    r.optFriendlyName ?: Path(finRepoPath).name,
-                    r.optIsStatic ?: true,
                     r.optRepoIdCouplingWith,
-                    this.repoMutexTimeoutMs ?: 5_000L
+                    r.optIsStatic ?: true,
+                    r.optMutexTimeoutMs ?: 5_000L
                 )
             )
         }
