@@ -36,6 +36,9 @@ object HttpServer {
 
     @JvmStatic
     fun main(args: Array<String>) {
+        // env var E_BGM_ARCHIVE_CONFIG_PATH
+        // or
+        // sys prop config.path
         val cfg = checkAndGetConfigDto()
         setConfigDelegate(cfg)
         writeDbPersistKeyIfNecessary(cfg)

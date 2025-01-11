@@ -109,8 +109,10 @@ data class RepoDto(
     val isStatic: Boolean,
     val mutexTimeoutMs: Long,
 ) {
+    @Transient
     private val lock = ReentrantLock()
 
+    @Transient
     val repo = GitHelper.getRepoByPath(path)
 
     fun <T> withLock(action: () -> T) {

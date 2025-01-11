@@ -130,6 +130,8 @@ fun ConfigReadout.toDto(): ConfigDto {
     val finHome: String = if (!this.homeFolderAbsolutePath.isNullOrBlank()) {
         if (Path(this.homeFolderAbsolutePath).notExists()) {
             throw IllegalStateException("$homeFolderAbsolutePath not found")
+        } else if( !Path(this.homeFolderAbsolutePath).isDirectory()){
+            throw IllegalStateException("$homeFolderAbsolutePath is not a folder")
         }
         this.homeFolderAbsolutePath
     } else {
