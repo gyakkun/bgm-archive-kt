@@ -89,10 +89,10 @@ data class ConfigReadout(
 
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
     val repoMutexTimeoutMs: Long? = null,
-    val repoList: List<RepoLike>? = null,
+    val repoList: List<RepoReadout>? = null,
 )
 
-data class RepoLike(
+data class RepoReadout(
     val id: Int?,
     val path: String?,
     val type: String?,
@@ -196,15 +196,15 @@ fun ConfigReadout.toDto(): ConfigDto {
         disableAllHooks = this.disableAllHooks ?: false,
 
         httpHost = this.httpHost ?: "localhost",
-        httpPort = this.httpPort ?: 5926,
+        httpPort = this.httpPort?.coerceIn(1025..65535) ?: 5926,
 
         dbIsEnableWal = this.dbIsEnableWal ?: false,
 
         jdbcUrl = finJdbcUrl,
         jdbcUsername = if (this.jdbcUsername.isNullOrEmpty()) null else this.jdbcUsername,
         jdbcPassword = if (this.jdbcPassword.isNullOrEmpty()) null else this.jdbcPassword,
-        hikariMinIdle = this.hikariMinIdle ?: 2,
-        hikariMaxConn = this.hikariMaxConn ?: 10,
+        hikariMinIdle = this.hikariMinIdle?.coerceIn(2..40) ?: 2,
+        hikariMaxConn = this.hikariMaxConn?.coerceIn(4..100) ?: 10,
 
         dbMetaKeyPrevCachedCommitRevId = this.dbMetaKeyPrevCachedCommitRevId
             ?: "prev_cached_commit_rev_id",
@@ -218,12 +218,13 @@ fun ConfigReadout.toDto(): ConfigDto {
 
         isRemoveJsonAfterProcess = this.isRemoveJsonAfterProcess ?: false,
 
-        spotCheckerTimeoutThresholdMs = this.spotCheckerTimeoutThresholdMs ?: 200_000,
-        bgmHealthStatus500TimeoutThresholdMs = this.bgmHealthStatus500TimeoutThresholdMs ?: 1_200_000,
+        spotCheckerTimeoutThresholdMs = this.spotCheckerTimeoutThresholdMs?.coerceIn(30_000L..300_000L) ?: 200_000L,
+        bgmHealthStatus500TimeoutThresholdMs = this.bgmHealthStatus500TimeoutThresholdMs?.coerceIn(200_000L..2_000_000L)
+            ?: 1_200_000,
 
         enableCrankerConnector = this.enableCrankerConnector ?: false,
         crankerRegUrl = this.crankerRegUrl ?: "ws://localhost:3000",
-        crankerSlidingWin = this.crankerSlidingWin ?: 2,
+        crankerSlidingWin = this.crankerSlidingWin?.coerceIn(1..50) ?: 2,
         crankerComponent = this.crankerComponent ?: "bgm-archive-kt",
 
         repoList = finRepoList

@@ -5,13 +5,13 @@ import com.google.gson.ToNumberPolicy
 import moe.nyamori.bgm.config.RepoDto
 import moe.nyamori.bgm.config.hasCouplingArchiveRepo
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
-import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.git.GitHelper.getPrevPersistedJsonCommitRef
 import moe.nyamori.bgm.git.GitHelper.getWalkBetweenCommitInReverseOrder
 import moe.nyamori.bgm.git.GitHelper.simpleName
+import moe.nyamori.bgm.git.GitRepoHolder
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
@@ -27,7 +27,9 @@ import org.slf4j.LoggerFactory
 
 class JsonToDbProcessor(
     private val bgmDao: IBgmDao,
-    private val topicJsonHelper: TopicJsonHelper
+    private val topicJsonHelper: TopicJsonHelper,
+    private val gitRepoHolder: GitRepoHolder,
+    private val preferJgit: Boolean
 ) {
     val LOGGER = LoggerFactory.getLogger(JsonToDbProcessor::class.java)
     val GSON = GsonBuilder()
@@ -38,21 +40,21 @@ class JsonToDbProcessor(
 
     init {
         // ensure they have different hash
-        check(allJsonRepoListSingleton.map { it.repo.absolutePathWithoutDotGit() }
-            .distinct().size == allJsonRepoListSingleton.size)
+        check(gitRepoHolder.allJsonRepoListSingleton.map { it.repo.absolutePathWithoutDotGit() }
+            .distinct().size == gitRepoHolder.allJsonRepoListSingleton.size)
     }
 
     fun job(isAll: Boolean = false, idx: Int = 0) {
         val reposToProcess = mutableListOf<RepoDto>()
         if (isAll) {
-            allJsonRepoListSingleton
+            gitRepoHolder.allJsonRepoListSingleton
                 .filter { it.hasCouplingArchiveRepo() }
                 .map { reposToProcess.add(it) }
         } else {
-            if (idx in allJsonRepoListSingleton.indices
-                && allJsonRepoListSingleton[idx].hasCouplingArchiveRepo()
+            if (idx in gitRepoHolder.allJsonRepoListSingleton.indices
+                && gitRepoHolder.allJsonRepoListSingleton[idx].hasCouplingArchiveRepo()
             ) {
-                reposToProcess.add(allJsonRepoListSingleton[idx])
+                reposToProcess.add(gitRepoHolder.allJsonRepoListSingleton[idx])
             }
         }
         reposToProcess.forEach { jsonRepo ->
@@ -99,7 +101,7 @@ class JsonToDbProcessor(
                         LOGGER.info("Path ${jsonRepo.repo.simpleName()}/$path")
                         var jsonStr = "NOT READY YET"
                         runCatching {
-                            jsonStr = jsonRepo.getFileContentAsStringInACommit(cur.sha1Str(), path)
+                            jsonStr = jsonRepo.getFileContentAsStringInACommit(cur.sha1Str(), path, preferJgit)
                             val topicUnmod = GSON.fromJson(jsonStr, Topic::class.java)
 
                             if (!isValidTopic(topicUnmod)) return@inner

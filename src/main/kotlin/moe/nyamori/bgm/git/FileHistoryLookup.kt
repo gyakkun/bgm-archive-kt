@@ -3,11 +3,8 @@ package moe.nyamori.bgm.git
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.LoadingCache
 import com.github.benmanes.caffeine.cache.Scheduler
-import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.RepoDto
 import moe.nyamori.bgm.db.IBgmDao
-import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
-import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getRevCommitById
@@ -30,6 +27,8 @@ import java.util.*
 
 class FileHistoryLookup(
     private val bgmDao: IBgmDao,
+    private val gitRepoHolder: GitRepoHolder,
+    private val preferJgit: Boolean
 ) {
     private val log = LoggerFactory.getLogger(FileHistoryLookup::class.java)
 
@@ -101,7 +100,7 @@ class FileHistoryLookup(
                 }
 
                 val metaTs = htmlChatam.repoDto.getFileContentAsStringInACommit(
-                    htmlChatam.hash, "${spaceType.lowercaseName()}/meta_ts.txt", forceJgit = true
+                    htmlChatam.hash, "${spaceType.lowercaseName()}/meta_ts.txt", preferJgit, forceJgit = true
                 )
                 if (metaTs.trim().isBlank()) return@associate htmlChatam.timestampHint() to ChatamPair(
                     spaceType,
@@ -149,7 +148,7 @@ class FileHistoryLookup(
             throw UnsupportedOperationException("Not support get chatam from db cache for non-json and non-html file!")
         }
         val repoIdToCommitIdList = bgmDao.queryRepoCommitForCacheByFileRelativePath(relPath).groupBy { it.repoId }
-        val repoList = if (isHtml) allArchiveRepoListSingleton else allJsonRepoListSingleton
+        val repoList = if (isHtml) gitRepoHolder.allArchiveRepoListSingleton else gitRepoHolder.allJsonRepoListSingleton
         val repoIdToRepo = repoList.associateBy { it.hashedAbsolutePathWithoutGitId().toLong() }
         val res = repoIdToRepo.mapNotNull { (k, repo) ->
             repoIdToCommitIdList[k]
@@ -163,11 +162,11 @@ class FileHistoryLookup(
         val timing = System.currentTimeMillis()
         val isHtml = relPath.endsWith("html", ignoreCase = true)
         val isJson = relPath.endsWith("json", ignoreCase = true)
-        val repoList = if (isHtml) allArchiveRepoListSingleton
-        else if (isJson) allJsonRepoListSingleton
-        else listOf(allArchiveRepoListSingleton, allJsonRepoListSingleton).flatten()
+        val repoList = if (isHtml) gitRepoHolder.allArchiveRepoListSingleton
+        else if (isJson) gitRepoHolder.allJsonRepoListSingleton
+        else listOf(gitRepoHolder.allArchiveRepoListSingleton, gitRepoHolder.allJsonRepoListSingleton).flatten()
 
-        val res = if (Config.BGM_ARCHIVE_PREFER_JGIT || forceJgit) {
+        val res = if (preferJgit || forceJgit) {
             repoList.parallelStream().map {
                 runCatching {
                     it.getRevCommitListJgit(relPath)
@@ -194,7 +193,7 @@ class FileHistoryLookup(
             if (elapsed >= 100) {
                 log.warn(
                     "$this ${
-                        if (Config.BGM_ARCHIVE_PREFER_JGIT) "jgit" else "external git"
+                        if (preferJgit) "jgit" else "external git"
                     } get log timing: ${elapsed}ms. RelPath: $relPath"
                 )
             }
@@ -223,7 +222,7 @@ class FileHistoryLookup(
         }.getOrNull() ?:
         runCatching {
             val timing = System.currentTimeMillis()
-            val res = if (Config.BGM_ARCHIVE_PREFER_JGIT) {
+            val res = if (preferJgit) {
                 this.getRevCommitListJgit(relPath)
             } else {
                 this.getRevCommitListExtGit(relPath)
@@ -233,7 +232,7 @@ class FileHistoryLookup(
                 if (elapsed >= 100) {
                     log.warn(
                         "$this ${
-                            if (Config.BGM_ARCHIVE_PREFER_JGIT) "jgit" else "external git"
+                            if (preferJgit) "jgit" else "external git"
                         } get log timing: ${elapsed}ms. RelPath: $relPath"
                     )
                 }
@@ -330,6 +329,7 @@ class FileHistoryLookup(
                 it to it.html.repoDto.getFileContentAsStringInACommit(
                     it.html.hash,
                     it.topicId.toHtmlRelPath(it.spaceType),
+                    preferJgit
                 )
             }
         }
@@ -362,6 +362,7 @@ class FileHistoryLookup(
                 it to it.json.repoDto.getFileContentAsStringInACommit(
                     it.json.hash,
                     it.topicId.toJsonRelPath(it.spaceType),
+                    preferJgit
                 )
             }
         }

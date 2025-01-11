@@ -8,7 +8,9 @@ import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
 import java.util.concurrent.TimeUnit
 
-object CommitHook : Handler {
+class CommitHook(
+    private val commitToJsonProcessor: CommitToJsonProcessor,
+) : Handler {
     override fun handle(ctx: Context) {
         if (Config.BGM_ARCHIVE_DISABLE_HOOK) {
             ctx.status(HttpStatus.BAD_REQUEST)
@@ -19,7 +21,7 @@ object CommitHook : Handler {
         Thread {
             try {
                 if (GIT_RELATED_LOCK.tryLock(10, TimeUnit.SECONDS)) {
-                    CommitToJsonProcessor.job(isAll, idx)
+                    commitToJsonProcessor.job(isAll, idx)
                 }
             } catch (ignore: Exception) {
 

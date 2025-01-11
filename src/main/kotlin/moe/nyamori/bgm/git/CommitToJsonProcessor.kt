@@ -1,12 +1,7 @@
 package moe.nyamori.bgm.git
 
 import io.javalin.http.sse.NEW_LINE
-import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
-import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS
-import moe.nyamori.bgm.config.RepoDto
-import moe.nyamori.bgm.config.getCouplingJsonRepo
-import moe.nyamori.bgm.config.hasCouplingJsonRepo
+import moe.nyamori.bgm.config.*
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
@@ -26,14 +21,31 @@ import java.nio.file.Path
 import java.util.*
 
 
-object CommitToJsonProcessor {
-    private val log = LoggerFactory.getLogger(CommitToJsonProcessor.javaClass)
-    private const val NO_GOOD_FILE_NAME = "ng.txt"
+class CommitToJsonProcessor(
+    private val prevProcessedCommitRevIdFileName: String,
+    private val spotCheckerTimeoutThresholdMs: Long,
+    private val gitRepoHolder: GitRepoHolder,
+    private val preferJgit: Boolean,
+    private val spotChecker: SpotChecker
+) {
+    private val log = LoggerFactory.getLogger(CommitToJsonProcessor::class.java)
 
 
-    @JvmStatic
-    fun main(arg: Array<String>) {
-        job()
+    companion object {
+        private const val NO_GOOD_FILE_NAME = "ng.txt"
+
+        @JvmStatic
+        fun main(arg: Array<String>) {
+            val cfg = ConfigReadout().toDto()
+            val ctjp = CommitToJsonProcessor(
+                cfg.prevProcessedCommitRevIdFileName,
+                cfg.spotCheckerTimeoutThresholdMs,
+                GitRepoHolder(emptyList()),
+                cfg.preferJgit,
+                SpotChecker(GitRepoHolder(emptyList()), cfg.prevProcessedCommitRevIdFileName, cfg.preferJgit),
+            )
+            ctjp.job()
+        }
     }
 
     fun job(
@@ -42,14 +54,14 @@ object CommitToJsonProcessor {
     ) {
         val reposToProcess = mutableListOf<RepoDto>()
         if (isAll) {
-            GitHelper.allArchiveRepoListSingleton
+            gitRepoHolder.allArchiveRepoListSingleton
                 .filter { it.hasCouplingJsonRepo() }
                 .map { reposToProcess.add(it) }
         } else {
-            if (idx in GitHelper.allArchiveRepoListSingleton.indices
-                && GitHelper.allArchiveRepoListSingleton[idx].hasCouplingJsonRepo()
+            if (idx in gitRepoHolder.allArchiveRepoListSingleton.indices
+                && gitRepoHolder.allArchiveRepoListSingleton[idx].hasCouplingJsonRepo()
             ) {
-                reposToProcess.add(GitHelper.allArchiveRepoListSingleton[idx])
+                reposToProcess.add(gitRepoHolder.allArchiveRepoListSingleton[idx])
             }
         }
 
@@ -59,10 +71,13 @@ object CommitToJsonProcessor {
         reposToProcess.forEach { archiveRepo ->
             repoCounter++
             val walk =
-                archiveRepo.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder()
+                archiveRepo.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(
+                    prevProcessedCommitRevIdFileName, preferJgit
+                )
             val jsonRepo = archiveRepo.getCouplingJsonRepo()!!
             var prev = walk.next() // used in the iteration (now = next() ... prev = now)
-            val prevProcessedArchiveCommitRef = archiveRepo.getPrevProcessedArchiveCommitRef()
+            val prevProcessedArchiveCommitRef =
+                archiveRepo.getPrevProcessedArchiveCommitRef(prevProcessedCommitRevIdFileName, preferJgit)
 
             // FIXME: Workaround the inclusive walk boundary
             while (prev != null) {
@@ -111,7 +126,11 @@ object CommitToJsonProcessor {
                                 if (path.endsWith(NO_GOOD_FILE_NAME)) {
                                     handleNoGoodFile(
                                         Path.of(archiveRepo.repo.absolutePathWithoutDotGit()).resolve(path),
-                                        archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path),
+                                        archiveRepo.getFileContentAsStringInACommit(
+                                            curCommit.sha1Str(),
+                                            path,
+                                            preferJgit
+                                        ),
                                         noGoodIdTreeSet
                                     )
                                     continue
@@ -144,7 +163,7 @@ object CommitToJsonProcessor {
                                 }
 
                                 val fileContentInStr =
-                                    archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path)
+                                    archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path, preferJgit)
                                 val topicId = path.split("/").last().replace(".html", "").toInt()
 
                                 var timing = System.currentTimeMillis()
@@ -199,9 +218,9 @@ object CommitToJsonProcessor {
                             Git(jsonRepo.repo).gc()
                         }
                         timing = System.currentTimeMillis() - timing
-                        if (timing >= BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS) {
+                        if (timing >= spotCheckerTimeoutThresholdMs) {
                             log.error(
-                                "Process commit taking longer than expected (threshold:${BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS}ms). Skipping generating spot check file. Cur commit: ${
+                                "Process commit taking longer than expected (threshold:${spotCheckerTimeoutThresholdMs}ms). Skipping generating spot check file. Cur commit: ${
                                     curCommit.sha1Str()
                                 }"
                             )
@@ -232,7 +251,7 @@ object CommitToJsonProcessor {
                 }
                 runCatching {
                     if (shouldSpotCheck && firstCommitSpaceType != null) {
-                        SpotChecker.genSpotCheckListFile(archiveRepo, firstCommitSpaceType!!)
+                        spotChecker.genSpotCheckListFile(archiveRepo, firstCommitSpaceType!!)
                     }
                 }.onFailure {
                     if (shouldSpotCheck && firstCommitSpaceType != null) {
@@ -254,7 +273,7 @@ object CommitToJsonProcessor {
     private fun writeJsonRepoLastCommitId(prevProcessedCommit: RevCommit, jsonRepo: RepoDto) {
         log.info("Writing last commit id: ${jsonRepo.repo.simpleName()}/$prevProcessedCommit")
         val lastCommitIdFile =
-            File(jsonRepo.repo.absolutePathWithoutDotGit()).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+            File(jsonRepo.repo.absolutePathWithoutDotGit()).resolve(prevProcessedCommitRevIdFileName)
         val lastCommitIdStr = prevProcessedCommit.sha1Str()
         FileWriter(lastCommitIdFile).use {
             it.write(lastCommitIdStr)
@@ -284,7 +303,7 @@ object CommitToJsonProcessor {
         changedHtmlFilePathList: List<String>
     ) {
         var timing = System.currentTimeMillis()
-        if (Config.BGM_ARCHIVE_PREFER_JGIT) {
+        if (preferJgit) {
             jgitCommitJsonRepo(jsonRepo, changedHtmlFilePathList, archiveCommit)
         } else {
             if (Config.BGM_ARCHIVE_PREFER_GIT_BATCH_ADD) {
@@ -350,7 +369,7 @@ object CommitToJsonProcessor {
             }
             jsonFileListToGitAdd.append("${absolutePathFile.absolutePath} ")
         }
-        BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME.apply {
+        prevProcessedCommitRevIdFileName.apply {
             val absolutePath = jsonRepoDir.resolve(this)
             jsonFileListToGitAdd.append("${absolutePath.absolutePath} ")
         }
@@ -409,7 +428,7 @@ object CommitToJsonProcessor {
                     .call()
             }
             git.add()
-                .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+                .addFilepattern(prevProcessedCommitRevIdFileName)
                 .call()
             log.info("Complete git add")
             log.info("About to git commit")

@@ -4,9 +4,9 @@ import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.RepoDto
+import moe.nyamori.bgm.config.checkAndGetConfigDto
 import moe.nyamori.bgm.config.getCouplingArchiveRepo
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
-import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLastCommitSha1StrExtGit
 import moe.nyamori.bgm.git.GitHelper.getRevCommitById
@@ -26,21 +26,51 @@ import kotlin.streams.toList
 import kotlin.text.Charsets.UTF_8
 
 
-object SpotChecker {
-    private val LOGGER = LoggerFactory.getLogger(SpotChecker::class.java)
-    private val GSON = GsonBuilder()
-        .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
-        .registerTypeAdapterFactory(
-            SealedTypeAdapterFactory.of(Space::class)
-        ).create()
-    const val HIDDEN_TOPIC_MASK_FILE_NAME = "hidden_topic_mask.txt"
-    const val SPOT_CHECK_BITSET_FILE_NAME = "spot_check_bitset.txt"
-    const val SPOT_CHECK_LIST_FILE_NAME = "sc.txt"
-    const val MIN_SPOT_CHECK_SIZE = 10
-    const val MAX_SPOT_CHECK_SIZE = 80
-    const val RANGE_HOLE_INTERVAL_THRESHOLD = 35
-    const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 100
-    const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
+class SpotChecker(
+    private val gitRepoHolder: GitRepoHolder,
+    private val prevProcessedCommitRevIdFileName: String,
+    private val preferJgit: Boolean
+) {
+    companion object {
+        private val LOGGER = LoggerFactory.getLogger(SpotChecker::class.java)
+        private val GSON = GsonBuilder()
+            .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+            .registerTypeAdapterFactory(
+                SealedTypeAdapterFactory.of(Space::class)
+            ).create()
+        const val HIDDEN_TOPIC_MASK_FILE_NAME = "hidden_topic_mask.txt"
+        const val SPOT_CHECK_BITSET_FILE_NAME = "spot_check_bitset.txt"
+        const val SPOT_CHECK_LIST_FILE_NAME = "sc.txt"
+        const val MIN_SPOT_CHECK_SIZE = 10
+        const val MAX_SPOT_CHECK_SIZE = 80
+        const val RANGE_HOLE_INTERVAL_THRESHOLD = 35
+        const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 100
+        const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
+
+
+        @JvmStatic
+        fun main(argv: Array<String>) {
+            // LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
+            // repeat(10) { genSpotCheckListFile(SpaceType.SUBJECT) }
+            // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
+//        SpaceType.values().forEach {
+//            genHiddenTopicMaskFile(it)
+//        }
+//        randomSelectTopicIds(GitHelper.defaultArchiveRepoSingleton, spaceType = SpaceType.EP)
+//        genEmptyTopicMaskFile(SpaceType.EP)
+            val baktConfig = checkAndGetConfigDto()
+            Config.setConfigDtoDelegate(baktConfig)
+            val gitRepoHolder = GitRepoHolder(baktConfig.repoList)
+            val sc = SpotChecker(gitRepoHolder, baktConfig.prevProcessedCommitRevIdFileName, baktConfig.preferJgit)
+            gitRepoHolder.allJsonRepoListSingleton.forEach {
+                if (it.getCouplingArchiveRepo() == null) return@forEach
+                if (!it.repo.simpleName().contains("gre")) return@forEach
+                System.err.println(it.repo.simpleName())
+                sc.genHiddenTopicMaskFile(it.getCouplingArchiveRepo()!!, SpaceType.EP)
+            }
+        }
+    }
+
     val HOLE_CHECK_SKIP_TYPE = listOf(SpaceType.EP, SpaceType.CHARACTER, SpaceType.PERSON)
     private val HOLE_CHECKED_TYPE_SET = mutableSetOf<SpaceType>()
     val HOLE_CHECKED_SET_SIZE_LIMIT: Int
@@ -65,7 +95,10 @@ object SpotChecker {
             LOGGER.error("Spot check list file for $spaceType not found! Creating one.")
             scFile.createNewFile()
         }
-        val holesInTopicListRange = checkIfHolesInTopicListRange(spaceType, getTopicList(spaceType))
+        val holesInTopicListRange = checkIfHolesInTopicListRange(
+            spaceType,
+            getTopicList(spaceType, prevProcessedCommitRevIdFileName, preferJgit, gitRepoHolder)
+        )
 
         FileWriter(scFile).use { fw ->
             BufferedWriter(fw).use { bw ->
@@ -263,7 +296,8 @@ object SpotChecker {
         val hiddenTopicMaskFileContent =
             archiveRepo.getFileContentAsStringInACommit(
                 archiveRepo.getLastCommitSha1StrExtGit(),
-                "${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME"
+                "${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME",
+                preferJgit
             )
         if (hiddenTopicMaskFileContent.isNotBlank()) {
             LOGGER.warn("Old hidden topic mask file exists. Perform bitwise operation to gen a new one.")
@@ -315,7 +349,9 @@ object SpotChecker {
     }
 
     fun getMaxTopicId(spaceType: SpaceType): Int {
-        val result = getTopicList(spaceType).max().coerceAtLeast(TYPE_MAX_ID_MAP[spaceType]!!)
+        val result = getTopicList(
+            spaceType, prevProcessedCommitRevIdFileName, preferJgit, gitRepoHolder
+        ).max().coerceAtLeast(TYPE_MAX_ID_MAP[spaceType]!!)
         TYPE_MAX_ID_MAP[spaceType] = result
         LOGGER.info("Max id for $spaceType: $result")
         return result
@@ -323,13 +359,13 @@ object SpotChecker {
 
 
     private fun walkThroughJson(
-        jsonRepoList: List<RepoDto> = allJsonRepoListSingleton,
+        jsonRepoList: List<RepoDto> = gitRepoHolder.allJsonRepoListSingleton,
         handler: (RelPathAndContentSupp) -> Boolean
     ) {
         val timing = System.currentTimeMillis()
         LOGGER.info("Walking through json repo folders.")
         // we should ensure the oldest repo to be iterated first, so we resort the repos here
-        val workingRepoList = allJsonRepoListSingleton.toMutableList().apply {
+        val workingRepoList = gitRepoHolder.allJsonRepoListSingleton.toMutableList().apply {
             sortBy {
                 val lastCommitSha1 = it.getLastCommitSha1StrExtGit()
                 val revCommit = it.getRevCommitById(lastCommitSha1)
@@ -359,7 +395,7 @@ object SpotChecker {
                         while (br.readLine().also { line = it } != null) {
                             val relPath = line!!
                             val fileContent = {
-                                jsonRepo.getFileContentAsStringInACommit(headSha1, relPath)
+                                jsonRepo.getFileContentAsStringInACommit(headSha1, relPath, preferJgit)
                             }
                             runCatching {
                                 handler.invoke(RelPathAndContentSupp(jsonRepo, relPath, fileContent))
@@ -392,25 +428,6 @@ object SpotChecker {
         val relPath: String,
         val fileContent: Supplier<String>
     )
-
-
-    @JvmStatic
-    fun main(argv: Array<String>) {
-        // LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
-        // repeat(10) { genSpotCheckListFile(SpaceType.SUBJECT) }
-        // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
-//        SpaceType.values().forEach {
-//            genHiddenTopicMaskFile(it)
-//        }
-//        randomSelectTopicIds(GitHelper.defaultArchiveRepoSingleton, spaceType = SpaceType.EP)
-//        genEmptyTopicMaskFile(SpaceType.EP)
-        allJsonRepoListSingleton.forEach {
-            if (it.getCouplingArchiveRepo() == null) return@forEach
-            if (!it.repo.simpleName().contains("gre")) return@forEach
-            System.err.println(it.repo.simpleName())
-            genHiddenTopicMaskFile(it.getCouplingArchiveRepo()!!, SpaceType.EP)
-        }
-    }
 
     private fun checkEmptyTopicMaskBitsetFile(htmlRepo: RepoDto, spaceType: SpaceType) {
         val bs = getBitsetFromLongPlaintextFile(

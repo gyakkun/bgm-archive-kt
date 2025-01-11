@@ -14,12 +14,10 @@ import moe.nyamori.bgm.config.checkAndGetConfigDto
 import moe.nyamori.bgm.db.DSProvider
 import moe.nyamori.bgm.db.DaoHolder
 import moe.nyamori.bgm.db.JsonToDbProcessor
-import moe.nyamori.bgm.git.FileHistoryLookup
-import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.*
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
-import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadable
 import moe.nyamori.bgm.model.SpaceType
@@ -59,7 +57,15 @@ object HttpServer {
         val bgmDao = daoHolder.bgmDao
 
         val rangeHelper = RangeHelper(bgmDao)
-        val fileHistoryLookup = FileHistoryLookup(bgmDao)
+        val gitRepoHolder = GitRepoHolder(baktConfig.repoList)
+        val fileHistoryLookup = FileHistoryLookup(bgmDao, gitRepoHolder, baktConfig.preferJgit)
+        val gitStatusHandler = GitRepoStatusHandler(gitRepoHolder)
+        val latestTopicListWrapper = LatestTopicListWrapper(
+            baktConfig.prevProcessedCommitRevIdFileName,
+            baktConfig.preferJgit,
+            gitRepoHolder
+        )
+        val spotChecker = SpotChecker(gitRepoHolder, baktConfig.prevProcessedCommitRevIdFileName, baktConfig.preferJgit)
 
 
         val app = Javalin.create { jc ->
@@ -90,8 +96,8 @@ object HttpServer {
                 }
             }
             jc.router.apiBuilder {
-                get("/status", GitRepoStatusHandler)
-                get("/status/git", GitRepoStatusHandler)
+                get("/status", gitStatusHandler)
+                get("/status/git", gitStatusHandler)
                 get("/status/jvm", JvmStatusHandler)
                 get("/status/db", DbStatusHandler(dsProvider))
                 get("/holes") { it.redirect("/holes/blog") }
@@ -122,7 +128,7 @@ object HttpServer {
                         }
                         val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
                         val body = it.body()
-                        val bs = SpotChecker.getBitsetFromLongListStr(body)
+                        val bs = spotChecker.getBitsetFromLongListStr(body)
                         val holes = rangeHelper.checkHolesForType(spaceType)
                         if (holes.isEmpty()) {
                             it.html(""); return@post
@@ -146,13 +152,13 @@ object HttpServer {
                         it.html(res)
                     }
                 }
-                get("/health", healthHandler(rangeHelper))
-                head("/health", healthHandler(rangeHelper, true))
+                get("/health", healthHandler(gitRepoHolder, rangeHelper, spotChecker))
+                head("/health", healthHandler(gitRepoHolder, rangeHelper, spotChecker, true))
                 path("/history") {
-                    get("/status", GitRepoStatusHandler)
+                    get("/status", gitStatusHandler)
                     path("/{spaceType}") {
-                        get("/latest_topic_list", LatestTopicListWrapper)
-                        get("/latest-topic-list", LatestTopicListWrapper)
+                        get("/latest_topic_list", latestTopicListWrapper)
+                        get("/latest-topic-list", latestTopicListWrapper)
                         path("/{topicId}") {
                             get(FileHistoryWrapper(fileHistoryLookup))
                             get("/link", LinkHandlerWrapper)
@@ -181,7 +187,7 @@ object HttpServer {
                         get("/html") {
                             it.result(
                                 GitHelper.GSON.toJson(
-                                    GitHelper.allArchiveRepoListSingleton.mapIndexed { idx, repoDto ->
+                                    gitRepoHolder.allArchiveRepoListSingleton.mapIndexed { idx, repoDto ->
                                         Pair(
                                             idx,
                                             StringHashingHelper.stringHash(repoDto.repo.absolutePathWithoutDotGit())
@@ -193,7 +199,7 @@ object HttpServer {
                         get("/json") {
                             it.result(
                                 GitHelper.GSON.toJson(
-                                    GitHelper.allJsonRepoListSingleton.mapIndexed { idx, repoDto ->
+                                    gitRepoHolder.allJsonRepoListSingleton.mapIndexed { idx, repoDto ->
                                         Pair(
                                             idx,
                                             StringHashingHelper.stringHash(repoDto.repo.absolutePathWithoutDotGit())
@@ -206,13 +212,33 @@ object HttpServer {
                 }
                 path("/hook") {
                     path("/db") {
-                        get("/persist", DbPersistHook(JsonToDbProcessor(bgmDao, TopicJsonHelper(bgmDao))))
-                        get("/reset", DbSetPersistIdHandler(bgmDao))
+                        get(
+                            "/persist",
+                            DbPersistHook(
+                                JsonToDbProcessor(
+                                    bgmDao,
+                                    TopicJsonHelper(bgmDao),
+                                    gitRepoHolder,
+                                    baktConfig.preferJgit
+                                )
+                            )
+                        )
+                        get("/reset", DbSetPersistIdHandler(bgmDao, gitRepoHolder))
                         get("/purge", DbPurgeAllMetaHandler(bgmDao))
                     }
 
-                    get("/commit", CommitHook)
-                    get("/cache", CacheHook(bgmDao))
+                    get(
+                        "/commit", CommitHook(
+                            CommitToJsonProcessor(
+                                baktConfig.prevProcessedCommitRevIdFileName,
+                                baktConfig.spotCheckerTimeoutThresholdMs,
+                                gitRepoHolder,
+                                baktConfig.preferJgit,
+                                spotChecker
+                            )
+                        )
+                    )
+                    get("/cache", CacheHook(bgmDao, gitRepoHolder))
                 }
                 path("/forum-enhance") {
                     post("/query", ForumEnhanceHandler(bgmDao))
@@ -315,13 +341,19 @@ object HttpServer {
     @Volatile
     private var lastDownTimestamp: Long = Long.MAX_VALUE
 
-    private fun healthHandler(rangeHelper: RangeHelper, isHead: Boolean = false) = Handler { ctx ->
+    private fun healthHandler(
+        gitRepoHolder: GitRepoHolder,
+        rangeHelper: RangeHelper,
+        spotChecker: SpotChecker,
+        isHead: Boolean = false
+    ) =
+        Handler { ctx ->
         val holes = SpaceType.entries.associateWith {
             val res = rangeHelper.checkHolesForType(it)
             runCatching {
                 val holesMaskFile = File(System.getProperty("user.home"))
                     .resolve("source/bgm-archive-holes/${it.name.lowercase()}.txt")
-                val masked = SpotChecker.getBitsetFromLongPlaintextFile(holesMaskFile)
+                val masked = spotChecker.getBitsetFromLongPlaintextFile(holesMaskFile)
                 res.filter { !masked.get(it) }
             }.getOrDefault(res)
         }
@@ -329,7 +361,7 @@ object HttpServer {
         // In case we have other fields counted in isAvailable
         var isAvailable = blogHealth
         val now = Instant.now()
-        val lastCommits = GitHelper.allRepoInDisplayOrder
+            val lastCommits = gitRepoHolder.allRepoInDisplayOrder
             .map { it.repo.folderName() to it.getLatestCommitRef() }
             .associate { (folderName, commit) ->
                 @Suppress("unused")

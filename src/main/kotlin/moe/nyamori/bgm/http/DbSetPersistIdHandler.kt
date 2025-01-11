@@ -5,12 +5,13 @@ import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.IBgmDao
-import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitRepoHolder
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
 
 class DbSetPersistIdHandler(
-    private val bgmDao: IBgmDao
+    private val bgmDao: IBgmDao,
+    private val gitRepoHolder: GitRepoHolder
 ) : Handler {
     val LOGGER = LoggerFactory.getLogger(DbSetPersistIdHandler::class.java)
     override fun handle(ctx: Context) {
@@ -21,11 +22,11 @@ class DbSetPersistIdHandler(
             return
         }
         val idx = ctx.queryParam("idx")?.toIntOrNull() ?: 0
-        if (idx !in GitHelper.allJsonRepoListSingleton.indices) {
+        if (idx !in gitRepoHolder.allJsonRepoListSingleton.indices) {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }
-        val repo = GitHelper.allJsonRepoListSingleton[idx]
+        val repo = gitRepoHolder.allJsonRepoListSingleton[idx]
         Thread {
             try {
                 if (HttpHelper.tryLockDbMs(10_000)) {

@@ -6,6 +6,7 @@ import io.javalin.json.JavalinJackson
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.folderName
+import moe.nyamori.bgm.git.GitRepoHolder
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadableBytes
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.slf4j.LoggerFactory
@@ -15,10 +16,12 @@ import kotlin.math.absoluteValue
 import kotlin.math.ln
 import kotlin.math.pow
 
-object GitRepoStatusHandler : Handler {
+class GitRepoStatusHandler(
+    private val gitRepoHolder: GitRepoHolder
+) : Handler {
     override fun handle(ctx: Context) {
         val res = object {
-            val gitRepositories = GitHelper.allRepoInDisplayOrder
+            val gitRepositories = gitRepoHolder.allRepoInDisplayOrder
                 .associate {
                     it.repo.folderName() to run {
                         val gitProcess = Runtime.getRuntime()

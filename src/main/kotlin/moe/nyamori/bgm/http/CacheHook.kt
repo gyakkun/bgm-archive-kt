@@ -5,13 +5,14 @@ import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.IBgmDao
-import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitRepoHolder
 import moe.nyamori.bgm.util.CommitHistoryCacheHelper.buildCache
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
 
 class CacheHook(
-    private val bgmDao: IBgmDao
+    private val bgmDao: IBgmDao,
+    private val gitRepoHolder: GitRepoHolder,
 ) : Handler {
     private val LOGGER = LoggerFactory.getLogger(CacheHook::class.java)
     override fun handle(ctx: Context) {
@@ -23,7 +24,7 @@ class CacheHook(
         Thread {
             try {
                 if (HttpHelper.tryLockDbMs(10_000)) {
-                    listOf(GitHelper.allJsonRepoListSingleton, GitHelper.allArchiveRepoListSingleton).flatten()
+                    listOf(gitRepoHolder.allJsonRepoListSingleton, gitRepoHolder.allArchiveRepoListSingleton).flatten()
                         .forEach { it.buildCache(bgmDao) }
                 }
             } catch (th: Throwable) {
