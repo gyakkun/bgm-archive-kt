@@ -1,5 +1,6 @@
 package moe.nyamori.bgm
 
+import com.google.gson.GsonBuilder
 import com.hsbc.cranker.connector.CrankerConnectorBuilder
 import com.hsbc.cranker.connector.CrankerConnectorBuilder.*
 import com.hsbc.cranker.connector.RouterEventListener
@@ -7,11 +8,8 @@ import com.hsbc.cranker.connector.RouterRegistration
 import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.*
-import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.*
 import moe.nyamori.bgm.config.Config.bgmHealthStatus500TimeoutThresholdMs
-import moe.nyamori.bgm.config.IConfig
-import moe.nyamori.bgm.config.checkAndGetConfigDto
-import moe.nyamori.bgm.config.setConfigDelegate
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
@@ -41,6 +39,7 @@ object HttpServer {
         val cfg = checkAndGetConfigDto()
         setConfigDelegate(cfg)
         writeDbPersistKeyIfNecessary(cfg)
+        writeConfigToConfigFolder(cfg)
 
         val app = Javalin.create { config ->
             config.useVirtualThreads = true
@@ -264,6 +263,24 @@ object HttpServer {
             {
                 app.stop()
             })
+    }
+
+    private fun writeConfigToConfigFolder(cfg: ConfigDto) {
+        val gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
+        val json = gson.toJson(cfg)
+        val folder = File(cfg.homeFolderAbsolutePath)
+            .resolve("bgm-archive-kt-config")
+            .apply { mkdirs() }
+        val cfgJsonFile = folder.resolve("config.json")
+        if (cfgJsonFile.exists()) {
+            LOGGER.error("config file exists: {}", cfgJsonFile.path)
+            LOGGER.error("orig config file content: {}", cfgJsonFile.readText())
+            LOGGER.error("will overwrite the config file.")
+        }
+        FileWriter(cfgJsonFile).use {
+            it.write(json)
+            it.flush()
+        }
     }
 
     private fun writeDbPersistKeyIfNecessary(cfg: IConfig) {
