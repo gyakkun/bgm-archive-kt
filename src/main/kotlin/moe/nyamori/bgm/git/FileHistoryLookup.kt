@@ -15,7 +15,7 @@ import moe.nyamori.bgm.model.lowercaseName
 import moe.nyamori.bgm.util.FilePathHelper
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
-import moe.nyamori.bgm.util.StringHashingHelper.hashedAbsolutePathWithoutGitId
+import moe.nyamori.bgm.util.StringHashingHelper.repoIdFromDto
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants.DOT_GIT
@@ -153,7 +153,7 @@ object FileHistoryLookup {
         }
         val repoIdToCommitIdList = Dao.bgmDao.queryRepoCommitForCacheByFileRelativePath(relPath).groupBy { it.repoId }
         val repoList = if (isHtml) allArchiveRepoListSingleton else allJsonRepoListSingleton
-        val repoIdToRepo = repoList.associateBy { it.hashedAbsolutePathWithoutGitId().toLong() }
+        val repoIdToRepo = repoList.associateBy { it.repoIdFromDto().toLong() }
         val res = repoIdToRepo.mapNotNull { (k, repo) ->
             repoIdToCommitIdList[k]
                 ?.mapNotNull { runCatching { repo.getRevCommitById(it.commitId) }.getOrNull() }
@@ -218,7 +218,7 @@ object FileHistoryLookup {
     fun Repository.getRevCommitList(relPath: String): List<CommitHashAndTimestampAndMsg> =
         runCatching {
             val repoIdCommitIdList = Dao.bgmDao.queryRepoCommitForCacheByFileRelativePath(relPath)
-            repoIdCommitIdList.filter { it.repoId == this.hashedAbsolutePathWithoutGitId().toLong() }
+            repoIdCommitIdList.filter { it.repoId == this.repoIdFromDto().toLong() }
                 .map { this.getRevCommitById(it.commitId) }
                 .map { it.toChatam(this) }
         }.onFailure {

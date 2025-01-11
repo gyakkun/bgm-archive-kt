@@ -1,6 +1,6 @@
 package moe.nyamori.bgm.util
 
-import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
+import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import org.eclipse.jgit.lib.Repository
 import kotlin.math.abs
 
@@ -32,6 +32,9 @@ object StringHashingHelper {
         return -abs(hash1 xor hash2)
     }
 
-    fun Repository.hashedAbsolutePathWithoutGitId() = StringHashingHelper.stringHash(this.absolutePathWithoutDotGit())
+    fun Repository.repoIdFromDto(): Int {
+        // return StringHashingHelper.stringHash(this.absolutePathWithoutDotGit())
+        return this.toRepoDtoOrThrow().id
+    }
 
 }

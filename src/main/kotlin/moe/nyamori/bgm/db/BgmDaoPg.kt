@@ -5,7 +5,7 @@ import moe.nyamori.bgm.model.Like
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.model.User
-import moe.nyamori.bgm.util.StringHashingHelper.hashedAbsolutePathWithoutGitId
+import moe.nyamori.bgm.util.StringHashingHelper.repoIdFromDto
 import org.eclipse.jgit.lib.Repository
 import org.jdbi.v3.sqlobject.customizer.Bind
 import org.jdbi.v3.sqlobject.customizer.BindBean
@@ -62,7 +62,7 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
     ): Int {
         return upsertMetaData(
             Config.dbMetaKeyPrevPersistedJsonCommitRevId
-                    + repo.hashedAbsolutePathWithoutGitId(), prevPersistRevId
+                    + repo.repoIdFromDto(), prevPersistRevId
         )
     }
 
@@ -70,14 +70,14 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
     override fun getPrevPersistedCommitId(repo: Repository): String {
         return getMetaData(
             Config.dbMetaKeyPrevPersistedJsonCommitRevId
-                    + repo.hashedAbsolutePathWithoutGitId()
+                    + repo.repoIdFromDto()
         ) ?: ""
     }
 
     override fun getPrevCachedCommitId(repo: Repository): String? {
         return getMetaData(
             Config.dbMetaKeyPrevCachedCommitRevId
-                    + repo.hashedAbsolutePathWithoutGitId()
+                    + repo.repoIdFromDto()
         )
     }
 
@@ -87,7 +87,7 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
     ): Int {
         return upsertMetaData(
             Config.dbMetaKeyPrevCachedCommitRevId
-                    + repo.hashedAbsolutePathWithoutGitId(), prevCachedCommitId
+                    + repo.repoIdFromDto(), prevCachedCommitId
         )
     }
 

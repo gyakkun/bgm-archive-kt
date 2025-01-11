@@ -8,7 +8,7 @@ import moe.nyamori.bgm.git.GitHelper.getRevCommitById
 import moe.nyamori.bgm.git.GitHelper.getWalkBetweenCommitInReverseOrder
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
-import moe.nyamori.bgm.util.StringHashingHelper.hashedAbsolutePathWithoutGitId
+import moe.nyamori.bgm.util.StringHashingHelper.repoIdFromDto
 import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 
@@ -69,13 +69,13 @@ object CommitHistoryCacheHelper {
 
                     // 2. Insert this commit to repo commit table
                     val resInt =
-                        Dao.bgmDao.insertRepoCommitForCache(this.hashedAbsolutePathWithoutGitId().toLong(), curCommitId)
+                        Dao.bgmDao.insertRepoCommitForCache(this.repoIdFromDto().toLong(), curCommitId)
                     // LOGGER.info("commit insert res int: $resInt")
 
                     // 3. Insert to file-commit
                     val cacheFileCommitInsertRes = Dao.bgmDao.batchUpsertFileCommitForCache(
                         changedFilePaths,
-                        this.hashedAbsolutePathWithoutGitId().toLong(),
+                        this.repoIdFromDto().toLong(),
                         curCommitId
                     )
                     // LOGGER.info("Insert result: $cacheFileCommitInsertRes")
