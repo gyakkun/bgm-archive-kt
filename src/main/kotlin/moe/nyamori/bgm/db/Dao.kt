@@ -12,7 +12,7 @@ import java.util.concurrent.CountDownLatch
 object Dao {
     private val latch = CountDownLatch(1)
 
-    fun runFlyway() {
+    init {
         Flyway.configure()
             .dataSource(DSProvider.ds)
             .baselineOnMigrate(true)
