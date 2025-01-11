@@ -13,7 +13,7 @@ object CacheHook : Handler {
     private val LOGGER = LoggerFactory.getLogger(CacheHook::class.java)
     override fun handle(ctx: Context) {
         val keyParam = ctx.queryParam("key")
-        if (Config.BGM_ARCHIVE_DISABLE_DB_PERSIST || keyParam != Config.BGM_ARCHIVE_DB_PERSIST_KEY) {
+        if (Config.disableDbPersist || keyParam != Config.dbPersistKey) {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }

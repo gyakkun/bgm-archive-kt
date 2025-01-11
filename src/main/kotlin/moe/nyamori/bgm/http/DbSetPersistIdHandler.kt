@@ -8,14 +8,13 @@ import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
-import java.util.concurrent.TimeUnit
 
 object DbSetPersistIdHandler : Handler {
     val LOGGER = LoggerFactory.getLogger(DbSetPersistIdHandler.javaClass)
     override fun handle(ctx: Context) {
         val keyParam = ctx.queryParam("key")
         val commitId = ctx.queryParam("id")
-        if (Config.BGM_ARCHIVE_DISABLE_DB_PERSIST || keyParam != Config.BGM_ARCHIVE_DB_PERSIST_KEY || commitId == null) {
+        if (Config.disableDbPersist || keyParam != Config.dbPersistKey || commitId == null) {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }

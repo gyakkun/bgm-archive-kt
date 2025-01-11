@@ -2,8 +2,8 @@ package moe.nyamori.bgm.git
 
 import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
-import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS
+import moe.nyamori.bgm.config.Config.prevProcessedCommitRevIdFileName
+import moe.nyamori.bgm.config.Config.spotCheckerTimeoutThresholdMs
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
@@ -199,9 +199,9 @@ object CommitToJsonProcessor {
                             Git(jsonRepo).gc()
                         }
                         timing = System.currentTimeMillis() - timing
-                        if (timing >= BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS) {
+                        if (timing >= spotCheckerTimeoutThresholdMs) {
                             log.error(
-                                "Process commit taking longer than expected (threshold:${BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS}ms). Skipping generating spot check file. Cur commit: ${
+                                "Process commit taking longer than expected (threshold:${spotCheckerTimeoutThresholdMs}ms). Skipping generating spot check file. Cur commit: ${
                                     curCommit.sha1Str()
                                 }"
                             )
@@ -254,7 +254,7 @@ object CommitToJsonProcessor {
     private fun writeJsonRepoLastCommitId(prevProcessedCommit: RevCommit, jsonRepo: Repository) {
         log.info("Writing last commit id: ${jsonRepo.simpleName()}/$prevProcessedCommit")
         val lastCommitIdFile =
-            File(jsonRepo.absolutePathWithoutDotGit()).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+            File(jsonRepo.absolutePathWithoutDotGit()).resolve(prevProcessedCommitRevIdFileName)
         val lastCommitIdStr = prevProcessedCommit.sha1Str()
         FileWriter(lastCommitIdFile).use {
             it.write(lastCommitIdStr)
@@ -284,17 +284,17 @@ object CommitToJsonProcessor {
         changedHtmlFilePathList: List<String>
     ) {
         var timing = System.currentTimeMillis()
-        if (Config.BGM_ARCHIVE_PREFER_JGIT) {
+        if (Config.preferJgit) {
             jgitCommitJsonRepo(jsonRepo, changedHtmlFilePathList, archiveCommit)
         } else {
-            if (Config.BGM_ARCHIVE_PREFER_GIT_BATCH_ADD) {
+            if (Config.preferGitBatchAdd) {
                 commandLineCommitJsonRepoAddFileInBatch(jsonRepo, archiveCommit)
             } else {
                 commandLineCommitJsonRepoAddFileSeparately(jsonRepo, archiveCommit, changedHtmlFilePathList)
             }
         }
         timing = System.currentTimeMillis() - timing
-        if (Config.BGM_ARCHIVE_IS_REMOVE_JSON_AFTER_PROCESS) {
+        if (Config.isRemoveJsonAfterProcess) {
             if (jsonRepo.isBare) {
                 log.error(
                     "Json repo {} is a bare git repo. Will not remove json files.",
@@ -350,7 +350,7 @@ object CommitToJsonProcessor {
             }
             jsonFileListToGitAdd.append("${absolutePathFile.absolutePath} ")
         }
-        BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME.apply {
+        prevProcessedCommitRevIdFileName.apply {
             val absolutePath = jsonRepoDir.resolve(this)
             jsonFileListToGitAdd.append("${absolutePath.absolutePath} ")
         }
@@ -409,7 +409,7 @@ object CommitToJsonProcessor {
                     .call()
             }
             git.add()
-                .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
+                .addFilepattern(prevProcessedCommitRevIdFileName)
                 .call()
             log.info("Complete git add")
             log.info("About to git commit")

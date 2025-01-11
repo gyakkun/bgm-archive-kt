@@ -3,6 +3,7 @@ package moe.nyamori.bgm.git
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.expectedCommitPerDay
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.couplingArchiveRepo
@@ -56,7 +57,7 @@ object SpotChecker {
 
 
     fun genSpotCheckListFile(archiveRepo: Repository, spaceType: SpaceType) {
-        if (Config.BGM_ARCHIVE_DISABLE_SPOT_CHECK) return
+        if (Config.disableSpotCheck) return
         LOGGER.info("Generating spot check list file $SPOT_CHECK_BITSET_FILE_NAME for $spaceType.")
         val scList = randomSelectTopicIds(archiveRepo, spaceType)
         val scFile =
@@ -164,7 +165,7 @@ object SpotChecker {
             return result
         }
         val samplingSize =
-            (fakeTotalCount / (30 * (Config.BGM_ARCHIVE_HOW_MANY_COMMIT_ON_GITHUB_PER_DAY / (2 * (SpaceType.entries.size)))))
+            (fakeTotalCount / (30 * (archiveRepo.expectedCommitPerDay / (2 * (SpaceType.entries.size)))))
                 .coerceAtLeast(MIN_SPOT_CHECK_SIZE).coerceAtMost(MAX_SPOT_CHECK_SIZE)
         val r = Random()
 

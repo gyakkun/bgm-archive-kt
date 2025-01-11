@@ -8,7 +8,6 @@ import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
 import java.util.*
-import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
 object DbPurgeAllMetaHandler : Handler {
@@ -28,7 +27,7 @@ object DbPurgeAllMetaHandler : Handler {
         if (System.currentTimeMillis() - _captchaTimestamp > _captchaTimeout) _waiting = false
         val keyParam = ctx.queryParam("key")
         val v = ctx.queryParam("v")
-        if (Config.BGM_ARCHIVE_DISABLE_DB_PERSIST || keyParam != Config.BGM_ARCHIVE_DB_PERSIST_KEY) {
+        if (Config.disableDbPersist || keyParam != Config.dbPersistKey) {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }

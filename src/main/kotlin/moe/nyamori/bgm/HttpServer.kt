@@ -8,7 +8,7 @@ import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
 import io.javalin.http.*
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.config.Config.BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS
+import moe.nyamori.bgm.config.Config.bgmHealthStatus500TimeoutThresholdMs
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
@@ -34,6 +34,34 @@ object HttpServer {
 
     @JvmStatic
     fun main(args: Array<String>) {
+        // TODO read config
+
+
+        // TODO write db persist key if necessary
+        /*
+        runCatching {
+                        System.err.println("############ DB PERSIST KEY: $key ############")
+                        val dbFile = File(BGM_ARCHIVE_SQLITE_FILE)
+                        val folder = dbFile.parentFile
+                        if (!folder.exists()) folder.mkdirs()
+                        val keyfile = folder.resolve("db-persist-key")
+                        if (disableDbPersistKey) {
+                            System.err.println("Will not write db persist keyfile due to env config.")
+                            return@runCatching
+                        }
+                        if (!keyfile.exists()) keyfile.createNewFile()
+                        FileWriter(keyfile).use { fw ->
+                            fw.write(key)
+                            fw.flush()
+                        }
+                    }.onFailure {
+                        System.err.println("Error when writing key file!")
+                        it.printStackTrace()
+                    }
+         */
+
+
+
         val app = Javalin.create { config ->
             config.useVirtualThreads = true
             config.http.brotliAndGzipCompression()
@@ -221,18 +249,18 @@ object HttpServer {
             val reqSalt = System.currentTimeMillis() and 2047
             it.attribute("reqSalt", reqSalt)
             LOGGER.info("[{}] Req: {} {} {}", reqSalt, ip(it), it.method(), it.fullUrl())
-        }.start(Config.BGM_ARCHIVE_ADDRESS, Config.BGM_ARCHIVE_PORT)
+        }.start(Config.httpHost, Config.httpPort)
 
-        if (Config.BGM_ARCHIVE_ENABLE_CRANKER_CONNECTOR) {
+        if (Config.enableCrankerConnector) {
             LOGGER.info("Starting cranker connector")
             val crankerConnector = connector()
                 .withHttpClient(CrankerConnectorBuilder.createHttpClient(true).build())
                 .withRoute("*") // catch all
                 .withPreferredProtocols(listOf(CRANKER_PROTOCOL_3, CRANKER_PROTOCOL_1))
                 .withComponentName("bgm-archive-kt")
-                .withRouterUris { listOf(URI.create(Config.BGM_ARCHIVE_CRANKER_REG_URL)) }
-                .withSlidingWindowSize(Config.BGM_ARCHIVE_CRANKER_SLIDING_WIN)
-                .withTarget(URI.create("http://${Config.BGM_ARCHIVE_ADDRESS}:${Config.BGM_ARCHIVE_PORT}"))
+                .withRouterUris { listOf(URI.create(Config.crankerRegUrl)) }
+                .withSlidingWindowSize(Config.crankerSlidingWin)
+                .withTarget(URI.create("http://${Config.httpHost}:${Config.httpPort}"))
                 .withRouterRegistrationListener(object : RouterEventListener {
                     override fun onRegistrationChanged(data: RouterEventListener.ChangeData) {
                         LOGGER.info(
@@ -297,7 +325,7 @@ object HttpServer {
                 }
             }
         val should500 =
-            !isAvailable && ((System.currentTimeMillis() - lastDownTimestamp) > BGM_HEALTH_STATUS_500_TIMEOUT_THRESHOLD_MS)
+            !isAvailable && ((System.currentTimeMillis() - lastDownTimestamp) > bgmHealthStatus500TimeoutThresholdMs)
         lastDownTimestamp = if (isAvailable) Long.MAX_VALUE else Math.min(System.currentTimeMillis(), lastDownTimestamp)
         ctx.status(if (should500) 500 else 200)
         if (isHead) return@Handler

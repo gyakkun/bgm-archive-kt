@@ -170,7 +170,7 @@ object FileHistoryLookup {
         else if (isJson) allJsonRepoListSingleton
         else listOf(allArchiveRepoListSingleton, allJsonRepoListSingleton).flatten()
 
-        val res = if (Config.BGM_ARCHIVE_PREFER_JGIT || forceJgit) {
+        val res = if (Config.preferJgit || forceJgit) {
             repoList.parallelStream().map {
                 runCatching {
                     it.getRevCommitListJgit(relPath)
@@ -197,7 +197,7 @@ object FileHistoryLookup {
             if (elapsed >= 100) {
                 log.warn(
                     "$this ${
-                        if (Config.BGM_ARCHIVE_PREFER_JGIT) "jgit" else "external git"
+                        if (Config.preferJgit) "jgit" else "external git"
                     } get log timing: ${elapsed}ms. RelPath: $relPath"
                 )
             }
@@ -226,7 +226,7 @@ object FileHistoryLookup {
         }.getOrNull() ?:
         runCatching {
             val timing = System.currentTimeMillis()
-            val res = if (Config.BGM_ARCHIVE_PREFER_JGIT) {
+            val res = if (Config.preferJgit) {
                 this.getRevCommitListJgit(relPath)
             } else {
                 this.getRevCommitListExtGit(relPath)
@@ -236,7 +236,7 @@ object FileHistoryLookup {
                 if (elapsed >= 100) {
                     log.warn(
                         "$this ${
-                            if (Config.BGM_ARCHIVE_PREFER_JGIT) "jgit" else "external git"
+                            if (Config.preferJgit) "jgit" else "external git"
                         } get log timing: ${elapsed}ms. RelPath: $relPath"
                     )
                 }

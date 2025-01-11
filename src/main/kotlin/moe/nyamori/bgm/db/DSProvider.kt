@@ -6,23 +6,32 @@ import moe.nyamori.bgm.config.Config
 import java.io.File
 
 object DSProvider {
+    val isSqlite = Config.jdbcUrl.lowercase().contains("sqlite")
+    val sqliteFilePathOrNull: String?
+        get() {
+            if (!isSqlite) return null
+            return Config.jdbcUrl.substring("jdbc:sqlite:".length)
+        }
     val ds: HikariDataSource by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        File(Config.BGM_ARCHIVE_SQLITE_FILE).apply {
+        if (isSqlite) {
+            val sqliteFilePath = Config.jdbcUrl.substring("jdbc:sqlite:".length)
+            File(sqliteFilePath).apply {
             if (!exists()) {
                 parentFile.mkdirs()
                 createNewFile()
             }
+            }
         }
+
         val hikariConfig = HikariConfig().apply {
-            // jdbcUrl = "jdbc:sqlite:" + Config.BGM_ARCHIVE_SQLITE_FILE
-            jdbcUrl = "jdbc:postgresql://127.0.0.1:15432/bgm_archive"
-            driverClassName = "org.postgresql.Driver"
-            poolName = "PgPool"
-            username = "bgm-archive"
+            this.jdbcUrl = jdbcUrl
+            poolName = if (isSqlite) "SqlitePool" else "PgPool"
+            if (Config.jdbcUsername != null) username = Config.jdbcUsername
+            if (Config.jdbcPassword != null) password = Config.jdbcPassword
             // isAutoCommit = false
-            minimumIdle = 20
-            maximumPoolSize = 50
-            // if (Config.BGM_ARCHIVE_DB_IS_ENABLE_WAL) connectionInitSql = "PRAGMA journal_mode= WAL;"
+            minimumIdle = Config.hikariMinIdle
+            maximumPoolSize = Config.hikariMaxConn
+            if (Config.dbIsEnableWal) connectionInitSql = "PRAGMA journal_mode= WAL;"
         }
         HikariDataSource(hikariConfig)
     }

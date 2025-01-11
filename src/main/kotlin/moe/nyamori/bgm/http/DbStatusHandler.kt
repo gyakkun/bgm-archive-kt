@@ -9,9 +9,13 @@ import java.io.File
 
 object DbStatusHandler:Handler {
     override fun handle(ctx: Context) {
+        if (!DSProvider.isSqlite) {
+            ctx.result("not a sqlite db")
+            return
+        }
         ctx.prettyJson(object {
             val db = object {
-                val dbFileSize = File(Config.BGM_ARCHIVE_SQLITE_FILE).length().toHumanReadableBytes()
+                val dbFileSize = File(DSProvider.sqliteFilePathOrNull!!).length().toHumanReadableBytes()
                 val dbTableSize = DSProvider.ds.connection.use { conn ->
                     conn.prepareStatement(
                         """

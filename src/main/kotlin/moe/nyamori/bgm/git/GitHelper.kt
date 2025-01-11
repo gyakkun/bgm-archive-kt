@@ -4,7 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.ibm.icu.text.CharsetDetector
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+import moe.nyamori.bgm.config.Config.prevProcessedCommitRevIdFileName
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
@@ -165,20 +165,20 @@ object GitHelper {
         if (jsonRepo.isBare) {
             return jsonRepo.getFileContentAsStringInACommit(
                 jsonRepo.getLatestCommitRef().sha1Str(),
-                BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+                prevProcessedCommitRevIdFileName
             ).trim()
         } else {
             return runCatching {
                 jsonRepo.getFileContentAsStringInACommit(
                     jsonRepo.getLastCommitSha1StrExtGit(),
-                    BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+                    prevProcessedCommitRevIdFileName
                 ).trim()
             }.onFailure {
                 log.error("Failed to get last commit sha1 str using ext git: ", it)
             }.getOrElse {
                 val prevProcessedCommitRevIdFile =
                     File(jsonRepo.absolutePathWithoutDotGit()).resolve(
-                        BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+                        prevProcessedCommitRevIdFileName
                     )
                 if (!prevProcessedCommitRevIdFile.exists()) return@getOrElse ""
                 val rawFileStr = prevProcessedCommitRevIdFile.readText(Charsets.UTF_8)
@@ -188,7 +188,7 @@ object GitHelper {
     }
 
 
-    private fun getRepoByPath(path: String): Repository {
+    fun getRepoByPath(path: String): Repository {
         var repo = File(path)
         if (repo.resolve(DOT_GIT).let { it.exists() && it.isDirectory }) {
             repo = repo.resolve(DOT_GIT)
@@ -216,7 +216,7 @@ object GitHelper {
         forceJgit: Boolean = false
     ): String = runCatching {
         val timing = System.currentTimeMillis()
-        val res = if (Config.BGM_ARCHIVE_PREFER_JGIT || forceJgit) {
+        val res = if (Config.preferJgit || forceJgit) {
             this.getFileContentAsStringInACommitJgit(commitId, relPath)
         } else {
             this.getFileContentAsStringInACommitExtGit(commitId, relPath)
@@ -226,7 +226,7 @@ object GitHelper {
             if (elapsed >= 100) {
                 log.warn(
                     "$this ${
-                        if (Config.BGM_ARCHIVE_PREFER_JGIT) "jgit" else "external git"
+                        if (Config.preferJgit) "jgit" else "external git"
                     } get file content: ${elapsed}ms. RelPath: $relPath"
                 )
             }

@@ -10,7 +10,7 @@ import moe.nyamori.bgm.util.HttpHelper
 object DbPersistHook : Handler {
     override fun handle(ctx: Context) {
         val keyParam = ctx.queryParam("key")
-        if (Config.BGM_ARCHIVE_DISABLE_DB_PERSIST || keyParam != Config.BGM_ARCHIVE_DB_PERSIST_KEY) {
+        if (Config.disableDbPersist || keyParam != Config.dbPersistKey) {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }

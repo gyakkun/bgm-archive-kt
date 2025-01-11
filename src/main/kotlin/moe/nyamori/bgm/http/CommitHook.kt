@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 
 object CommitHook : Handler {
     override fun handle(ctx: Context) {
-        if (Config.BGM_ARCHIVE_DISABLE_HOOK) {
+        if (Config.disableAllHooks) {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }

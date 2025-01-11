@@ -24,7 +24,7 @@ object HttpHelper {
     }
 
     inline fun tryLockDbMs(milliseconds: Long, isRead: Boolean = false): Boolean {
-        if (Config.BGM_ARCHIVE_DB_IS_ENABLE_WAL && isRead) return true
+        if (Config.dbIsEnableWal && isRead) return true
         return DB_WRITE_LOCK.tryLock(milliseconds, TimeUnit.MILLISECONDS)
     }
 
