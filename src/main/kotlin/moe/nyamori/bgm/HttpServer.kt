@@ -237,7 +237,7 @@ object HttpServer {
                 .withHttpClient(CrankerConnectorBuilder.createHttpClient(true).build())
                 .withRoute("*") // catch all
                 .withPreferredProtocols(listOf(CRANKER_PROTOCOL_3, CRANKER_PROTOCOL_1))
-                .withComponentName("bgm-archive-kt")
+                .withComponentName(Config.crankerComponent)
                 .withRouterUris { listOf(URI.create(Config.crankerRegUrl)) }
                 .withSlidingWindowSize(Config.crankerSlidingWin)
                 .withTarget(URI.create("http://${Config.httpHost}:${Config.httpPort}"))
