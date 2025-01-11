@@ -1,10 +1,7 @@
 package moe.nyamori.bgm
 
 import com.hsbc.cranker.connector.CrankerConnectorBuilder
-import com.hsbc.cranker.connector.CrankerConnectorBuilder.CRANKER_PROTOCOL_1
-import com.hsbc.cranker.connector.CrankerConnectorBuilder.CRANKER_PROTOCOL_3
-import com.hsbc.cranker.connector.CrankerConnectorBuilder.connector
-import com.hsbc.cranker.connector.ProxyEventListener
+import com.hsbc.cranker.connector.CrankerConnectorBuilder.*
 import com.hsbc.cranker.connector.RouterEventListener
 import com.hsbc.cranker.connector.RouterRegistration
 import io.javalin.Javalin
@@ -82,7 +79,7 @@ object HttpServer {
                         val spaceType = SpaceType.valueOf(spaceTypeParam.uppercase())
                         val holes = RangeHelper.checkHolesForType(spaceType);
                         if (holes.isEmpty()) {
-                            it.html(""); return@get
+                            it.html("\n"); return@get
                         }
                         it.html(
                             holes.take(maxLine).joinToString("\n", postfix = "\n")
@@ -100,7 +97,7 @@ object HttpServer {
                         val bs = SpotChecker.getBitsetFromLongListStr(body)
                         val holes = RangeHelper.checkHolesForType(spaceType)
                         if (holes.isEmpty()) {
-                            it.html(""); return@post
+                            it.html("\n"); return@post
                         }
                         val res = holes.filter { !bs.get(it) }.take(maxLine).joinToString("\n", postfix = "\n")
                         it.html(res)
