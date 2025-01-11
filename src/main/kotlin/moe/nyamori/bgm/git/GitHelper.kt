@@ -3,11 +3,9 @@ package moe.nyamori.bgm.git
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.ibm.icu.text.CharsetDetector
-import moe.nyamori.bgm.config.RepoDto
-import moe.nyamori.bgm.config.RepoType
-import moe.nyamori.bgm.config.getCouplingJsonRepo
-import moe.nyamori.bgm.config.hasCouplingJsonRepo
-import moe.nyamori.bgm.db.IBgmDao
+import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
@@ -27,45 +25,65 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.charset.StandardCharsets
 
-class GitRepoHolder(
-    private val allRepos: List<RepoDto>
-) {
+object GitHelper {
+    private val log = LoggerFactory.getLogger(GitHelper.javaClass)
+    val GSON: Gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
+
+    val defaultJsonRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        getDefaultJsonRepo()
+    }
+
+    val defaultArchiveRepoSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        getDefaultArchiveRepo()
+    }
+
+    val jsonStaticRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        if (Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
+        else {
+            Config.BGM_ARCHIVE_JSON_GIT_STATIC_REPO_DIR_LIST.split(",")
+                .map { getRepoByPath(it.trim()) }
+                .toList()
+        }
+    }
+
+    val archiveStaticRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+        if (Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.isBlank()) return@lazy listOf<Repository>()
+        else {
+            Config.BGM_ARCHIVE_GIT_STATIC_REPO_DIR_LIST.split(",")
+                .map { getRepoByPath(it.trim()) }
+                .toList()
+        }
+    }
+
     val allArchiveRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        allRepos.filter { it.type == RepoType.HTML }
+        mutableListOf<Repository>().apply {
+            add(defaultArchiveRepoSingleton)
+            addAll(archiveStaticRepoListSingleton)
+        }
     }
 
     val allJsonRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        allRepos.filter { it.type == RepoType.JSON }
+        mutableListOf<Repository>().apply {
+            add(defaultJsonRepoSingleton)
+            addAll(jsonStaticRepoListSingleton)
+        }
     }
 
     val allRepoInDisplayOrder by lazy {
         allArchiveRepoListSingleton
             .filter { it.hasCouplingJsonRepo() }
-            .map { archiveRepo ->
-                listOf(
-                    archiveRepo, /*it.couplingJsonRepo()!!*/
-                    allRepos.first { it.id == archiveRepo.optRepoIdCouplingWith!! }
-                )
-            }
+            .map { listOf(it, it.couplingJsonRepo()!!) }
             .flatten()
             .let { cps ->
                 cps + (allArchiveRepoListSingleton + allJsonRepoListSingleton).filter { it !in cps }
             }
     }
-}
 
-object GitHelper {
-    private val log = LoggerFactory.getLogger(GitHelper.javaClass)
-    val GSON: Gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
-
-    fun RepoDto.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(
-        prevProcessedCommitRevIdFileName: String,
-        preferJgit: Boolean,
-    ): RevWalk {
+    fun Repository.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(): RevWalk {
         require(hasCouplingJsonRepo()) {
             "It should be an archive repo with coupling json repo!"
         }
-        val prevProcessedArchiveCommit = getPrevProcessedArchiveCommitRef(prevProcessedCommitRevIdFileName, preferJgit)
+        val prevProcessedArchiveCommit = getPrevProcessedArchiveCommitRef()
         val latestArchiveCommit = getLatestCommitRef()
         return this.getWalkBetweenCommitInReverseOrder(
             latestArchiveCommit,
@@ -77,12 +95,12 @@ object GitHelper {
     /**
      * @param stepInAdvance Walk from top to bottom are inclusive
      */
-    fun RepoDto.getWalkBetweenCommitInReverseOrder(
+    fun Repository.getWalkBetweenCommitInReverseOrder(
         topCommit: RevCommit,
         bottomCommit: RevCommit,
         stepInAdvance: Boolean = true
     ): RevWalk {
-        this.repo.use {
+        this.use {
             val walk = RevWalk(it)
             walk.markStart(topCommit)
             walk.markUninteresting(bottomCommit)
@@ -94,8 +112,8 @@ object GitHelper {
         }
     }
 
-    fun RepoDto.getRevCommitById(id: String): RevCommit {
-        this.repo.use { repo ->
+    fun Repository.getRevCommitById(id: String): RevCommit {
+        this.use { repo ->
             // val revWalk = RevWalk(repo)
             // val revId = repo.resolve(id)
             // val revCommit = revWalk.parseCommit(revId)
@@ -103,9 +121,9 @@ object GitHelper {
         }
     }
 
-    fun RepoDto.getFirstCommitIdStr(): String {
-        this.repo.use { repo ->
-            val headObj = repo.resolve(HEAD)
+    fun Repository.getFirstCommitIdStr(): String {
+        this.use { repo ->
+            val headObj = this.resolve(HEAD)
             val headCommit = repo.parseCommit(headObj)
             val tmpWalk = RevWalk(repo)
             tmpWalk.markStart(headCommit)
@@ -113,7 +131,7 @@ object GitHelper {
         }
     }
 
-    fun RepoDto.getGivenCommitByIdStrOrFirstCommit(commitIdStr: String): RevCommit {
+    fun Repository.getGivenCommitByIdStrOrFirstCommit(commitIdStr: String): RevCommit {
         return runCatching {
             if (commitIdStr.isBlank()) throw IllegalArgumentException("Commit id should not be blank! Repo: $this")
             this.getRevCommitById(commitIdStr)
@@ -122,27 +140,20 @@ object GitHelper {
         }.getOrDefault(this.getRevCommitById(this.getFirstCommitIdStr()))
     }
 
-    fun getPrevPersistedJsonCommitRef(bgmDao: IBgmDao, jsonRepo: RepoDto): RevCommit {
-        return jsonRepo.getGivenCommitByIdStrOrFirstCommit(bgmDao.getPrevPersistedCommitId(jsonRepo))
+    fun getPrevPersistedJsonCommitRef(jsonRepo: Repository): RevCommit {
+        return jsonRepo.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo))
     }
 
-    fun RepoDto.getPrevProcessedArchiveCommitRef(
-        prevProcessedCommitRevIdFileName: String,
-        preferJgit: Boolean
-    ): RevCommit {
+    fun Repository.getPrevProcessedArchiveCommitRef(): RevCommit {
         require(this.hasCouplingJsonRepo())
         return getGivenCommitByIdStrOrFirstCommit(
-            getPrevProcessedArchiveCommitRevIdStr(
-                this.getCouplingJsonRepo()!!,
-                prevProcessedCommitRevIdFileName,
-                preferJgit
-            )
+            getPrevProcessedArchiveCommitRevIdStr(couplingJsonRepo()!!)
         )
     }
 
 
-    fun RepoDto.getLatestCommitRef(): RevCommit {
-        this.repo.use { repo ->
+    fun Repository.getLatestCommitRef(): RevCommit {
+        this.use { repo ->
             val revWalk = RevWalk(repo)
             val latestHeadCommitRevId = repo.resolve(HEAD)
             val latestHeadCommit = revWalk.parseCommit(latestHeadCommitRevId)
@@ -150,30 +161,24 @@ object GitHelper {
         }
     }
 
-    private fun getPrevProcessedArchiveCommitRevIdStr(
-        jsonRepo: RepoDto,
-        prevProcessedCommitRevIdFileName: String,
-        preferJgit: Boolean
-    ): String {
-        if (jsonRepo.repo.isBare) {
+    fun getPrevProcessedArchiveCommitRevIdStr(jsonRepo: Repository): String {
+        if (jsonRepo.isBare) {
             return jsonRepo.getFileContentAsStringInACommit(
                 jsonRepo.getLatestCommitRef().sha1Str(),
-                prevProcessedCommitRevIdFileName,
-                preferJgit
+                BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
             ).trim()
         } else {
             return runCatching {
                 jsonRepo.getFileContentAsStringInACommit(
                     jsonRepo.getLastCommitSha1StrExtGit(),
-                    prevProcessedCommitRevIdFileName,
-                    preferJgit
+                    BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
                 ).trim()
             }.onFailure {
                 log.error("Failed to get last commit sha1 str using ext git: ", it)
             }.getOrElse {
                 val prevProcessedCommitRevIdFile =
-                    File(jsonRepo.repo.absolutePathWithoutDotGit()).resolve(
-                        prevProcessedCommitRevIdFileName
+                    File(jsonRepo.absolutePathWithoutDotGit()).resolve(
+                        BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
                     )
                 if (!prevProcessedCommitRevIdFile.exists()) return@getOrElse ""
                 val rawFileStr = prevProcessedCommitRevIdFile.readText(Charsets.UTF_8)
@@ -183,7 +188,7 @@ object GitHelper {
     }
 
 
-    fun getRepoByPath(path: String): Repository {
+    private fun getRepoByPath(path: String): Repository {
         var repo = File(path)
         if (repo.resolve(DOT_GIT).let { it.exists() && it.isDirectory }) {
             repo = repo.resolve(DOT_GIT)
@@ -195,16 +200,23 @@ object GitHelper {
             .build()
     }
 
+    private fun getDefaultJsonRepo(): Repository {
+        return getRepoByPath(Config.BGM_ARCHIVE_JSON_GIT_REPO_DIR)
+    }
+
+    private fun getDefaultArchiveRepo(): Repository {
+        return getRepoByPath(Config.BGM_ARCHIVE_GIT_REPO_DIR)
+    }
+
     val notLogRelPathSuffix = setOf("meta_ts.txt")
 
-    fun RepoDto.getFileContentAsStringInACommit(
+    fun Repository.getFileContentAsStringInACommit(
         commitId: String,
         relPath: String,
-        configPreferJgit: Boolean,
-        forceJgit: Boolean = false,
+        forceJgit: Boolean = false
     ): String = runCatching {
         val timing = System.currentTimeMillis()
-        val res = if (configPreferJgit || forceJgit) {
+        val res = if (Config.BGM_ARCHIVE_PREFER_JGIT || forceJgit) {
             this.getFileContentAsStringInACommitJgit(commitId, relPath)
         } else {
             this.getFileContentAsStringInACommitExtGit(commitId, relPath)
@@ -214,7 +226,7 @@ object GitHelper {
             if (elapsed >= 100) {
                 log.warn(
                     "$this ${
-                        if (configPreferJgit) "jgit" else "external git"
+                        if (Config.BGM_ARCHIVE_PREFER_JGIT) "jgit" else "external git"
                     } get file content: ${elapsed}ms. RelPath: $relPath"
                 )
             }
@@ -226,10 +238,10 @@ object GitHelper {
         return this.getFileContentAsStringInACommitJgit(commitId, relPath)
     }
 
-    private fun RepoDto.getFileContentAsStringInACommitJgit(
+    private fun Repository.getFileContentAsStringInACommitJgit(
         commitId: String,
         relPath: String
-    ): String = this.repo.use outerUse@{ repo ->
+    ): String = this.use outerUse@{ repo ->
         val revCommit = runCatching { repo.parseCommit(ObjectId.fromString(commitId)) }
             .onFailure {
                 log.error(
@@ -280,22 +292,22 @@ object GitHelper {
             }
     }
 
-    fun RepoDto.getLastCommitSha1StrExtGit(): String {
+    fun Repository.getLastCommitSha1StrExtGit(): String {
         val cmd = "git rev-parse HEAD"
         val gitProcess = Runtime.getRuntime()
-            .exec(cmd, null, File(this.repo.absolutePathWithoutDotGit()))
+            .exec(cmd, null, File(this.absolutePathWithoutDotGit()))
         val msgList =
             gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = false, printAtStdErr = false, logCmd = false)
         return msgList.filter { it.isNotBlank() }.joinToString(separator = "").trim()
     }
 
-    private fun RepoDto.getFileContentAsStringInACommitExtGit(
+    private fun Repository.getFileContentAsStringInACommitExtGit(
         commitId: String,
         relativePathToRepoFolder: String
     ): String {
         val cmd = "git --no-pager show $commitId:$relativePathToRepoFolder"
         val gitProcess = Runtime.getRuntime()
-            .exec(cmd, null, File(this.repo.absolutePathWithoutDotGit()))
+            .exec(cmd, null, File(this.absolutePathWithoutDotGit()))
         val msgList = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = false, printAtStdErr = false, logCmd = false)
         if (msgList.size > 2) log.info("msgListLen = ${msgList.size}")
         if (msgList.last().isBlank()) return msgList.take(msgList.size - 1).joinToString("\n")
@@ -335,4 +347,18 @@ object GitHelper {
     fun Repository.simpleName() =
         this.directory.path.split(File.separator).last { it != DOT_GIT }
 
+    fun Repository.hasCouplingJsonRepo() = couplingJsonRepo() != null
+
+    fun Repository.couplingJsonRepo() =
+        allJsonRepoListSingleton.firstOrNull { jsonRepo ->
+            absolutePathWithoutDotGit() + "-json" == jsonRepo.absolutePathWithoutDotGit()
+        }
+
+    fun Repository.hasCouplingArchiveRepo() = couplingArchiveRepo() != null
+
+    fun Repository.couplingArchiveRepo() = allArchiveRepoListSingleton.firstOrNull { archiveRepo ->
+        absolutePathWithoutDotGit() == archiveRepo.absolutePathWithoutDotGit() + "-json"
+    }
+
+    fun Repository.hasCouplingRepo() = hasCouplingArchiveRepo() || hasCouplingJsonRepo()
 }

@@ -4,14 +4,15 @@ import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.db.IBgmDao
+import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
 import java.util.*
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 
-class DbPurgeAllMetaHandler(private val bgmDao: IBgmDao) : Handler {
-    val LOGGER = LoggerFactory.getLogger(DbPurgeAllMetaHandler::class.java)
+object DbPurgeAllMetaHandler : Handler {
+    val LOGGER = LoggerFactory.getLogger(DbPurgeAllMetaHandler.javaClass)
     private val _random = Random()
 
     @Volatile
@@ -22,11 +23,7 @@ class DbPurgeAllMetaHandler(private val bgmDao: IBgmDao) : Handler {
 
     @Volatile
     private var _captchaTimestamp = -1L
-
-    companion object {
-        private const val _captchaTimeout = 60_000 // ms
-    }
-
+    private const val _captchaTimeout = 60_000 // ms
     override fun handle(ctx: Context) {
         if (System.currentTimeMillis() - _captchaTimestamp > _captchaTimeout) _waiting = false
         val keyParam = ctx.queryParam("key")
@@ -74,7 +71,7 @@ class DbPurgeAllMetaHandler(private val bgmDao: IBgmDao) : Handler {
 
         try {
             if (HttpHelper.tryLockDbMs(10_000)) {
-                val result = bgmDao._TRUNCATE_ALL_META()
+                val result = Dao.bgmDao._TRUNCATE_ALL_META()
                 LOGGER.error("Truncate all meta. Lines deleted: $result")
                 ctx.result(
                     """

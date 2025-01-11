@@ -6,22 +6,21 @@ import org.flywaydb.core.api.callback.Context
 import org.flywaydb.core.api.callback.Event
 import org.jdbi.v3.core.Jdbi
 import org.jdbi.v3.core.kotlin.KotlinPlugin
+import org.jdbi.v3.core.statement.Slf4JSqlLogger
 import org.jdbi.v3.sqlobject.SqlObjectPlugin
 import java.util.concurrent.CountDownLatch
 
-class DaoHolder(
-    private val dsProvider: DSProvider,
-) {
+object Dao {
     private val latch = CountDownLatch(1)
 
-    fun runFlyway() {
+    init {
         Flyway.configure()
-            .dataSource(dsProvider.ds)
+            .dataSource(DSProvider.ds)
             .baselineOnMigrate(true)
             .baselineVersion("0")
             .sqlMigrationPrefix("0")
-            .locations(if (dsProvider.isSqlite) "db/migration" else "db/postgres")
-            .schemas(if (dsProvider.isSqlite) "main" else "public")
+            .locations("db/migration")
+            .schemas("main")
             .table("flyway_schema_history")
             .callbacks(object : Callback {
                 override fun supports(event: Event?, context: Context?): Boolean {
@@ -46,21 +45,17 @@ class DaoHolder(
             .migrate()
     }
 
-    private val jdbi: Jdbi = Jdbi.create(dsProvider.ds).apply {
+    private val jdbi: Jdbi = Jdbi.create(DSProvider.ds).apply {
         installPlugins()
         installPlugin(SqlObjectPlugin())
         installPlugin(KotlinPlugin())
         // setSqlLogger(Slf4JSqlLogger())
     }
 
-    val bgmDao: IBgmDao by lazy {
+    val bgmDao: BgmDao by lazy {
         latch.await()
-        val res = if (dsProvider.isSqlite) {
-            jdbi.onDemand(BgmDaoSqlite::class.java)
-        } else {
-            jdbi.onDemand(BgmDaoPg::class.java)
-        }
-        return@lazy res ?: throw IllegalStateException("Should get jdbi dao class but got null")
+        jdbi.onDemand(BgmDao::class.java)
+            ?: throw IllegalStateException("Should get jdbi dao class but got null")
     }
 
 }

@@ -4,16 +4,14 @@ import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.db.IBgmDao
-import moe.nyamori.bgm.git.GitRepoHolder
+import moe.nyamori.bgm.db.Dao
+import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
+import java.util.concurrent.TimeUnit
 
-class DbSetPersistIdHandler(
-    private val bgmDao: IBgmDao,
-    private val gitRepoHolder: GitRepoHolder
-) : Handler {
-    val LOGGER = LoggerFactory.getLogger(DbSetPersistIdHandler::class.java)
+object DbSetPersistIdHandler : Handler {
+    val LOGGER = LoggerFactory.getLogger(DbSetPersistIdHandler.javaClass)
     override fun handle(ctx: Context) {
         val keyParam = ctx.queryParam("key")
         val commitId = ctx.queryParam("id")
@@ -22,15 +20,15 @@ class DbSetPersistIdHandler(
             return
         }
         val idx = ctx.queryParam("idx")?.toIntOrNull() ?: 0
-        if (idx !in gitRepoHolder.allJsonRepoListSingleton.indices) {
+        if (idx !in GitHelper.allJsonRepoListSingleton.indices) {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }
-        val repo = gitRepoHolder.allJsonRepoListSingleton[idx]
+        val repo = GitHelper.allJsonRepoListSingleton[idx]
         Thread {
             try {
                 if (HttpHelper.tryLockDbMs(10_000)) {
-                    val result = bgmDao.updatePrevPersistedCommitId(repo, commitId)
+                    val result = Dao.bgmDao.updatePrevPersistedCommitId(repo, commitId)
                     LOGGER.info("Set persist id $commitId result: $result")
                 }
             } catch (ignore: Exception) {

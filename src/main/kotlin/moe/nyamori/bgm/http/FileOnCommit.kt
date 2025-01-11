@@ -14,11 +14,7 @@ import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.TimeUnit
 
-class FileOnCommit(
-    private val spaceType: SpaceType,
-    private val isHtml: Boolean = false,
-    private val fileHistoryLookup: FileHistoryLookup
-) : Handler {
+class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean = false) : Handler {
     private val log = LoggerFactory.getLogger(FileHistory::class.java)
     override fun handle(ctx: Context) {
         try {
@@ -37,9 +33,9 @@ class FileOnCommit(
                     else if (timestampPathParam.toLongOrNull() != null) timestampPathParam.toLong()
                     else -1L
                 val timestampList = if (isHtml) {
-                    fileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
+                    FileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
                 } else {
-                    fileHistoryLookup.getJsonTimestampList(spaceType, topicId)
+                    FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
                 }
                 val ts = TreeSet<Long>().apply {
                     addAll(timestampList)
@@ -69,7 +65,7 @@ class FileOnCommit(
 
                 ctx.header(CACHE_CONTROL, "max-age=86400")
                 if (isHtml) {
-                    var (cp, html) = fileHistoryLookup.getArchiveFileHashMsgContentAsStringAtTimestamp(
+                    var (cp, html) = FileHistoryLookup.getArchiveFileHashMsgContentAsStringAtTimestamp(
                         spaceType,
                         topicId,
                         timestamp
@@ -78,7 +74,7 @@ class FileOnCommit(
                     html = htmlModifier(html)
                     ctx.html(html)
                 } else {
-                    val (cp, jsonStr) = fileHistoryLookup.getJsonFileHashMsgContentAsStringTimestamp(
+                    val (cp, jsonStr) = FileHistoryLookup.getJsonFileHashMsgContentAsStringTimestamp(
                         spaceType,
                         topicId,
                         timestamp
@@ -96,8 +92,8 @@ class FileOnCommit(
     }
 
     private fun fillMetaHeader(ctx: Context, cp: FileHistoryLookup.ChatamPair) = with(ctx) {
-        header("x-bak-hrn", cp.html.repoDto.repo.simpleName())
-        header("x-bak-jrn", cp.json.repoDto.repo.simpleName())
+        header("x-bak-hrn", cp.html.repo.simpleName())
+        header("x-bak-jrn", cp.json.repo.simpleName())
         header("x-bak-hch", cp.html.hash)
         header("x-bak-jch", cp.json.hash)
         header("x-bak-hcm", cp.html.msg)

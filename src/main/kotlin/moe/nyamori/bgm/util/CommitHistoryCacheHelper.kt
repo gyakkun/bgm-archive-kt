@@ -1,7 +1,6 @@
 package moe.nyamori.bgm.util
 
-import moe.nyamori.bgm.config.RepoDto
-import moe.nyamori.bgm.db.IBgmDao
+import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFirstCommitIdStr
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
@@ -10,23 +9,24 @@ import moe.nyamori.bgm.git.GitHelper.getWalkBetweenCommitInReverseOrder
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.StringHashingHelper.hashedAbsolutePathWithoutGitId
+import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 
 object CommitHistoryCacheHelper {
     private val LOGGER = LoggerFactory.getLogger(CommitHistoryCacheHelper::class.java)
-    fun RepoDto.buildCache(bgmDao: IBgmDao) {
+    fun Repository.buildCache() {
         check(HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread)
-        val repoDto = this
+        val repo = this
         // require(this.hasCouplingJsonRepo() || this.hasCouplingArchiveRepo())
         var isFreshCacheBuild = false
         val prevCachedSha1 =
-            bgmDao.getPrevCachedCommitId(repoDto) ?: run { isFreshCacheBuild = true; repoDto.getFirstCommitIdStr() }
-        val latestSha1 = repoDto.getLatestCommitRef().sha1Str()
-        val firstCommitSha1 = repoDto.getFirstCommitIdStr()
-        val firstRevCommit = repoDto.getRevCommitById(firstCommitSha1)
-        val prevCachedRevCommit = repoDto.getRevCommitById(prevCachedSha1)
+            Dao.bgmDao.getPrevCachedCommitId(this) ?: run { isFreshCacheBuild = true; this.getFirstCommitIdStr() }
+        val latestSha1 = this.getLatestCommitRef().sha1Str()
+        val firstCommitSha1 = this.getFirstCommitIdStr()
+        val firstRevCommit = this.getRevCommitById(firstCommitSha1)
+        val prevCachedRevCommit = this.getRevCommitById(prevCachedSha1)
         val prevCachedMsg = prevCachedRevCommit.fullMessage.trim()
-        val latestRevCommit = repoDto.getRevCommitById(latestSha1)
+        val latestRevCommit = this.getRevCommitById(latestSha1)
         val latestMsg = latestRevCommit.fullMessage.trim()
         val walk = getWalkBetweenCommitInReverseOrder(
             topCommit = latestRevCommit, bottomCommit = prevCachedRevCommit,
@@ -49,67 +49,67 @@ object CommitHistoryCacheHelper {
                 runCatching {
                     counter++
                     if (cur == prev) {
-                        LOGGER.warn("Commit $cur has been iterated twice! Repo: ${repoDto.repo.simpleName()}")
+                        LOGGER.warn("Commit $cur has been iterated twice! Repo: ${this.simpleName()}")
                         return@breakable
                     }
                     val curCommitId = cur.sha1Str()
                     val curCommitFullMsg = cur.fullMessage
                     if (curCommitFullMsg.startsWith("META", ignoreCase = true) && cur == firstRevCommit) {
-                        bgmDao.updatePrevCachedCommitId(repoDto, curCommitId)
+                        Dao.bgmDao.updatePrevCachedCommitId(this, curCommitId)
                         prev = cur
                         return@outer
                     }
-                    val changedFilePaths = repoDto.repo.findChangedFilePaths(prev, cur)
+                    val changedFilePaths = this.findChangedFilePaths(prev, cur)
                         .filter { it.endsWith("html", ignoreCase = true) || it.endsWith("json", ignoreCase = true) }
-                    LOGGER.debug("[CACHE] ${repoDto.repo.simpleName()} - cur commit: $curCommitId , msg - $curCommitFullMsg")
+                    LOGGER.debug("[CACHE] $this - cur commit: $curCommitId , msg - $curCommitFullMsg")
 
                     // 1. Update changed files
-                    val resIntArray = bgmDao.batchUpsertFileRelativePathForCache(changedFilePaths)
+                    val resIntArray = Dao.bgmDao.batchUpsertFileRelativePathForCache(changedFilePaths)
                     // LOGGER.info("File ids insert res int array: {}", resIntArray)
 
                     // 2. Insert this commit to repo commit table
                     val resInt =
-                        bgmDao.insertRepoCommitForCache(repoDto.hashedAbsolutePathWithoutGitId().toLong(), curCommitId)
+                        Dao.bgmDao.insertRepoCommitForCache(this.hashedAbsolutePathWithoutGitId().toLong(), curCommitId)
                     // LOGGER.info("commit insert res int: $resInt")
 
                     // 3. Insert to file-commit
-                    val cacheFileCommitInsertRes = bgmDao.batchUpsertFileCommitForCache(
+                    val cacheFileCommitInsertRes = Dao.bgmDao.batchUpsertFileCommitForCache(
                         changedFilePaths,
-                        repoDto.hashedAbsolutePathWithoutGitId().toLong(),
+                        this.hashedAbsolutePathWithoutGitId().toLong(),
                         curCommitId
                     )
                     // LOGGER.info("Insert result: $cacheFileCommitInsertRes")
 
                     // 4. Update meta data
-                    val updateMetaRes = bgmDao.updatePrevCachedCommitId(repoDto, curCommitId)
+                    val updateMetaRes = Dao.bgmDao.updatePrevCachedCommitId(this, curCommitId)
                     // LOGGER.info("Update meta res: $cacheFileCommitInsertRes")
 
                     // 5. validate
                     // changedFilePaths.forEach {
-                    //     val validate = bgmDao.queryRepoCommitForCacheByFileRelativePath(it)
+                    //     val validate = Dao.bgmDao.queryRepoCommitForCacheByFileRelativePath(it)
                     //     if (validate.isEmpty()) throw IllegalStateException("$it Not found in cache!")
                     //     if (validate.none { it.commitId == curCommitId }) throw IllegalStateException("$it Not found in cache!")
                     // }
 
                     // End of this iteration
                     // return@breakable
-                    LOGGER.debug("[CACHE] ${repoDto.repo.simpleName()} build cache for commit successfully - [$curCommitId - $curCommitFullMsg]")
+                    LOGGER.debug("[CACHE] $this build cache for commit successfully - [$curCommitId - $curCommitFullMsg]")
                     prev = cur
                 }.onFailure {
                     failedCount++
-                    LOGGER.error("Failed to build cache for ${repoDto.repo.simpleName()} - commit - ${cur.sha1Str()}")
+                    LOGGER.error("Failed to build cache for $this - commit - ${cur.sha1Str()}")
                 }
             }
             @Suppress("KotlinConstantConditions")
             if (counter > 0 && failedCount == 0) {
-                val sentence = """Successfully build cache for $repoDto from 
+                val sentence = """Successfully build cache for $repo from 
                     [old] [$prevCachedMsg] [$prevCachedSha1]
                     to
                     [latest] [$latestMsg] [$latestSha1]
                     Total: $counter""".trimIndent()
                 LOGGER.info(sentence)
             } else if (counter > 0 && failedCount != 0) {
-                val sentence = """Failed to build cache for $repoDto from 
+                val sentence = """Failed to build cache for $repo from 
                     [old] [$prevCachedMsg] [$prevCachedSha1]
                     to
                     [latest] [$latestMsg] [$latestSha1]

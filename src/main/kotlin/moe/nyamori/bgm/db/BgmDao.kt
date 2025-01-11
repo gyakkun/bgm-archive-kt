@@ -1,12 +1,12 @@
 package moe.nyamori.bgm.db
 
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.config.RepoDto
 import moe.nyamori.bgm.model.Like
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.model.User
 import moe.nyamori.bgm.util.StringHashingHelper.hashedAbsolutePathWithoutGitId
+import org.eclipse.jgit.lib.Repository
 import org.jdbi.v3.sqlobject.customizer.Bind
 import org.jdbi.v3.sqlobject.customizer.BindBean
 import org.jdbi.v3.sqlobject.customizer.BindList
@@ -20,17 +20,17 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 @JvmDefaultWithCompatibility
-interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
+interface BgmDao : Transactional<BgmDao> {
 
     val LOGGER: Logger
-        get() = LoggerFactory.getLogger(BgmDaoSqlite::class.java)
+        get() = LoggerFactory.getLogger(BgmDao::class.java)
 
     @SqlQuery(
         """
         select 1
     """
     )
-    override fun healthCheck(): Int
+    fun healthCheck(): Int
 
 
     @SqlUpdate(
@@ -39,14 +39,14 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @Transaction
-    override fun upsertMetaData(@Bind("k") k: String, @Bind("v") v: String): Int
+    fun upsertMetaData(@Bind("k") k: String, @Bind("v") v: String): Int
 
     @SqlQuery(
         """
         select v from meta_data where k = :k
         """
     )
-    override fun getMetaData(@Bind("k") k: String): String?
+    fun getMetaData(@Bind("k") k: String): String?
 
     @SqlQuery(
         """
@@ -54,10 +54,12 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(MetaRow::class)
-    override fun getAllMetaData(): List<MetaRow>
+    fun getAllMetaData(): List<MetaRow>
 
-    override fun updatePrevPersistedCommitId(
-        repo: RepoDto,
+    data class MetaRow(val k: String, val v: String)
+
+    fun updatePrevPersistedCommitId(
+        repo: Repository,
         prevPersistRevId: String
     ): Int {
         return upsertMetaData(
@@ -67,22 +69,22 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     }
 
 
-    override fun getPrevPersistedCommitId(repo: RepoDto): String {
+    fun getPrevPersistedCommitId(repo: Repository): String {
         return getMetaData(
             Config.BGM_ARCHIVE_DB_META_KEY_PREV_PERSISTED_JSON_COMMIT_REV_ID
                     + repo.hashedAbsolutePathWithoutGitId()
         ) ?: ""
     }
 
-    override fun getPrevCachedCommitId(repo: RepoDto): String? {
+    fun getPrevCachedCommitId(repo: Repository): String? {
         return getMetaData(
             Config.BGM_ARCHIVE_DB_META_KEY_PREV_CACHED_COMMIT_REV_ID
                     + repo.hashedAbsolutePathWithoutGitId()
         )
     }
 
-    override fun updatePrevCachedCommitId(
-        repo: RepoDto,
+    fun updatePrevCachedCommitId(
+        repo: Repository,
         prevCachedCommitId: String
     ): Int {
         return upsertMetaData(
@@ -99,7 +101,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     )
     @Transaction
     // WARN: No generated key back from sqlite jdbc driver
-    override fun batchUpsertFileRelativePathForCache(@Bind("t") fileRelativePaths: List<String>): IntArray
+    fun batchUpsertFileRelativePathForCache(@Bind("t") fileRelativePaths: List<String>): IntArray
 //    {
 //        return Dao.bgmDao.withHandle<List<Long>, Exception> {
 //            val batch = it.prepareBatch(
@@ -121,7 +123,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun insertRepoCommitForCache(@Bind("repoId") repoId: Long, @Bind("commitId") commitId: String): Int
+    fun insertRepoCommitForCache(@Bind("repoId") repoId: Long, @Bind("commitId") commitId: String): Int
 
     @SqlBatch(
         """
@@ -132,7 +134,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun batchUpsertFileCommitForCache(
+    fun batchUpsertFileCommitForCache(
         @Bind("frp") frp: Iterable<String>,
         @Bind("rid") rid: Long,
         @Bind("cid") cid: String
@@ -147,7 +149,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
             where bcfrp.file_relative_path = :frp
     """
     )
-    override fun queryRepoCommitForCacheByFileRelativePath(@Bind("frp") frp: String): List<RepoIdCommitId>
+    fun queryRepoCommitForCacheByFileRelativePath(@Bind("frp") frp: String): List<RepoIdCommitId>
 
 
     @SqlBatch(
@@ -160,7 +162,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @Transaction
-    override fun batchUpsertUser(@BindBean userList: Iterable<User>): IntArray
+    fun batchUpsertUser(@BindBean userList: Iterable<User>): IntArray
 
     @SqlBatch(
         """
@@ -185,7 +187,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun batchUpsertTopic(@Bind("typeId") typeId: Int, @BindBean("t") topicList: Iterable<Topic>): IntArray
+    fun batchUpsertTopic(@Bind("typeId") typeId: Int, @BindBean("t") topicList: Iterable<Topic>): IntArray
 
     @SqlBatch(
         """
@@ -202,7 +204,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun batchUpsertPost(
+    fun batchUpsertPost(
         @Bind("typeId") typeId: Int,
         @Bind("sid") sid: Int?,
         @BindBean("p") postList: Iterable<Post>
@@ -223,7 +225,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun batchUpsertPostRow(
+    fun batchUpsertPostRow(
         @BindBean("p") postList: Iterable<PostRow>
     ): IntArray
 
@@ -239,7 +241,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @Transaction
-    override fun batchUpsertLikes(@BindBean likeList: Iterable<Like>): IntArray
+    fun batchUpsertLikes(@BindBean likeList: Iterable<Like>): IntArray
 
 
     @SqlQuery(
@@ -253,14 +255,14 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(User::class)
-    override fun getNegativeUidUsers(): List<User>
+    fun getNegativeUidUsers(): List<User>
 
     @SqlQuery(
         """
         select distinct username from ba_user where username in (<l>) and username is not null
     """
     )
-    override fun getValidUsernameListFromList(@BindList("l") l: List<String>): List<String>
+    fun getValidUsernameListFromList(@BindList("l") l: List<String>): List<String>
 
     @SqlBatch(
         """
@@ -271,7 +273,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun updateNegativeUidInTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
+    fun updateNegativeUidInTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
 
     @SqlBatch(
@@ -283,7 +285,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun updateNegativeUidInPost(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
+    fun updateNegativeUidInPost(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
     @SqlBatch(
         """
@@ -295,7 +297,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun updateNegativeSidInBlogTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
+    fun updateNegativeSidInBlogTopic(@BindBean("p") userList: Iterable<Pair<Int, Int>>): IntArray
 
     @SqlBatch(
         """
@@ -303,10 +305,10 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @Transaction
-    override fun removeNegativeUidUser(@BindBean("p") userList: Iterable<Pair<Int, Int>>)
+    fun removeNegativeUidUser(@BindBean("p") userList: Iterable<Pair<Int, Int>>)
 
     @Transaction
-    override fun handleNegativeUid(): List<Pair<Int/*TYPE*/, Int /*Mid*/>> {
+    fun handleNegativeUid(): List<Pair<Int/*TYPE*/, Int /*Mid*/>> {
         val negativeUidUsers = getNegativeUidUsers()
         LOGGER.info("Negative uid list: ${negativeUidUsers.map { Pair(it.username, it.id) }}")
         val userList = negativeUidUsers.groupBy { it.username }.map {
@@ -366,7 +368,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @Transaction
-    override fun upsertPositiveSidForBlog():Int
+    fun upsertPositiveSidForBlog():Int
 
     @SqlUpdate(
         """
@@ -383,7 +385,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun deleteNegativeSidForBlog():Int
+    fun deleteNegativeSidForBlog():Int
 
     @SqlBatch(
         """
@@ -397,7 +399,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @Transaction
-    override fun updateNegativeUidInLikesRev(@BindBean("t") l: List<Triple<Int, Int, DeReplicaLikeRev>>)
+    fun updateNegativeUidInLikesRev(@BindBean("t") l: List<Triple<Int, Int, DeReplicaLikeRev>>)
 
     @SqlQuery(
         """
@@ -405,7 +407,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(LikeRevRow::class)
-    override fun selectLikeRevByUidPair(@BindBean("t") t: Pair<Int, Int>): List<LikeRevRow>
+    fun selectLikeRevByUidPair(@BindBean("t") t: Pair<Int, Int>): List<LikeRevRow>
 
     @SqlUpdate(
         """
@@ -418,9 +420,16 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun doRemoveConflictInLikesRev(@BindBean("t") t: DeReplicaLikeRev): Int
+    fun doRemoveConflictInLikesRev(@BindBean("t") t: DeReplicaLikeRev): Int
 
-    override fun preRemoveConflictSidInLikesRev(uidPairList: List<Pair<Int/*pos*/, Int/*neg*/>>): List<Triple<Int, Int, DeReplicaLikeRev>> {
+    data class DeReplicaLikeRev(
+        val type: Int,
+        val mid: Int,
+        val pid: Int,
+        val value: Int
+    )
+
+    fun preRemoveConflictSidInLikesRev(uidPairList: List<Pair<Int/*pos*/, Int/*neg*/>>): List<Triple<Int, Int, DeReplicaLikeRev>> {
         return uidPairList.mapNotNull { i ->
             val deReplicaLikeRev = selectLikeRevByUidPair(i)
                 .groupBy {
@@ -460,7 +469,9 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(DeRepetitiveTopicData::class)
-    override fun selectTopicTypeAndIdByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveTopicData>
+    fun selectTopicTypeAndIdByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveTopicData>
+
+    data class DeRepetitiveTopicData(val type: Int, val id: Int)
 
     @SqlUpdate(
         """
@@ -468,9 +479,9 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun doRemoveConflictTopic(@BindBean("t") t: DeRepetitiveTopicData): Int
+    fun doRemoveConflictTopic(@BindBean("t") t: DeRepetitiveTopicData): Int
 
-    override fun preRemoveConflictTopic(userList: List<Pair<Int, Int>>) {
+    fun preRemoveConflictTopic(userList: List<Pair<Int, Int>>) {
         for (i in userList) {
             val deRepetitiveTopicData = selectTopicTypeAndIdByUidListAndGroupByPk(i)
             if (deRepetitiveTopicData.isEmpty()) continue
@@ -489,7 +500,9 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(DeRepetitivePostData::class)
-    override fun selectPostTypeAndIdAndMidByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitivePostData>
+    fun selectPostTypeAndIdAndMidByUidListAndGroupByPk(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitivePostData>
+
+    data class DeRepetitivePostData(val type: Int, val id: Int, val mid: Int)
 
     @SqlUpdate(
         """
@@ -497,9 +510,9 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun doRemoveConflictPost(@BindBean("t") t: DeRepetitivePostData): Int
+    fun doRemoveConflictPost(@BindBean("t") t: DeRepetitivePostData): Int
 
-    override fun preRemoveConflictPost(userList: List<Pair<Int, Int>>) {
+    fun preRemoveConflictPost(userList: List<Pair<Int, Int>>) {
         for (i in userList) {
             val deRepetitivePostData = selectPostTypeAndIdAndMidByUidListAndGroupByPk(i)
             if (deRepetitivePostData.isEmpty()) continue
@@ -518,7 +531,9 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(DeRepetitiveBlogTopicData::class)
-    override fun selectBlogTopicTypeAndIdByUidListAndGroupByTypeIdAndSid(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveBlogTopicData>
+    fun selectBlogTopicTypeAndIdByUidListAndGroupByTypeIdAndSid(@BindBean("t") t: Pair<Int, Int>): List<DeRepetitiveBlogTopicData>
+
+    data class DeRepetitiveBlogTopicData(val type: Int, val id: Int)
 
     @SqlUpdate(
         """
@@ -526,8 +541,8 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun doRemoveConflictBlogTopic(@BindBean("t") t: DeRepetitiveBlogTopicData): Int
-    override fun preRemoveConflictSidInBlog(userList: List<Pair<Int, Int>>) {
+    fun doRemoveConflictBlogTopic(@BindBean("t") t: DeRepetitiveBlogTopicData): Int
+    fun preRemoveConflictSidInBlog(userList: List<Pair<Int, Int>>) {
         for (i in userList) {
             val deRepetitiveBlogTopicData = selectBlogTopicTypeAndIdByUidListAndGroupByTypeIdAndSid(i)
             if (deRepetitiveBlogTopicData.isEmpty()) continue
@@ -550,7 +565,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @Transaction
-    override fun upsertSidAlias(@BindBean("t") sidAliasMappingList: Iterable<SpaceNameMappingData>): IntArray
+    fun upsertSidAlias(@BindBean("t") sidAliasMappingList: Iterable<SpaceNameMappingData>): IntArray
 
     @SqlBatch(
         """
@@ -561,7 +576,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @Transaction
-    override fun upsertBlogSubjectIdMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, Int>>)
+    fun upsertBlogSubjectIdMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, Int>>)
 
     @SqlBatch(
         """
@@ -572,7 +587,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @Transaction
-    override fun upsertBlogTagMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, String>>)
+    fun upsertBlogTagMapping(@BindBean("t") blogSubjectIdMappingList: Iterable<Pair<Int, String>>)
 
     @SqlQuery(
         """
@@ -580,7 +595,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(PostRow::class)
-    override fun getPostListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<PostRow>
+    fun getPostListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<PostRow>
 
     @SqlQuery(
         """
@@ -588,7 +603,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(PostRow::class)
-    override fun getLikeListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRow>
+    fun getLikeListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRow>
 
     @SqlQuery(
         """
@@ -596,7 +611,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(PostRow::class)
-    override fun getTopicListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<TopicRow>
+    fun getTopicListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<TopicRow>
 
 
     // View queries
@@ -606,7 +621,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VAllPostCountRow::class)
-    override fun getAllPostCountByTypeAndUsernameList(
+    fun getAllPostCountByTypeAndUsernameList(
         @Bind("t") t: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllPostCountRow>
@@ -617,7 +632,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VAllTopicCountRow::class)
-    override fun getAllTopicCountByTypeAndUsernameList(
+    fun getAllTopicCountByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllTopicCountRow>
@@ -629,7 +644,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VAllPostCount30dRow::class)
-    override fun getAllPostCount30dByTypeAndUsernameList(
+    fun getAllPostCount30dByTypeAndUsernameList(
         @Bind("t") t: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllPostCount30dRow>
@@ -640,7 +655,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VAllTopicCount30dRow::class)
-    override fun getAllTopicCount30dByTypeAndUsernameList(
+    fun getAllTopicCount30dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllTopicCount30dRow>
@@ -651,7 +666,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VAllPostCount7dRow::class)
-    override fun getAllPostCount7dByTypeAndUsernameList(
+    fun getAllPostCount7dByTypeAndUsernameList(
         @Bind("t") t: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllPostCount7dRow>
@@ -662,7 +677,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VAllTopicCount7dRow::class)
-    override fun getAllTopicCount7dByTypeAndUsernameList(
+    fun getAllTopicCount7dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VAllTopicCount7dRow>
@@ -687,7 +702,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
-    override fun getLikesSumByTypeAndUsernameList(
+    fun getLikesSumByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikesSumRow>
@@ -698,7 +713,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
-    override fun getPostCountSpaceByTypeAndUsernameList(
+    fun getPostCountSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VPostCountSpaceRow>
@@ -709,7 +724,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
-    override fun getPostCountSpace30dByTypeAndUsernameList(
+    fun getPostCountSpace30dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VPostCountSpaceRow>
@@ -720,7 +735,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
-    override fun getPostCountSpace7dByTypeAndUsernameList(
+    fun getPostCountSpace7dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VPostCountSpaceRow>
@@ -732,7 +747,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    override fun getTopicCountSpaceByTypeAndUsernameList(
+    fun getTopicCountSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VTopicCountSpaceRow>
@@ -744,7 +759,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    override fun getTopicCountSpace30dByTypeAndUsernameList(
+    fun getTopicCountSpace30dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VTopicCountSpaceRow>
@@ -756,7 +771,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    override fun getTopicCountSpace7dByTypeAndUsernameList(
+    fun getTopicCountSpace7dByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VTopicCountSpaceRow>
@@ -785,7 +800,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
-    override fun getUserLastReplyTopicByTypeAndUsernameList(
+    fun getUserLastReplyTopicByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VUserLastReplyTopicRow>
@@ -811,7 +826,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VUserLatestCreateTopicRow::class)
-    override fun getUserLatestCreateTopicAndUsernameList(
+    fun getUserLatestCreateTopicAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VUserLatestCreateTopicRow>
@@ -824,7 +839,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(UserRow::class)
-    override fun getUserRowByUsernameList(
+    fun getUserRowByUsernameList(
         @BindList("l") l: Iterable<String>
     ): List<UserRow>
 
@@ -834,7 +849,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(PostRow::class)
-    override fun getLikeRevListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRevRow>
+    fun getLikeRevListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<LikeRevRow>
 
     @SqlBatch(
         """
@@ -849,7 +864,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @Transaction
-    override fun batchUpsertLikesRev(@BindBean likeList: Iterable<LikeRevRow>): IntArray
+    fun batchUpsertLikesRev(@BindBean likeList: Iterable<LikeRevRow>): IntArray
 
 
     @SqlQuery(
@@ -871,7 +886,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
-    override fun getLikeRevSumByTypeAndUsernameList(
+    fun getLikeRevSumByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikesSumRow>
@@ -897,7 +912,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(VLikeRevCountSpaceRow::class)
-    override fun getLikeRevStatForSpaceByTypeAndUsernameList(
+    fun getLikeRevStatForSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikeRevCountSpaceRow>
@@ -923,7 +938,7 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VLikeCountSpaceRow::class)
-    override fun getLikeStatForSpaceByTypeAndUsernameList(
+    fun getLikeStatForSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikeCountSpaceRow>
@@ -959,20 +974,20 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     """
     )
     @RegisterKotlinMapper(VUserLatestLikeRevRow::class)
-    override fun getUserLatestLikeRevByTypeAndUsernameList(
+    fun getUserLatestLikeRevByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VUserLatestLikeRevRow>
 
 
     @SqlQuery("select id from ba_topic where type = ?")
-    override fun getAllTopicIdByType(type: Int): ArrayList<Int>
+    fun getAllTopicIdByType(type: Int): ArrayList<Int>
 
     @SqlQuery("select max(id) from ba_topic where type = ?")
-    override fun getMaxTopicIdByType(type: Int): Int
+    fun getMaxTopicIdByType(type: Int): Int
 
     @SqlUpdate("delete from meta_data")
     @Transaction
-    override fun _TRUNCATE_ALL_META():Int
+    fun _TRUNCATE_ALL_META():Int
 }
 

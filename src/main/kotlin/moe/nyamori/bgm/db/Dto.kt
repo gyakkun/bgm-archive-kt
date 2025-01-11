@@ -126,19 +126,3 @@ data class RepoIdCommitId(
     val repoId: Long,
     val commitId: String
 )
-
-// Migrate from BgmDao.kt
-data class MetaRow(val k: String, val v: String)
-
-data class DeReplicaLikeRev(
-    val type: Int,
-    val mid: Int,
-    val pid: Int,
-    val value: Int
-)
-
-data class DeRepetitiveTopicData(val type: Int, val id: Int)
-
-data class DeRepetitivePostData(val type: Int, val id: Int, val mid: Int)
-
-data class DeRepetitiveBlogTopicData(val type: Int, val id: Int)

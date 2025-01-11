@@ -1,27 +1,19 @@
 package moe.nyamori.bgm.util
 
+import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
-import moe.nyamori.bgm.git.GitRepoHolder
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 
 object TopicListHelper {
-    fun getTopicList(
-        spaceType: SpaceType,
-        prevProcessedCommitRevIdFileName: String,
-        preferJgit: Boolean,
-        gitRepoHolder: GitRepoHolder
-    ): List<Int> {
+    fun getTopicList(spaceType: SpaceType): List<Int> {
         var result = listOf(-1)
-        gitRepoHolder.allArchiveRepoListSingleton.forEach { repo ->
+        GitHelper.allArchiveRepoListSingleton.forEach { repo ->
             runCatching {
                 val topiclistFile = repo.getFileContentAsStringInACommit(
-                    repo.getPrevProcessedArchiveCommitRef(
-                        prevProcessedCommitRevIdFileName, preferJgit
-                    ).sha1Str(),
-                    spaceType.name.lowercase() + "/topiclist.txt",
-                    preferJgit
+                    repo.getPrevProcessedArchiveCommitRef().sha1Str(),
+                    spaceType.name.lowercase() + "/topiclist.txt"
                 )
                 val tmpResult = topiclistFile.lines().mapNotNull { it.toIntOrNull() }.sorted()
                 if (tmpResult.max() > result.max()) {

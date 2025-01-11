@@ -5,7 +5,9 @@ import com.github.benmanes.caffeine.cache.LoadingCache
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
-import moe.nyamori.bgm.git.GitRepoHolder
+import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
+import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.HttpHelper.checkAndExtractSpaceTypeInContext
 import moe.nyamori.bgm.util.TopicListHelper.getTopicList
@@ -14,11 +16,7 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
-class LatestTopicListWrapper(
-    private val prevProcessedCommitRevIdFileName: String,
-    private val preferJgit: Boolean,
-    private val gitRepoHolder: GitRepoHolder
-) : Handler {
+object LatestTopicListWrapper : Handler {
     private val log = LoggerFactory.getLogger(LatestTopicListWrapper::class.java)
     private val lock = ReentrantLock()
     private val topicListCache: LoadingCache<SpaceType, List<Int>> =
@@ -26,13 +24,7 @@ class LatestTopicListWrapper(
             .maximumSize(5)
             .expireAfterWrite(Duration.ofMinutes(30))
             .build { spaceType ->
-                getTopicList(
-                    spaceType,
-
-                    prevProcessedCommitRevIdFileName,
-                    preferJgit,
-                    gitRepoHolder
-                )
+                getTopicList(spaceType)
             }
 
     override fun handle(ctx: Context) {

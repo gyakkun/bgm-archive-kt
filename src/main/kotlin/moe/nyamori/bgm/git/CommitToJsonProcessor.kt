@@ -1,18 +1,23 @@
 package moe.nyamori.bgm.git
 
 import io.javalin.http.sse.NEW_LINE
-import moe.nyamori.bgm.config.*
+import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME
+import moe.nyamori.bgm.config.Config.BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
+import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
 import moe.nyamori.bgm.git.GitHelper.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder
+import moe.nyamori.bgm.git.GitHelper.hasCouplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.TopicParserEntrance
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
 import org.slf4j.LoggerFactory
 import java.io.*
@@ -21,47 +26,30 @@ import java.nio.file.Path
 import java.util.*
 
 
-class CommitToJsonProcessor(
-    private val prevProcessedCommitRevIdFileName: String,
-    private val spotCheckerTimeoutThresholdMs: Long,
-    private val gitRepoHolder: GitRepoHolder,
-    private val preferJgit: Boolean,
-    private val spotChecker: SpotChecker
-) {
-    private val log = LoggerFactory.getLogger(CommitToJsonProcessor::class.java)
+object CommitToJsonProcessor {
+    private val log = LoggerFactory.getLogger(CommitToJsonProcessor.javaClass)
+    private const val NO_GOOD_FILE_NAME = "ng.txt"
 
 
-    companion object {
-        private const val NO_GOOD_FILE_NAME = "ng.txt"
-
-        @JvmStatic
-        fun main(arg: Array<String>) {
-            val cfg = ConfigReadout().toDto()
-            val ctjp = CommitToJsonProcessor(
-                cfg.prevProcessedCommitRevIdFileName,
-                cfg.spotCheckerTimeoutThresholdMs,
-                GitRepoHolder(emptyList()),
-                cfg.preferJgit,
-                SpotChecker(GitRepoHolder(emptyList()), cfg.prevProcessedCommitRevIdFileName, cfg.preferJgit),
-            )
-            ctjp.job()
-        }
+    @JvmStatic
+    fun main(arg: Array<String>) {
+        job()
     }
 
     fun job(
         isAll: Boolean = false,
         idx: Int = 0
     ) {
-        val reposToProcess = mutableListOf<RepoDto>()
+        val reposToProcess = mutableListOf<Repository>()
         if (isAll) {
-            gitRepoHolder.allArchiveRepoListSingleton
+            GitHelper.allArchiveRepoListSingleton
                 .filter { it.hasCouplingJsonRepo() }
                 .map { reposToProcess.add(it) }
         } else {
-            if (idx in gitRepoHolder.allArchiveRepoListSingleton.indices
-                && gitRepoHolder.allArchiveRepoListSingleton[idx].hasCouplingJsonRepo()
+            if (idx in GitHelper.allArchiveRepoListSingleton.indices
+                && GitHelper.allArchiveRepoListSingleton[idx].hasCouplingJsonRepo()
             ) {
-                reposToProcess.add(gitRepoHolder.allArchiveRepoListSingleton[idx])
+                reposToProcess.add(GitHelper.allArchiveRepoListSingleton[idx])
             }
         }
 
@@ -71,13 +59,10 @@ class CommitToJsonProcessor(
         reposToProcess.forEach { archiveRepo ->
             repoCounter++
             val walk =
-                archiveRepo.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(
-                    prevProcessedCommitRevIdFileName, preferJgit
-                )
-            val jsonRepo = archiveRepo.getCouplingJsonRepo()!!
+                archiveRepo.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder()
+            val jsonRepo = archiveRepo.couplingJsonRepo()!!
             var prev = walk.next() // used in the iteration (now = next() ... prev = now)
-            val prevProcessedArchiveCommitRef =
-                archiveRepo.getPrevProcessedArchiveCommitRef(prevProcessedCommitRevIdFileName, preferJgit)
+            val prevProcessedArchiveCommitRef = archiveRepo.getPrevProcessedArchiveCommitRef()
 
             // FIXME: Workaround the inclusive walk boundary
             while (prev != null) {
@@ -87,19 +72,19 @@ class CommitToJsonProcessor(
                 prev = walk.next()
             }
 
-            log.info("The previously processed commit for repo - ${archiveRepo.repo.simpleName()}: $prev")
+            log.info("The previously processed commit for repo - ${archiveRepo.simpleName()}: $prev")
             run breakable@{
                 walk.forEachIndexed { commitIdx, curCommit ->
                     var timing = System.currentTimeMillis()
                     try {
                         val noGoodIdTreeSet = TreeSet<Int>()
                         if (curCommit == prev) {
-                            log.error("The first commit being iterated twice! Repo - ${archiveRepo.repo.simpleName()}")
+                            log.error("The first commit being iterated twice! Repo - ${archiveRepo.simpleName()}")
                             return@breakable
                         }
 
                         if (curCommit.fullMessage.startsWith("META") || curCommit.fullMessage.startsWith("init")) {
-                            log.warn("Iterating meta or init commit for repo ${archiveRepo.repo.simpleName()}: $curCommit")
+                            log.warn("Iterating meta or init commit for repo ${archiveRepo.simpleName()}: $curCommit")
                             return@forEachIndexed // continue
                         }
 
@@ -118,19 +103,15 @@ class CommitToJsonProcessor(
                             throw IllegalStateException("Not a valid commit message! - ${curCommit.shortMessage}")
                         }
                         if (firstCommitSpaceType == null) firstCommitSpaceType = commitSpaceType
-                        val changedHtmlFilePathList = archiveRepo.repo.findChangedFilePaths(prev, curCommit)
+                        val changedHtmlFilePathList = archiveRepo.findChangedFilePaths(prev, curCommit)
 
                         for (pathIdx in changedHtmlFilePathList.indices) {
                             val path = changedHtmlFilePathList[pathIdx]
                             try {
                                 if (path.endsWith(NO_GOOD_FILE_NAME)) {
                                     handleNoGoodFile(
-                                        Path.of(archiveRepo.repo.absolutePathWithoutDotGit()).resolve(path),
-                                        archiveRepo.getFileContentAsStringInACommit(
-                                            curCommit.sha1Str(),
-                                            path,
-                                            preferJgit
-                                        ),
+                                        Path.of(archiveRepo.absolutePathWithoutDotGit()).resolve(path),
+                                        archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path),
                                         noGoodIdTreeSet
                                     )
                                     continue
@@ -139,7 +120,7 @@ class CommitToJsonProcessor(
                                 log.warn(
                                     "Cur commit id: ${
                                         curCommit.name().substring(0, 8)
-                                    }, path: ${archiveRepo.repo.simpleName()}/$path , message:  ${curCommit.shortMessage}"
+                                    }, path: ${archiveRepo.simpleName()}/$path , message:  ${curCommit.shortMessage}"
                                 )
                                 val pathSplitArr = path.split("/")
                                 val htmlSpaceType = if (pathSplitArr.isNotEmpty()) {
@@ -159,11 +140,11 @@ class CommitToJsonProcessor(
 
                                 if (htmlSpaceType != commitSpaceType) {
                                     log.error("Html space type not consistent with commit space type! htmlSpaceType=$htmlSpaceType, commitSpaceType=$commitSpaceType")
-                                    log.error("At commit -  ${curCommit.name}, repo - ${archiveRepo.repo.simpleName()}, path = $path")
+                                    log.error("At commit -  ${curCommit.name}, repo - ${archiveRepo.simpleName()}, path = $path")
                                 }
 
                                 val fileContentInStr =
-                                    archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path, preferJgit)
+                                    archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path)
                                 val topicId = path.split("/").last().replace(".html", "").toInt()
 
                                 var timing = System.currentTimeMillis()
@@ -175,23 +156,23 @@ class CommitToJsonProcessor(
                                 )
                                 timing = System.currentTimeMillis() - timing
                                 if (timing > 1000L) {
-                                    log.error("$timing ms is costed to process ${archiveRepo.repo.simpleName()}/$path in commit $curCommit!")
+                                    log.error("$timing ms is costed to process ${archiveRepo.simpleName()}/$path in commit $curCommit!")
                                 }
 
                                 if (isSuccess) {
                                     noGoodIdTreeSet.remove(topicId)
-                                    log.info("Parsing $htmlSpaceType-$topicId succeeded, repo - ${archiveRepo.repo.simpleName()}")
+                                    log.info("Parsing $htmlSpaceType-$topicId succeeded, repo - ${archiveRepo.simpleName()}")
                                     if (resultTopicEntity?.display == true) {
                                         log.info("topic id $htmlSpaceType-$topicId, title: ${resultTopicEntity.title}")
                                     }
                                     val json = GitHelper.GSON.toJson(resultTopicEntity)
                                     writeJsonFile(jsonRepo, path, json)
                                 } else {
-                                    log.error("Parsing $htmlSpaceType-$topicId failed, repo - ${archiveRepo.repo.simpleName()}")
+                                    log.error("Parsing $htmlSpaceType-$topicId failed, repo - ${archiveRepo.simpleName()}")
                                 }
                             } catch (ex: Exception) {
                                 log.error(
-                                    "Exception occurs when handling ${archiveRepo.repo.simpleName()}/$path, commit - ${
+                                    "Exception occurs when handling ${archiveRepo.simpleName()}/$path, commit - ${
                                         curCommit.name.substring(
                                             0,
                                             8
@@ -206,7 +187,7 @@ class CommitToJsonProcessor(
                         writeNoGoodFile(archiveRepo, noGoodIdTreeSet, commitSpaceType)
                         if (noGoodIdTreeSet.isNotEmpty()) {
                             log.error(
-                                "NG LIST during repo - ${archiveRepo.repo.simpleName()}, commit - ${
+                                "NG LIST during repo - ${archiveRepo.simpleName()}, commit - ${
                                     curCommit.name.substring(
                                         0,
                                         8
@@ -215,12 +196,12 @@ class CommitToJsonProcessor(
                             )
                         }
                         if (commitIdx % 100 == 0) {
-                            Git(jsonRepo.repo).gc()
+                            Git(jsonRepo).gc()
                         }
                         timing = System.currentTimeMillis() - timing
-                        if (timing >= spotCheckerTimeoutThresholdMs) {
+                        if (timing >= BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS) {
                             log.error(
-                                "Process commit taking longer than expected (threshold:${spotCheckerTimeoutThresholdMs}ms). Skipping generating spot check file. Cur commit: ${
+                                "Process commit taking longer than expected (threshold:${BGM_ARCHIVE_SPOT_CHECKER_TIMEOUT_THRESHOLD_MS}ms). Skipping generating spot check file. Cur commit: ${
                                     curCommit.sha1Str()
                                 }"
                             )
@@ -240,7 +221,7 @@ class CommitToJsonProcessor(
                         }
                     } catch (ex: Exception) {
                         log.error(
-                            "Ex occurs when processing repo - ${archiveRepo.repo.simpleName()},  commit - ${
+                            "Ex occurs when processing repo - ${archiveRepo.simpleName()},  commit - ${
                                 curCommit.name.substring(
                                     0,
                                     8
@@ -251,7 +232,7 @@ class CommitToJsonProcessor(
                 }
                 runCatching {
                     if (shouldSpotCheck && firstCommitSpaceType != null) {
-                        spotChecker.genSpotCheckListFile(archiveRepo, firstCommitSpaceType!!)
+                        SpotChecker.genSpotCheckListFile(archiveRepo, firstCommitSpaceType!!)
                     }
                 }.onFailure {
                     if (shouldSpotCheck && firstCommitSpaceType != null) {
@@ -270,10 +251,10 @@ class CommitToJsonProcessor(
         noGoodIdTreeSet.addAll(toAdd)
     }.onFailure { log.error("Failed to handle no good file: ", it) }
 
-    private fun writeJsonRepoLastCommitId(prevProcessedCommit: RevCommit, jsonRepo: RepoDto) {
-        log.info("Writing last commit id: ${jsonRepo.repo.simpleName()}/$prevProcessedCommit")
+    private fun writeJsonRepoLastCommitId(prevProcessedCommit: RevCommit, jsonRepo: Repository) {
+        log.info("Writing last commit id: ${jsonRepo.simpleName()}/$prevProcessedCommit")
         val lastCommitIdFile =
-            File(jsonRepo.repo.absolutePathWithoutDotGit()).resolve(prevProcessedCommitRevIdFileName)
+            File(jsonRepo.absolutePathWithoutDotGit()).resolve(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
         val lastCommitIdStr = prevProcessedCommit.sha1Str()
         FileWriter(lastCommitIdFile).use {
             it.write(lastCommitIdStr)
@@ -281,8 +262,8 @@ class CommitToJsonProcessor(
         }
     }
 
-    private fun writeNoGoodFile(archiveRepo: RepoDto, noGoodIdTreeSet: TreeSet<Int>, commitSpaceType: SpaceType) {
-        val noGoodFile = File(archiveRepo.repo.absolutePathWithoutDotGit())
+    private fun writeNoGoodFile(archiveRepo: Repository, noGoodIdTreeSet: TreeSet<Int>, commitSpaceType: SpaceType) {
+        val noGoodFile = File(archiveRepo.absolutePathWithoutDotGit())
             .resolve("${commitSpaceType.name.lowercase()}/$NO_GOOD_FILE_NAME")
         if (!noGoodFile.exists()) noGoodFile.createNewFile()
         FileWriter(noGoodFile, true).use { fw ->
@@ -297,13 +278,13 @@ class CommitToJsonProcessor(
     }
 
     private fun commitJsonRepo(
-        jsonRepo: RepoDto,
+        jsonRepo: Repository,
         commitSpaceType: SpaceType,
         archiveCommit: RevCommit,
         changedHtmlFilePathList: List<String>
     ) {
         var timing = System.currentTimeMillis()
-        if (preferJgit) {
+        if (Config.BGM_ARCHIVE_PREFER_JGIT) {
             jgitCommitJsonRepo(jsonRepo, changedHtmlFilePathList, archiveCommit)
         } else {
             if (Config.BGM_ARCHIVE_PREFER_GIT_BATCH_ADD) {
@@ -314,10 +295,10 @@ class CommitToJsonProcessor(
         }
         timing = System.currentTimeMillis() - timing
         if (Config.BGM_ARCHIVE_IS_REMOVE_JSON_AFTER_PROCESS) {
-            if (jsonRepo.repo.isBare) {
+            if (jsonRepo.isBare) {
                 log.error(
                     "Json repo {} is a bare git repo. Will not remove json files.",
-                    jsonRepo.repo.absolutePathWithoutDotGit()
+                    jsonRepo.absolutePathWithoutDotGit()
                 )
             } else {
                 log.warn("Removing json files for commit : {}", archiveCommit.shortMessage)
@@ -328,8 +309,8 @@ class CommitToJsonProcessor(
         log.info("Timing: $timing for git add/commit ${archiveCommit.fullMessage}")
     }
 
-    private fun removeJsonFiles(jsonRepo: RepoDto, changedHtmlFilePathList: List<String>) {
-        val jsonRepoDir = File(jsonRepo.repo.absolutePathWithoutDotGit())
+    private fun removeJsonFiles(jsonRepo: Repository, changedHtmlFilePathList: List<String>) {
+        val jsonRepoDir = File(jsonRepo.absolutePathWithoutDotGit())
         val jsonFileList = changedHtmlFilePathList.mapNotNull { path ->
             if (!path.endsWith("html")) return@mapNotNull null
             val absolutePathFile = jsonRepoDir.resolve(path.replace("html", "json"))
@@ -346,12 +327,12 @@ class CommitToJsonProcessor(
     }
 
     private fun commandLineCommitJsonRepoAddFileSeparately(
-        jsonRepo: RepoDto,
+        jsonRepo: Repository,
         archiveCommit: RevCommit,
         changedHtmlFilePathList: List<String>
     ) {
         val commitMsg = archiveCommit.fullMessage
-        val jsonRepoDir = File(jsonRepo.repo.absolutePathWithoutDotGit())
+        val jsonRepoDir = File(jsonRepo.absolutePathWithoutDotGit())
         val commitMsgFile =
             jsonRepoDir.resolve(".git").resolve("tmp-" + UUID.randomUUID())
         FileWriter(commitMsgFile).use {
@@ -369,7 +350,7 @@ class CommitToJsonProcessor(
             }
             jsonFileListToGitAdd.append("${absolutePathFile.absolutePath} ")
         }
-        prevProcessedCommitRevIdFileName.apply {
+        BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME.apply {
             val absolutePath = jsonRepoDir.resolve(this)
             jsonFileListToGitAdd.append("${absolutePath.absolutePath} ")
         }
@@ -391,9 +372,9 @@ class CommitToJsonProcessor(
         commitMsgFile.delete()
     }
 
-    private fun commandLineCommitJsonRepoAddFileInBatch(jsonRepo: RepoDto, archiveCommit: RevCommit) {
+    private fun commandLineCommitJsonRepoAddFileInBatch(jsonRepo: Repository, archiveCommit: RevCommit) {
         val commitMsg = archiveCommit.fullMessage
-        val jsonRepoDir = File(jsonRepo.repo.absolutePathWithoutDotGit())
+        val jsonRepoDir = File(jsonRepo.absolutePathWithoutDotGit())
         val commitMsgFile =
             jsonRepoDir.resolve(".git").resolve("tmp-" + UUID.randomUUID())
         FileWriter(commitMsgFile).use {
@@ -416,11 +397,11 @@ class CommitToJsonProcessor(
     }
 
     private fun jgitCommitJsonRepo(
-        jsonRepo: RepoDto,
+        jsonRepo: Repository,
         changedFilePathList: List<String>,
         archiveCommit: RevCommit
     ) {
-        Git(jsonRepo.repo).use { git ->
+        Git(jsonRepo).use { git ->
             log.info("About to git add")
             changedFilePathList.forEach { path ->
                 git.add()
@@ -428,7 +409,7 @@ class CommitToJsonProcessor(
                     .call()
             }
             git.add()
-                .addFilepattern(prevProcessedCommitRevIdFileName)
+                .addFilepattern(BGM_ARCHIVE_PREV_PROCESSED_COMMIT_REV_ID_FILE_NAME)
                 .call()
             log.info("Complete git add")
             log.info("About to git commit")
@@ -440,9 +421,9 @@ class CommitToJsonProcessor(
     }
 
 
-    private fun writeJsonFile(jsonRepo: RepoDto, path: String, json: String) {
+    private fun writeJsonFile(jsonRepo: Repository, path: String, json: String) {
         val jsonPath = path.replace("html", "json")
-        val jsonFileLoc = File(jsonRepo.repo.absolutePathWithoutDotGit()).resolve(jsonPath)
+        val jsonFileLoc = File(jsonRepo.absolutePathWithoutDotGit()).resolve(jsonPath)
         jsonFileLoc.parentFile.mkdirs()
         FileOutputStream(jsonFileLoc).use { fos ->
             OutputStreamWriter(fos, UTF_8).use { osw ->
