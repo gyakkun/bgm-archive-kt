@@ -24,6 +24,8 @@ import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
 import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
 import org.eclipse.jgit.lib.Repository
+import org.eclipse.jgit.revwalk.RevCommit
+import org.eclipse.jgit.revwalk.RevWalk
 import org.slf4j.LoggerFactory
 
 object JsonToDbProcessor {
@@ -76,9 +78,28 @@ object JsonToDbProcessor {
                 prev = walk.next()
             }
 
-            LOGGER.info("The previously persisted json repo commit for ${jsonRepo.absolutePathWithoutDotGit()}: $prev")
-            run breakable@{
-                walk.forEach outer@{ cur ->
+            everFailed = jsonRepo.toRepoDtoOrThrow().withLock {
+                walkAndPersistToDb(jsonRepo, prev, walk, sidNameMappingSet, everFailed)
+            }
+            if (everFailed) {
+                LOGGER.error("Failed at persistence for repo ${jsonRepo.simpleName()}. Please check log!")
+            }
+        }
+    }
+
+    private fun walkAndPersistToDb(
+        jsonRepo: Repository,
+        inPrev: RevCommit,
+        walk: RevWalk,
+        sidNameMappingSet: MutableSet<SpaceNameMappingData>,
+        inEverFailed: Boolean
+    ): Boolean {
+        var prev = inPrev
+        var everFailed = inEverFailed
+        LOGGER.info("The previously persisted json repo commit for ${jsonRepo.absolutePathWithoutDotGit()}: $prev")
+        run breakable@{
+            walk.use {
+                it.forEach outer@{ cur ->
                     if (cur == prev) {
                         LOGGER.warn("Commit $cur has been iterated twice! Repo: ${jsonRepo.simpleName()}")
                         return@breakable
@@ -159,15 +180,13 @@ object JsonToDbProcessor {
                 }
                 Dao.bgmDao.handleNegativeUid()
             }
-            LOGGER.info(
-                "Persisted last commit for repo ${jsonRepo.simpleName()}: ${
-                    Dao.bgmDao.getPrevPersistedCommitId(jsonRepo)
-                }"
-            )
-            if (everFailed) {
-                LOGGER.error("Failed at persistence for repo ${jsonRepo.simpleName()}. Please check log!")
-            }
         }
+        LOGGER.info(
+            "Persisted last commit for repo ${jsonRepo.simpleName()}: ${
+                Dao.bgmDao.getPrevPersistedCommitId(jsonRepo)
+            }"
+        )
+        return everFailed
     }
 
 

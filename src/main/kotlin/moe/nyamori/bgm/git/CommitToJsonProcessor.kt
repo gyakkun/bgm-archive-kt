@@ -20,6 +20,7 @@ import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Repository
 import org.eclipse.jgit.revwalk.RevCommit
+import org.eclipse.jgit.revwalk.RevWalk
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.charset.StandardCharsets.UTF_8
@@ -73,10 +74,37 @@ object CommitToJsonProcessor {
                 prev = walk.next()
             }
 
-            log.info("The previously processed commit for repo - ${archiveRepo.simpleName()}: $prev")
-            run breakable@{
-                walk.forEachIndexed { commitIdx, curCommit ->
-                    var timing = System.currentTimeMillis()
+            jsonRepo.toRepoDtoOrThrow().withLock {
+                walkAndWriteJsonAndCommitToJsonRepo(
+                    archiveRepo,
+                    prev,
+                    walk,
+                    firstCommitSpaceType,
+                    jsonRepo,
+                    shouldSpotCheck,
+                    repoCounter
+                )
+            }
+        }
+    }
+
+    private fun walkAndWriteJsonAndCommitToJsonRepo(
+        archiveRepo: Repository,
+        inPrev: RevCommit,
+        walk: RevWalk,
+        inFirstCommitSpaceType: SpaceType?,
+        jsonRepo: Repository,
+        inShouldSpotCheck: Boolean,
+        repoCounter: Int
+    ) {
+        var prev = inPrev
+        var firstCommitSpaceType = inFirstCommitSpaceType
+        var shouldSpotCheck = inShouldSpotCheck
+        log.info("The previously processed commit for repo - ${archiveRepo.simpleName()}: $prev")
+        run breakable@{
+            walk.use {
+                it.forEachIndexed { commitIdx, curCommit ->
+                    var outerTimingForCommit = System.currentTimeMillis()
                     try {
                         val noGoodIdTreeSet = TreeSet<Int>()
                         if (curCommit == prev) {
@@ -89,20 +117,7 @@ object CommitToJsonProcessor {
                             return@forEachIndexed // continue
                         }
 
-                        val commitMsgSplitArr = curCommit.fullMessage.split(" ")
-                        val commitSpaceType = if (commitMsgSplitArr.isNotEmpty()) {
-                            when (commitMsgSplitArr[0]) {
-                                in SpaceType.entries.map { it.toString().uppercase() } -> SpaceType.valueOf(
-                                    commitMsgSplitArr[0]
-                                )
-
-                                else -> {
-                                    throw IllegalStateException("${commitMsgSplitArr[0]} is not a valid topic type!")
-                                }
-                            }
-                        } else {
-                            throw IllegalStateException("Not a valid commit message! - ${curCommit.shortMessage}")
-                        }
+                        val commitSpaceType = extractSpaceTypeFromCommitOrThrow(curCommit)
                         if (firstCommitSpaceType == null) firstCommitSpaceType = commitSpaceType
                         val changedHtmlFilePathList = archiveRepo.findChangedFilePaths(prev, curCommit)
 
@@ -123,21 +138,7 @@ object CommitToJsonProcessor {
                                         curCommit.name().substring(0, 8)
                                     }, path: ${archiveRepo.simpleName()}/$path , message:  ${curCommit.shortMessage}"
                                 )
-                                val pathSplitArr = path.split("/")
-                                val htmlSpaceType = if (pathSplitArr.isNotEmpty()) {
-                                    when (pathSplitArr[0]) {
-                                        in SpaceType.entries.map { it.toString().lowercase() } ->
-                                            SpaceType.valueOf(
-                                                pathSplitArr.first().uppercase()
-                                            )
-
-                                        else -> {
-                                            throw IllegalStateException("unknown path prefix: ${pathSplitArr[0]}")
-                                        }
-                                    }
-                                } else {
-                                    throw IllegalStateException("unknown path format: $path")
-                                }
+                                val htmlSpaceType = extractSpaceTypeFromRelPathOrThrow(path)
 
                                 if (htmlSpaceType != commitSpaceType) {
                                     log.error("Html space type not consistent with commit space type! htmlSpaceType=$htmlSpaceType, commitSpaceType=$commitSpaceType")
@@ -148,16 +149,16 @@ object CommitToJsonProcessor {
                                     archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path)
                                 val topicId = path.split("/").last().replace(".html", "").toInt()
 
-                                var timing = System.currentTimeMillis()
+                                var innerTimingForFile = System.currentTimeMillis()
                                 noGoodIdTreeSet.add(topicId) // Proactively add id to ng list, otherwise ex throws and id not being added
                                 val (resultTopicEntity, isSuccess) = TopicParserEntrance.parseTopic(
                                     fileContentInStr,
                                     topicId,
                                     htmlSpaceType
                                 )
-                                timing = System.currentTimeMillis() - timing
-                                if (timing > 1000L) {
-                                    log.error("$timing ms is costed to process ${archiveRepo.simpleName()}/$path in commit $curCommit!")
+                                innerTimingForFile = System.currentTimeMillis() - innerTimingForFile
+                                if (innerTimingForFile > 1000L) {
+                                    log.error("$innerTimingForFile ms is costed to process ${archiveRepo.simpleName()}/$path in commit $curCommit!")
                                 }
 
                                 if (isSuccess) {
@@ -196,11 +197,11 @@ object CommitToJsonProcessor {
                                 } -  ${curCommit.shortMessage}:\n $noGoodIdTreeSet"
                             )
                         }
-                        if (commitIdx % 100 == 0) {
-                            Git(jsonRepo).gc()
-                        }
-                        timing = System.currentTimeMillis() - timing
-                        if (timing >= spotCheckerTimeoutThresholdMs) {
+                        // if (commitIdx % 100 == 0) {
+                        //    Git(jsonRepo).gc()
+                        // }
+                        outerTimingForCommit = System.currentTimeMillis() - outerTimingForCommit
+                        if (outerTimingForCommit >= spotCheckerTimeoutThresholdMs) {
                             log.error(
                                 "Process commit taking longer than expected (threshold:${spotCheckerTimeoutThresholdMs}ms). Skipping generating spot check file. Cur commit: ${
                                     curCommit.sha1Str()
@@ -236,12 +237,49 @@ object CommitToJsonProcessor {
                         SpotChecker.genSpotCheckListFile(archiveRepo, firstCommitSpaceType!!)
                     }
                 }.onFailure {
-                    if (shouldSpotCheck && firstCommitSpaceType != null) {
+                    if (shouldSpotCheck) {
                         log.error("Failed at spot check. SpaceType=${firstCommitSpaceType!!}")
-                    }
                 }
             }
+            }
         }
+    }
+
+    private fun extractSpaceTypeFromRelPathOrThrow(path: String): SpaceType {
+        val pathSplitArr = path.split("/")
+        val htmlSpaceType = if (pathSplitArr.isNotEmpty()) {
+            when (pathSplitArr[0]) {
+                in SpaceType.entries.map { it.toString().lowercase() } ->
+                    SpaceType.valueOf(
+                        pathSplitArr.first().uppercase()
+                    )
+
+                else -> {
+                    throw IllegalStateException("unknown path prefix: ${pathSplitArr[0]}")
+                }
+            }
+        } else {
+            throw IllegalStateException("unknown path format: $path")
+        }
+        return htmlSpaceType
+    }
+
+    private fun extractSpaceTypeFromCommitOrThrow(curCommit: RevCommit): SpaceType {
+        val commitMsgSplitArr = curCommit.fullMessage.split(" ")
+        val commitSpaceType = if (commitMsgSplitArr.isNotEmpty()) {
+            when (commitMsgSplitArr[0]) {
+                in SpaceType.entries.map { it.toString().uppercase() } -> SpaceType.valueOf(
+                    commitMsgSplitArr[0]
+                )
+
+                else -> {
+                    throw IllegalStateException("${commitMsgSplitArr[0]} is not a valid topic type!")
+                }
+            }
+        } else {
+            throw IllegalStateException("Not a valid commit message! - ${curCommit.shortMessage}")
+        }
+        return commitSpaceType
     }
 
     private fun handleNoGoodFile(path: Path, content: String, noGoodIdTreeSet: TreeSet<Int>) = runCatching {

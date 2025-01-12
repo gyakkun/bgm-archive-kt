@@ -119,12 +119,12 @@ data class RepoDto(
     @Transient
     val repo = GitHelper.getRepoByPath(path)
 
-    fun <T> withLock(action: () -> T) {
+    fun <T> withLock(action: () -> T): T {
         try {
             if (!lock.tryLock(mutexTimeoutMs, TimeUnit.MILLISECONDS)) {
                 throw IllegalStateException("Failed to acquire lock after $mutexTimeoutMs ms")
             }
-            action()
+            return action()
         } finally {
             if (lock.isHeldByCurrentThread) lock.unlock()
         }
