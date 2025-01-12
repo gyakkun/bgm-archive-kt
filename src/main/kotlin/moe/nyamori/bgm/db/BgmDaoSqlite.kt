@@ -198,7 +198,8 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
             :p.state,
             coalesce(:sid, 0)
         ) on conflict(type,id,mid) do update set 
-            state = :p.state
+            state = :p.state,
+            sid   = coalesce(:sid, 0)
     """
     )
     @Transaction
@@ -219,7 +220,8 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
             :p.state,
             coalesce(:p.sid, 0)
         ) on conflict(type,id,mid) do update set 
-            state = :p.state
+            state = :p.state,
+            sid   = coalesce(:sid, 0)
     """
     )
     @Transaction
