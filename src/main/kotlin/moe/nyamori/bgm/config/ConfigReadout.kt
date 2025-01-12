@@ -52,7 +52,7 @@ data class ConfigReadout(
     val prevProcessedCommitRevIdFileName: String? = null,
     val preferJgit: Boolean? = null,
     val preferGitBatchAdd: Boolean? = null,
-    val disableAllHooks: Boolean? = null,
+    val disableCommitHook: Boolean? = null,
 
     val httpHost: String? = null,
     val httpPort: Int? = null,
@@ -193,7 +193,7 @@ fun ConfigReadout.toDto(): ConfigDto {
         prevProcessedCommitRevIdFileName = this.prevProcessedCommitRevIdFileName ?: "last_processed_commit_rev_id",
         preferJgit = this.preferJgit ?: false,
         preferGitBatchAdd = this.preferGitBatchAdd ?: false,
-        disableAllHooks = this.disableAllHooks ?: false,
+        disableCommitHook = this.disableCommitHook ?: false,
 
         httpHost = this.httpHost ?: "localhost",
         httpPort = this.httpPort?.coerceIn(1025..65535) ?: 5926,

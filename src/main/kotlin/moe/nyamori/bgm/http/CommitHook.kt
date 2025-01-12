@@ -10,7 +10,7 @@ import java.util.concurrent.TimeUnit
 
 object CommitHook : Handler {
     override fun handle(ctx: Context) {
-        if (Config.disableAllHooks) {
+        if (Config.disableCommitHook) {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }

@@ -7,7 +7,7 @@
   "prevProcessedCommitRevIdFileName": "last_processed_commit_rev_id",
   "preferJgit": false,
   "preferGitBatchAdd": false,
-  "disableAllHooks": false,
+  "disableCommitHook": false,
 
   "httpHost": "localhost",
   "httpPort": 5926,

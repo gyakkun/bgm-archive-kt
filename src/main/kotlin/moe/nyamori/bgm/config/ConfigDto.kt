@@ -14,7 +14,7 @@ interface IConfig {
     val prevProcessedCommitRevIdFileName: String
     val preferJgit: Boolean
     val preferGitBatchAdd: Boolean
-    val disableAllHooks: Boolean
+    val disableCommitHook: Boolean
 
     val httpHost: String
     val httpPort: Int
@@ -63,7 +63,7 @@ data class ConfigDto(
     override val prevProcessedCommitRevIdFileName: String,
     override val preferJgit: Boolean,
     override val preferGitBatchAdd: Boolean,
-    override val disableAllHooks: Boolean,
+    override val disableCommitHook: Boolean,
 
     override val httpHost: String,
     override val httpPort: Int,
