@@ -14,12 +14,12 @@ object DbPersistHook : Handler {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }
-        val isAll = "all" == ctx.queryParam("idx")
-        val idx = ctx.queryParam("idx")?.toIntOrNull() ?: 0
+        val isAll = "all" == ctx.queryParam("id")
+        val id = ctx.queryParam("id")?.toIntOrNull() ?: -1
         Thread {
             try {
                 if (HttpHelper.tryLockDbMs(10_000)) {
-                    JsonToDbProcessor.job(isAll, idx)
+                    JsonToDbProcessor.job(isAll, id)
                 }
             } catch (ignore: Exception) {
 

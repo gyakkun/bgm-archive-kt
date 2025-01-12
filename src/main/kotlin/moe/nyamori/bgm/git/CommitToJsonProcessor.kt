@@ -4,6 +4,7 @@ import io.javalin.http.sse.NEW_LINE
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.Config.prevProcessedCommitRevIdFileName
 import moe.nyamori.bgm.config.Config.spotCheckerTimeoutThresholdMs
+import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
@@ -38,18 +39,18 @@ object CommitToJsonProcessor {
 
     fun job(
         isAll: Boolean = false,
-        idx: Int = 0
+        id: Int = 0
     ) {
         val reposToProcess = mutableListOf<Repository>()
         if (isAll) {
             GitHelper.allArchiveRepoListSingleton
-                .filter { it.hasCouplingJsonRepo() }
+                .filter { it.hasCouplingJsonRepo() && !it.toRepoDtoOrThrow().isStatic }
                 .map { reposToProcess.add(it) }
         } else {
-            if (idx in GitHelper.allArchiveRepoListSingleton.indices
-                && GitHelper.allArchiveRepoListSingleton[idx].hasCouplingJsonRepo()
+            if (id in GitHelper.allArchiveRepoListSingleton.map { it.toRepoDtoOrThrow().id }
+                && GitHelper.allArchiveRepoListSingleton.find { it.toRepoDtoOrThrow().id == id }!!.hasCouplingJsonRepo()
             ) {
-                reposToProcess.add(GitHelper.allArchiveRepoListSingleton[idx])
+                reposToProcess.add(GitHelper.allArchiveRepoListSingleton[id])
             }
         }
 

@@ -14,12 +14,12 @@ object CommitHook : Handler {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }
-        val isAll = "all" == ctx.queryParam("idx")
-        val idx = ctx.queryParam("idx")?.toIntOrNull() ?: 0
+        val isAll = "all" == ctx.queryParam("id")
+        val id = ctx.queryParam("id")?.toIntOrNull() ?: -1
         Thread {
             try {
                 if (GIT_RELATED_LOCK.tryLock(10, TimeUnit.SECONDS)) {
-                    CommitToJsonProcessor.job(isAll, idx)
+                    CommitToJsonProcessor.job(isAll, id)
                 }
             } catch (ignore: Exception) {
 

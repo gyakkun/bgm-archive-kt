@@ -167,7 +167,7 @@ object HttpServer {
                                     GitHelper.allArchiveRepoListSingleton.mapIndexed { idx, repo ->
                                         Pair(
                                             idx,
-                                            StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
+                                            repo.toRepoDtoOrThrow().id
                                         ) to repo.absolutePathWithoutDotGit()
                                     }.toMap()
                                 )
@@ -179,7 +179,7 @@ object HttpServer {
                                     GitHelper.allJsonRepoListSingleton.mapIndexed { idx, repo ->
                                         Pair(
                                             idx,
-                                            StringHashingHelper.stringHash(repo.absolutePathWithoutDotGit())
+                                            repo.toRepoDtoOrThrow().id
                                         ) to repo.absolutePathWithoutDotGit()
                                     }.toMap()
                                 )

@@ -2,6 +2,7 @@ package moe.nyamori.bgm.db
 
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
+import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
@@ -39,17 +40,17 @@ object JsonToDbProcessor {
             .distinct().size == allJsonRepoListSingleton.size)
     }
 
-    fun job(isAll: Boolean = false, idx: Int = 0) {
+    fun job(isAll: Boolean = false, id: Int = 0) {
         val reposToProcess = mutableListOf<Repository>()
         if (isAll) {
             allJsonRepoListSingleton
-                .filter { it.hasCouplingArchiveRepo() }
+                .filter { it.hasCouplingArchiveRepo() && !it.toRepoDtoOrThrow().isStatic }
                 .map { reposToProcess.add(it) }
         } else {
-            if (idx in allJsonRepoListSingleton.indices
-                && allJsonRepoListSingleton[idx].hasCouplingArchiveRepo()
+            if (id in allJsonRepoListSingleton.map { it.toRepoDtoOrThrow().id }
+                && allJsonRepoListSingleton.find { it.toRepoDtoOrThrow().id == id }!!.hasCouplingArchiveRepo()
             ) {
-                reposToProcess.add(allJsonRepoListSingleton[idx])
+                reposToProcess.add(allJsonRepoListSingleton[id])
             }
         }
         reposToProcess.forEach { jsonRepo ->
