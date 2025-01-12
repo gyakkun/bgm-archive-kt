@@ -1,5 +1,6 @@
 package moe.nyamori.bgm.util
 
+import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFirstCommitIdStr
@@ -11,6 +12,7 @@ import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.StringHashingHelper.repoIdFromDto
 import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
+import kotlin.random.Random
 
 object CommitHistoryCacheHelper {
     private val LOGGER = LoggerFactory.getLogger(CommitHistoryCacheHelper::class.java)
@@ -59,18 +61,19 @@ object CommitHistoryCacheHelper {
                         prev = cur
                         return@outer
                     }
+                    val shouldLog = Random.nextFloat() < 0.001F || Config.logCacheDetail
                     val changedFilePaths = this.findChangedFilePaths(prev, cur)
                         .filter { it.endsWith("html", ignoreCase = true) || it.endsWith("json", ignoreCase = true) }
-                    LOGGER.debug("[CACHE] $this - cur commit: $curCommitId , msg - $curCommitFullMsg")
+                    if (shouldLog) LOGGER.info("[CACHE] $this - cur commit: $curCommitId , msg - $curCommitFullMsg")
 
                     // 1. Update changed files
                     val resIntArray = Dao.bgmDao.batchUpsertFileRelativePathForCache(changedFilePaths)
-                    // LOGGER.info("File ids insert res int array: {}", resIntArray)
+                    if (shouldLog) LOGGER.info("[CACHE] File ids insert res int array: {}", resIntArray)
 
                     // 2. Insert this commit to repo commit table
                     val resInt =
                         Dao.bgmDao.insertRepoCommitForCache(this.repoIdFromDto().toLong(), curCommitId)
-                    // LOGGER.info("commit insert res int: $resInt")
+                    if (shouldLog) LOGGER.info("[CACHE] commit insert res int: $resInt")
 
                     // 3. Insert to file-commit
                     val cacheFileCommitInsertRes = Dao.bgmDao.batchUpsertFileCommitForCache(
@@ -78,11 +81,11 @@ object CommitHistoryCacheHelper {
                         this.repoIdFromDto().toLong(),
                         curCommitId
                     )
-                    // LOGGER.info("Insert result: $cacheFileCommitInsertRes")
+                    if (shouldLog) LOGGER.info("[CACHE] Insert result: $cacheFileCommitInsertRes")
 
                     // 4. Update meta data
                     val updateMetaRes = Dao.bgmDao.updatePrevCachedCommitId(this, curCommitId)
-                    // LOGGER.info("Update meta res: $cacheFileCommitInsertRes")
+                    if (shouldLog) LOGGER.info("[CACHE] Update meta res: $cacheFileCommitInsertRes")
 
                     // 5. validate
                     // changedFilePaths.forEach {
@@ -93,7 +96,8 @@ object CommitHistoryCacheHelper {
 
                     // End of this iteration
                     // return@breakable
-                    LOGGER.info("[CACHE] $this build cache for commit successfully - [$curCommitId - $curCommitFullMsg]")
+                    if (shouldLog)
+                        LOGGER.info("[CACHE] $this build cache for commit successfully - [$curCommitId - $curCommitFullMsg]")
                     prev = cur
                 }.onFailure {
                     failedCount++

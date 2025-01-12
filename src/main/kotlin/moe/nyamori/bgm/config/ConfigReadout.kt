@@ -86,6 +86,8 @@ data class ConfigReadout(
     val crankerSlidingWin: Int? = null,
     val crankerComponent: String? = null,
 
+    val logCacheDetail: Boolean? = null,
+
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
     val repoList: List<RepoReadout>? = null,
 )
@@ -224,6 +226,8 @@ fun ConfigReadout.toDto(): ConfigDto {
         crankerRegUrl = this.crankerRegUrl ?: "ws://localhost:3000",
         crankerSlidingWin = this.crankerSlidingWin?.coerceIn(1..50) ?: 2,
         crankerComponent = this.crankerComponent ?: "bgm-archive-kt",
+
+        logCacheDetail = this.logCacheDetail ?: false,
 
         repoList = finRepoList
     )

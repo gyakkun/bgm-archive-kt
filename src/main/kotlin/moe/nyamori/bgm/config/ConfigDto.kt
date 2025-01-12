@@ -49,6 +49,8 @@ interface IConfig {
     val crankerSlidingWin: Int
     val crankerComponent: String
 
+    val logCacheDetail: Boolean
+
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
     val repoList: List<RepoDto>
 }
@@ -94,6 +96,8 @@ data class ConfigDto(
     override val crankerRegUrl: String,
     override val crankerSlidingWin: Int,
     override val crankerComponent: String,
+
+    override val logCacheDetail: Boolean,
 
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
     override val repoList: List<RepoDto>,
