@@ -93,7 +93,7 @@ object CommitHistoryCacheHelper {
 
                     // End of this iteration
                     // return@breakable
-                    LOGGER.debug("[CACHE] $this build cache for commit successfully - [$curCommitId - $curCommitFullMsg]")
+                    LOGGER.info("[CACHE] $this build cache for commit successfully - [$curCommitId - $curCommitFullMsg]")
                     prev = cur
                 }.onFailure {
                     failedCount++

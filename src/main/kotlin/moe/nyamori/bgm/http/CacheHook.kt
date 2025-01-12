@@ -5,6 +5,7 @@ import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.GitHelper
+import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.util.CommitHistoryCacheHelper.buildCache
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
@@ -21,11 +22,16 @@ object CacheHook : Handler {
             try {
                 if (HttpHelper.tryLockDbMs(10_000)) {
                     listOf(GitHelper.allJsonRepoListSingleton, GitHelper.allArchiveRepoListSingleton).flatten()
-                        .forEach { it.buildCache() }
+                        .forEach {
+                            LOGGER.info("Building cache for {}", it.simpleName())
+                            it.buildCache()
+                        }
                 }
             } catch (th: Throwable) {
                 if (th is IllegalStateException) {
                     LOGGER.error("Not holding lock before building cache: ", th)
+                } else {
+                    LOGGER.error("Something wrong: ", th)
                 }
             } finally {
                 HttpHelper.tryUnlockDb()
