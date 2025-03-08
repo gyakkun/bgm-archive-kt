@@ -37,16 +37,16 @@ object ForumEnhanceHandler : Handler {
             .expireAfterWrite(CACHE_DURATION)
             .build(object : CacheLoader<Pair<SpaceType, String/*username*/>, UserStat> {
 
-                override fun load(key: Pair<SpaceType, String>?): UserStat = runBlocking {
+                override fun load(key: Pair<SpaceType, String>): UserStat = runBlocking {
                     return@runBlocking getInfoBySpaceTypeAndUsernameList(
-                        key!!.first,
+                        key.first,
                         listOf(key.second)
                     ).get()[key.second]!!
                 }
 
-                override fun loadAll(keys: MutableSet<out Pair<SpaceType, String>>?): MutableMap<out Pair<SpaceType, String>, out UserStat> =
+                override fun loadAll(keys: MutableSet<out Pair<SpaceType, String>>): MutableMap<out Pair<SpaceType, String>, out UserStat> =
                     runBlocking {
-                        val tmp = keys!!.groupBy { it.first }.map { it.key to it.value.map { it.second } }
+                        val tmp = keys.groupBy { it.first }.map { it.key to it.value.map { it.second } }
                             .toMap()
                             .map {
                                 val type = it.key
