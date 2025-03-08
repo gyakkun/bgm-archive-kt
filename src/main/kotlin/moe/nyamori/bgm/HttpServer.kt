@@ -22,7 +22,6 @@ import moe.nyamori.bgm.http.HumanReadable.toHumanReadable
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.RangeHelper
-import moe.nyamori.bgm.util.StringHashingHelper
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
@@ -365,6 +364,11 @@ object HttpServer {
     }
 
     private fun ip(ctx: Context) = ctx.header("X-Forwarded-For")?.split(",")?.get(0) ?: ctx.ip()
-    private fun Context.isLocalhost() = ip(this).let { it == "localhost" || it == "127.0.0.1" }
+    private fun Context.isLocalhost() = ip(this).let {
+        it == "localhost"
+                || it == "127.0.0.1"
+                || it == "[0:0:0:0:0:0:0:1]"
+                || it == "0:0:0:0:0:0:0:1"
+    }
 }
 
