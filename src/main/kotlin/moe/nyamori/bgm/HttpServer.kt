@@ -22,6 +22,7 @@ import moe.nyamori.bgm.http.HumanReadable.toHumanReadable
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.RangeHelper
+import org.eclipse.jetty.http.HttpGenerator
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
@@ -43,7 +44,7 @@ object HttpServer {
         setConfigDelegate(cfg)
         writeDbPersistKeyIfNecessary(cfg)
         writeConfigToConfigFolder(cfg)
-
+        customizeHttpMsg()
         val app = Javalin.create { config ->
             config.useVirtualThreads = true
             config.http.brotliAndGzipCompression()
@@ -324,7 +325,7 @@ object HttpServer {
         }
         val blogHealth = holes[SpaceType.BLOG]!!.isEmpty()
         // In case we have other fields counted in isAvailable
-        var isAvailable = blogHealth
+        val syncHealth = java.util.concurrent.atomic.AtomicBoolean(true)
         val now = Instant.now()
         val lastCommits = GitHelper.allRepoInDisplayOrder
             .map { it.folderName() to it.getLatestCommitRef() }
@@ -341,16 +342,25 @@ object HttpServer {
                         now
                     ).also {
                         if ("old" !in folderName && it.minusMinutes(15L).isPositive) {
-                            isAvailable = false
-                            ctx.status(500)
+                            syncHealth.set(false)
                         }
                     }.toHumanReadable()
                 }
             }
-        val should500 =
-            !isAvailable && ((System.currentTimeMillis() - lastDownTimestamp) > bgmHealthStatus500TimeoutThresholdMs)
+        val redForSoLong = ((System.currentTimeMillis() - lastDownTimestamp) > bgmHealthStatus500TimeoutThresholdMs)
+        val shouldRedForBlogAndExceedingThreshold = !blogHealth && redForSoLong
+        val isAvailable = blogHealth && syncHealth.get()
         lastDownTimestamp = if (isAvailable) Long.MAX_VALUE else Math.min(System.currentTimeMillis(), lastDownTimestamp)
-        ctx.status(if (should500) 500 else 200)
+        // 501 to "SYNC TIMEOUT",
+        // 508 to "BLOG HOLES",
+        // 510 to "OTHER HOLES",
+        if (!syncHealth.get()) { // immediate
+            ctx.status(501)
+        } else if (shouldRedForBlogAndExceedingThreshold) {
+            ctx.status(508)
+        } else {
+            ctx.status(200)
+        }
         if (isHead) return@Handler
         @Suppress("unused")
         ctx.prettyJson(object {
@@ -369,6 +379,28 @@ object HttpServer {
                 || it == "127.0.0.1"
                 || it == "[0:0:0:0:0:0:0:1]"
                 || it == "0:0:0:0:0:0:0:1"
+    }
+
+
+    private fun customizeHttpMsg() = runCatching {
+        val m = mapOf(
+            501 to "SYNC TIMEOUT",
+            508 to "BLOG HOLES",
+            510 to "OTHER HOLES",
+        )
+        val ppf = HttpGenerator::class.java.getDeclaredField("__preprepared").apply { isAccessible = true }
+        val pp = ppf.get(null) as Array<*>
+        m.forEach { (code, msg) ->
+            val res = pp[code]!!
+            val rlf = res.javaClass.getDeclaredField("_responseLine").apply { isAccessible = true }
+            val rsnf = res.javaClass.getDeclaredField("_reason").apply { isAccessible = true }
+            val rsn = msg.toByteArray()
+            val rl = "HTTP/1.1 $code $msg\r\n".toByteArray()
+            rlf.set(res, rl)
+            rsnf.set(res, rsn)
+        }
+    }.onFailure {
+        LOGGER.error("Error while customizing http message: ", it)
     }
 }
 
