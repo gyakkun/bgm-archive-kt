@@ -52,7 +52,8 @@ object CommitToJsonProcessor {
                 && GitHelper.allArchiveRepoListSingleton.find { it.toRepoDtoOrThrow().id == htmlRepoId }!!
                     .hasCouplingJsonRepo()
             ) {
-                reposToProcess.add(GitHelper.allArchiveRepoListSingleton[htmlRepoId])
+                val theRepo = GitHelper.allArchiveRepoListSingleton.find { it.toRepoDtoOrThrow().id == htmlRepoId }!!
+                reposToProcess.add(theRepo)
             }
         }
 
