@@ -43,10 +43,15 @@ object SpotChecker {
     const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
     val HOLE_CHECK_SKIP_TYPE = listOf(SpaceType.EP, SpaceType.CHARACTER, SpaceType.PERSON)
     private val HOLE_CHECKED_TYPE_SET = mutableSetOf<SpaceType>()
+
+    @Deprecated("user HOLE_CHECK_SIZE_PER_TYPE")
     val HOLE_CHECKED_SET_SIZE_LIMIT: Int
         get() {
             return HOLE_CHECKED_TYPE_SET.size.coerceAtLeast(1) * 25
         }
+
+    // TODO: Make it configurable
+    const val HOLE_CHECK_SIZE_PER_TYPE: Int = 25
 
     val TYPE_MAX_ID_MAP = run {
         val result = mutableMapOf<SpaceType, Int>()
@@ -83,14 +88,21 @@ object SpotChecker {
     }
 
 
+    private val HOLE_CHECKED_SET_BY_TYPE = mutableMapOf<SpaceType, MutableSet<Int>>()
+
+    @Deprecated("use HOLE_CHECKED_SET_BY_TYPE")
     private val HOLE_CHECKED_SET = HashSet<Pair<SpaceType, Int>>() // Maintain in memory
     fun checkIfHolesInTopicListRange(spaceType: SpaceType, topicList: List<Int>): List<Int> {
         if (spaceType in HOLE_CHECK_SKIP_TYPE) return emptyList()
-        HOLE_CHECKED_TYPE_SET.add(spaceType)
-        if (HOLE_CHECKED_SET.size >= HOLE_CHECKED_SET_SIZE_LIMIT) {
-            LOGGER.info("HOLE_CHECKED_SET size ${HOLE_CHECKED_SET.size} is larger than limit ${HOLE_CHECKED_SET_SIZE_LIMIT}. Clearing.")
-            HOLE_CHECKED_SET.clear()
+        val checkedIds = HOLE_CHECKED_SET_BY_TYPE.computeIfAbsent(spaceType) { mutableSetOf() }
+        if (checkedIds.size >= HOLE_CHECK_SIZE_PER_TYPE) {
+            LOGGER.info("$spaceType checkedIds size ${checkedIds.size} is larger than limit ${HOLE_CHECK_SIZE_PER_TYPE}. Clearing.")
+            checkedIds.clear()
         }
+        // if (HOLE_CHECKED_SET.size >= HOLE_CHECKED_SET_SIZE_LIMIT) {
+        //     LOGGER.info("HOLE_CHECKED_SET size ${HOLE_CHECKED_SET.size} is larger than limit ${HOLE_CHECKED_SET_SIZE_LIMIT}. Clearing.")
+        //     HOLE_CHECKED_SET.clear()
+        // }
         val holes = mutableListOf<Int>()
         val maxId = topicList.max()
         val fakeTopicList = mutableListOf<Int>().apply {
@@ -113,14 +125,14 @@ object SpotChecker {
         val result = holes
             .filter {
                 // If already spot checked then skip it
-                !HOLE_CHECKED_SET.contains(Pair(spaceType, it))
+                !checkedIds.contains(it)
             }
             .takeLast((topicList.size / 8).coerceAtMost(RANGE_HOLE_DETECT_TAKE_LIMIT))
         if (result.isNotEmpty()) {
             LOGGER.warn("Holes for type $spaceType detected during spot check: $result")
         }
-        HOLE_CHECKED_SET.addAll(result.map { Pair(spaceType, it) })
-        LOGGER.info("HOLE_CHECKED_SET size / limit : ${HOLE_CHECKED_SET.size} / $HOLE_CHECKED_SET_SIZE_LIMIT")
+        checkedIds.addAll(result)
+        LOGGER.info("$spaceType checkedIds size / limit : ${checkedIds.size} / $HOLE_CHECK_SIZE_PER_TYPE")
         return result
     }
 
@@ -168,7 +180,9 @@ object SpotChecker {
         // val samplingSize =
         //    (fakeTotalCount / (30 * (archiveRepo.expectedCommitPerDay / (2 * (SpaceType.entries.size)))))
         //        .coerceAtLeast(MIN_SPOT_CHECK_SIZE).coerceAtMost(MAX_SPOT_CHECK_SIZE)
-        val samplingSize = Config.spotCheckSampleSizeByType[spaceType] ?: 10
+        val samplingSize = (Config.spotCheckSampleSizeByType[spaceType] ?: -1)
+            .coerceAtLeast(MIN_SPOT_CHECK_SIZE)
+            .coerceAtMost(MAX_SPOT_CHECK_SIZE)
         val r = Random()
 
         repeat(samplingSize.coerceAtMost(remainZeroCount)) {
