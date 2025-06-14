@@ -127,14 +127,14 @@ object SpotChecker {
 
     private fun randomSelectTopicIds(archiveRepo: Repository, spaceType: SpaceType): List<Int> {
         require(!archiveRepo.isBare) { "bare archive repo can't be applied to spot check" }
+        val maxId = getMaxIdAccordingToType(spaceType)
         val result = mutableListOf<Int>()
-        val spotCheckedBs = getSpotCheckedTopicMask(archiveRepo, spaceType)
+        val spotCheckedBs = getSpotCheckedTopicMask(archiveRepo, spaceType, maxId)
         val hiddenBs = getHiddenTopicMask(archiveRepo, spaceType)
-        val maxId = getMaxTopicId(spaceType)
 
         spotCheckedBs.or(hiddenBs)
         val remainZeroCount = spotCheckedBs.size() - spotCheckedBs.cardinality()
-        val fakeTotalCount = hiddenBs.size() - hiddenBs.cardinality()
+        val fakeTotalCount = (hiddenBs.size() - hiddenBs.cardinality()).coerceAtLeast(remainZeroCount)
         LOGGER.info(
             "Current approximate not spot-checked count: $spaceType - $remainZeroCount / $fakeTotalCount ," +
                     " spot-checked ratio: ${
@@ -157,7 +157,7 @@ object SpotChecker {
             // Reset the bitset file
             LOGGER.info("Writing empty spot check bitset file for $spaceType.")
             writeBitsetToFile(
-                BitSet(),
+                BitSet(maxId + 2).apply { set(maxId + 1) },
                 File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
             )
             // Reset the mask file
@@ -189,12 +189,12 @@ object SpotChecker {
         return result
     }
 
-    private fun getSpotCheckedTopicMask(archiveRepo: Repository, spaceType: SpaceType): BitSet {
+    private fun getSpotCheckedTopicMask(archiveRepo: Repository, spaceType: SpaceType, maxId: Int): BitSet {
         val maskFile =
             File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
         if (!maskFile.exists()) {
             LOGGER.warn("Spot checked mask bitset file not found for $spaceType. Creating one.")
-            return BitSet()
+            return BitSet(maxId + 1)
         }
         return getBitsetFromLongPlaintextFile(maskFile)
     }
@@ -228,15 +228,17 @@ object SpotChecker {
 
     private fun genHiddenTopicMaskFile(archiveRepo: Repository, spaceType: SpaceType) {
         LOGGER.info("Generating hidden topic mask file for $spaceType.")
-        val maxId = if (spaceType in listOf(SpaceType.EP, SpaceType.PERSON, SpaceType.CHARACTER)) {
-            getMaxIdByVisitingAllFiles(spaceType).coerceAtLeast(getMaxTopicId(spaceType))
-        } else {
-            getMaxTopicId(spaceType)
-        }
+        val maxId = getMaxIdAccordingToType(spaceType)
 
-        var newBs = BitSet(maxId + 2).apply { set(maxId + 1) } // Ensure (words in use) of bs is enough
+        // Note:
+        // Ensure words being used in bitset (64bits/word) is enough.
+        // set the (maxId+1) implies the (maxId+1) is hidden.
+        // As long as (maxId+1) being visited some time later (not deleted/closed by admin),
+        // in the next round of mask-id-regen, it will surely
+        // be visited, so that in the following merge processing,
+        // it will not be masked/treated as hidden.
+        var newBs = BitSet(maxId + 2).apply { set(maxId + 1) }
         val visited = BitSet(maxId + 1)
-//        val onceNormal = BitSet(maxId + 2).apply { set(maxId + 1) }
         walkThroughJson { (repo, relPath, fileContent) ->
             if (!relPath.contains(spaceType.name.lowercase())) return@walkThroughJson false
             if (!relPath.lowercase().endsWith("json")) return@walkThroughJson false
@@ -252,15 +254,8 @@ object SpotChecker {
             } else {
                 newBs.clear(topic.id)
             }
-//            if (topic.isBlogRedirect()/* Possibly reopen */) {
-//                onceNormal.set(topic.id)
-//            } else if (!topic.isEmptyTopic()) {
-//                onceNormal.set(topic.id)
-//            }
             return@walkThroughJson true
         }
-//        onceNormal.flip(0, onceNormal.size())
-//        var newBs = onceNormal.clone() as BitSet
         LOGGER.info("New bitset size: ${newBs.size()}. Cardinality: ${newBs.cardinality()}. Zero count: ${newBs.size() - newBs.cardinality()}")
         val hiddenTopicMaskFileContent =
             archiveRepo.getFileContentAsStringInACommit(
@@ -271,7 +266,7 @@ object SpotChecker {
             LOGGER.warn("Old hidden topic mask file exists. Perform bitwise operation to gen a new one.")
             val oldBs = getBitsetFromLongListStr(hiddenTopicMaskFileContent)
             LOGGER.info("Old bitset size: ${oldBs.size()}. Cardinality: ${oldBs.cardinality()}. Zero count: ${oldBs.size() - oldBs.cardinality()}")
-            val result = mergeOldNewVisited(oldBs, newBs, visited)
+            val result = mergeOldNewVisitedForHidden(oldBs, newBs, visited)
             newBs = result
             LOGGER.info("After merging op, new bitset size: ${newBs.size()}. Cardinality: ${newBs.cardinality()}. Zero count: ${newBs.size() - newBs.cardinality()}")
         }
@@ -281,11 +276,44 @@ object SpotChecker {
         )
     }
 
-    fun mergeOldNewVisited(oldBs: BitSet, newBs: BitSet, visited: BitSet): BitSet {
+    private fun getMaxIdAccordingToType(spaceType: SpaceType) =
+        if (spaceType in listOf(SpaceType.EP, SpaceType.PERSON, SpaceType.CHARACTER)) {
+            getMaxIdByVisitingAllFiles(spaceType).coerceAtLeast(getMaxTopicIdFromTopicList(spaceType))
+        } else {
+            getMaxTopicIdFromTopicList(spaceType)
+        }
+
+    /**
+     * Merge the new and old hidden topic mask. These hidden topics are either deleted or closed by admin
+     * and not visible to public
+     *
+     * @param oldBs the old hidden topic mask bitset
+     * @param newBs new hidden topic mask bitset, during the walk-through, only empty topic will be masked.
+     *        see `moe.nyamori.bgm.model.Topic.isEmptyTopic`
+     * @param visited in this round of hidden-mask-regen, all json files are being visited, unless the file
+     *        is removed in the current repo (e.g., the 20w-30w group topics deleted by admin due to spam),
+     *        it will be masked in this bitset.
+     *
+     * These 20w-30w group topics should already be masked in the `oldBs` unless admin re-open it some
+     * time. If so, and there's user reply to the topic, then this topic must be captured. Then its
+     * json will surely be visited. We call these "re-emerged"
+     *
+     * Worst case scenario is groups like `boring` which features lazy topic downgrading, then even
+     * topic is reopened and replied, it will not be captured and visited.
+     *
+     * @see moe.nyamori.bgm.model.Topic.isEmptyTopic
+     */
+    fun mergeOldNewVisitedForHidden(oldBs: BitSet, newBs: BitSet, visited: BitSet): BitSet {
+        // not visited means should probably already have been masked in the old bs
         val notVisited = (visited.clone() as BitSet).apply { flip(0, size()) }
 
+        // visitedAndNew means we can fairly treat the trailing word of the newBs
+        // remember we make newBs.apply { set(maxId + 1) }, and obviously (maxId+1)
+        // will not be visited. Now the masked bits are all empty topics within boundary. This operation also ensures during exception file gson deserialization (which could happen), the file will not be masked due to not visited since it's not masked in newBs
         val visitedAndNew = (newBs.clone() as BitSet).apply { and(visited) }
+        // notVisitedAndOld will exclude those "re-emerged" ones in the oldBs.
         val notVisitedAndOld = (oldBs.clone() as BitSet).apply { and(notVisited) }
+        // result is the OR sum of v&n and nv&o
         val result = (visitedAndNew.clone() as BitSet).apply { or(notVisitedAndOld) }
 
         val diff = (oldBs.clone() as BitSet).apply { xor(result) }
@@ -316,7 +344,7 @@ object SpotChecker {
         }
     }
 
-    fun getMaxTopicId(spaceType: SpaceType): Int {
+    fun getMaxTopicIdFromTopicList(spaceType: SpaceType): Int {
         val result = getTopicList(spaceType).max().coerceAtLeast(TYPE_MAX_ID_MAP[spaceType]!!)
         TYPE_MAX_ID_MAP[spaceType] = result
         LOGGER.info("Max id for $spaceType: $result")

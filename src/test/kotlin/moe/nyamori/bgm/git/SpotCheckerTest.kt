@@ -6,7 +6,7 @@ import java.util.BitSet
 
 class SpotCheckerTest {
     @Test
-    fun testMergeOldNewVisited() {
+    fun testMergeOldNewVisitedForHidden() {
         val len = 4//00_000
         val visited = BitSet(len)
         val new = BitSet(len)
@@ -17,7 +17,7 @@ class SpotCheckerTest {
         listOf(2, 3).forEach { old.set(it) }
 
 
-        val result = SpotChecker.mergeOldNewVisited(old, new, visited)
+        val result = SpotChecker.mergeOldNewVisitedForHidden(old, new, visited)
         assert(!result.get(0))
         assert(result.get(1))
         assert(!result.get(2))
