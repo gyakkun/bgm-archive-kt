@@ -976,5 +976,289 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     @SqlUpdate("delete from meta_data")
     @Transaction
     override fun _TRUNCATE_ALL_META():Int
+
+    @SqlQuery(BIG_SQL_USER_STAT)
+    fun bigQueryUserStat(
+        @Bind("typeId") typeId: Int,
+        @Bind("typeName") typeName: String,
+        @BindList("usernames") usernames: List<String>
+    ): String
 }
 
+
+private const val BIG_SQL_USER_STAT = """
+    with user_map as (select id as uid, username
+                  from ba_user
+                  where username in (<usernames>)),
+
+-- Posts stats per user
+     post_stats as (select p.uid,
+                           count(*)                                                                        as total,
+                           sum(case when p.dateline > strftime('%s', 'now', '-7 days') then 1 else 0 end)  as r7d,
+                           sum(case when p.dateline > strftime('%s', 'now', '-30 days') then 1 else 0 end) as r30d,
+                           sum(case when p.state = ${Post.STATE_DELETED} then 1 else 0 end)                as deleted,
+                           sum(case when p.state = ${Post.STATE_ADMIN_DELETED} then 1 else 0 end)          as adminDeleted,
+                           sum(case when p.state = ${Post.STATE_VIOLATIVE} then 1 else 0 end)              as violative,
+                           sum(case when p.state = ${Post.STATE_COLLAPSED} then 1 else 0 end)              as collapsed
+                    from ba_post p
+                             join user_map u on p.uid = u.uid
+                    where p.type = :typeId
+                    group by p.uid),
+
+-- Topic stats per user
+     topic_stats as (select t.uid,
+                            count(*)                                                                        as total,
+                            sum(case when t.dateline > strftime('%s', 'now', '-7 days') then 1 else 0 end)  as r7d,
+                            sum(case when t.dateline > strftime('%s', 'now', '-30 days') then 1 else 0 end) as r30d,
+                            sum(case when t.state = ${Post.STATE_DELETED} then 1 else 0 end)                as deleted,
+                            sum(case when t.state = ${Post.STATE_SILENT} then 1 else 0 end)                 as silent,
+                            sum(case when t.state = ${Post.STATE_CLOSED} then 1 else 0 end)                 as closed,
+                            sum(case when t.state = ${Post.STATE_REOPEN} then 1 else 0 end)                 as reopen
+                     from ba_topic t
+                              join user_map u on t.uid = u.uid
+                     where t.type = :typeId
+                     group by t.uid),
+
+-- Likes received per user (grouped by emoji value)
+     likes_received as (select p.uid,
+                               lr.value,
+                               count(*) as total
+                        from ba_likes_rev lr
+                                 join ba_post p on p.type = lr.type and p.id = lr.pid and p.mid = lr.mid
+                                 join user_map u on u.uid = p.uid
+                        where lr.type = :typeId
+                        group by p.uid, lr.value),
+
+-- Likes given by the user
+     likes_given as (select lr.uid,
+                            lr.value,
+                            count(*) as total
+                     from ba_likes_rev lr
+                              join user_map u on u.uid = lr.uid
+                     where lr.type = :typeId
+                     group by lr.uid, lr.value),
+                     
+     space_stats as (
+      select
+        u.uid,
+        json_group_array(
+          json_object(
+            'name', snm.name,
+            'displayName', snm.display_name,
+            'post', json_object(
+              'total', ifnull(post.total, 0),
+              'r7d', ifnull(post.r7d, 0),
+              'r30d', ifnull(post.r30d, 0),
+              'deleted', ifnull(post.deleted, 0),
+              'adminDeleted', ifnull(post.adminDeleted, 0)
+            ),
+            'topic', json_object(
+              'total', ifnull(topic.total, 0),
+              'r7d', ifnull(topic.r7d, 0),
+              'r30d', ifnull(topic.r30d, 0),
+              'deleted', ifnull(topic.deleted, 0),
+              'closed', ifnull(topic.closed, 0)
+            ),
+            'likeRev', json_object(
+              'total', ifnull(lr.total, 0)
+            ),
+            'like', json_object(
+              'total', ifnull(l.total, 0)
+            )
+          )
+        ) as space_array
+      from user_map u
+      join ba_space_naming_mapping snm on snm.type = :typeId
+      left join (
+        -- post stats per user per space
+        select uid, sid,
+          count(*) as total,
+          sum(case when dateline > strftime('%s','now','-7 days') then 1 else 0 end) as r7d,
+          sum(case when dateline > strftime('%s','now','-30 days') then 1 else 0 end) as r30d,
+          sum(case when state = ${Post.STATE_DELETED} then 1 else 0 end)                as deleted,
+          sum(case when state = ${Post.STATE_ADMIN_DELETED} then 1 else 0 end)          as adminDeleted,
+          sum(case when state = ${Post.STATE_VIOLATIVE} then 1 else 0 end)              as violative,
+          sum(case when state = ${Post.STATE_COLLAPSED} then 1 else 0 end)              as collapsed
+        from ba_post
+        where type = :typeId
+        group by uid, sid
+      ) post on post.uid = u.uid and post.sid = snm.sid
+      left join (
+        -- topic stats per user per space
+        select uid, sid,
+          count(*) as total,
+          sum(case when dateline > strftime('%s','now','-7 days') then 1 else 0 end) as r7d,
+          sum(case when dateline > strftime('%s','now','-30 days') then 1 else 0 end) as r30d,
+          sum(case when state = ${Post.STATE_DELETED} then 1 else 0 end)                as deleted,
+          sum(case when state = ${Post.STATE_SILENT} then 1 else 0 end)                 as silent,
+          sum(case when state = ${Post.STATE_CLOSED} then 1 else 0 end)                 as closed,
+          sum(case when state = ${Post.STATE_REOPEN} then 1 else 0 end)                 as reopen
+        from ba_topic
+        where type = :typeId
+        group by uid, sid
+      ) topic on topic.uid = u.uid and topic.sid = snm.sid
+      left join (
+        -- likes received per user per space
+        select p.uid, p.sid, count(*) as total
+        from ba_likes l
+        join ba_post p on p.type = l.type and p.mid = l.mid and p.id = l.pid
+        where l.type = :typeId
+        group by p.uid, p.sid
+      ) l on l.uid = u.uid and l.sid = snm.sid
+      left join (
+        -- likes given per user per space
+        select lr.uid, t.sid, count(*) as total
+        from ba_likes_rev lr
+        join ba_post p on p.type = lr.type and p.mid = lr.mid and p.id = lr.pid
+        join ba_topic t on t.type = lr.type and t.id = lr.mid
+        where lr.type = :typeId and lr.total = 1
+        group by lr.uid, t.sid
+      ) lr on lr.uid = u.uid and lr.sid = snm.sid
+      group by u.uid
+    ),
+
+-- likes_received JSON object per user
+     like_stat_json as (select uid,
+                              json_group_object(value, total) as likeStat
+                       from likes_received
+                       group by uid),
+
+-- likes_given JSON object per user
+     like_rev_stat_json as (select uid,
+                                 json_group_object(value, total) as likeRevStat
+                          from likes_given
+                          group by uid),
+
+     recent_topics as (select *
+                       from (select t.uid,
+                                    t.id,
+                                    t.title,
+                                    t.dateline,
+                                    m.display_name                                                  as spaceDisplayName,
+                                    row_number() over (partition by t.uid order by t.dateline desc) as rn
+                             from ba_topic t
+                                      join user_map u on u.uid = t.uid
+                                      join ba_space_naming_mapping m on m.type = t.type and m.sid = t.sid
+                             where t.type = :typeId
+                               and t.dateline > strftime('%s', 'now', '-3 years'))
+                       where rn <= 10),
+
+     recent_posts as (select *
+                      from (select p.uid,
+                                   p.id                                                            as pid,
+                                   p.mid,
+                                   p.dateline,
+                                   t.title,
+                                   m.display_name                                                  as spaceDisplayName,
+                                   row_number() over (partition by p.uid order by p.dateline desc) as rn
+                            from ba_post p
+                                     join user_map u on u.uid = p.uid
+                                     join ba_topic t on t.type = p.type and t.id = p.mid
+                                     join ba_space_naming_mapping m on m.type = p.type and m.sid = p.sid
+                            where p.type = :typeId
+                              and p.dateline > strftime('%s', 'now', '-3 years'))
+                      where rn <= 10),
+
+     recent_like_rev as (select *
+                         from (select lr.uid,
+                                      lr.mid,
+                                      t.title,
+                                      max(p.dateline)                                                       as dateline, -- from the liked post
+                                      m.display_name                                                        as spaceDisplayName,
+                                      json_group_array(
+                                              json_object('pid', lr.pid, 'faceKey', lr.value)
+                                      )                                                                     as likeRevList,
+                                      row_number() over (partition by lr.uid order by max(p.dateline) desc) as rn
+                               from ba_likes_rev lr
+                                        join user_map u on u.uid = lr.uid
+                                        join ba_post p on p.type = lr.type and p.mid = lr.mid and p.id = lr.pid
+                                        join ba_topic t on t.type = lr.type and t.id = lr.mid
+                                        join ba_space_naming_mapping m on m.type = lr.type and m.sid = t.sid
+                               where lr.type = :typeId
+                                 and lr.total = 1
+                                 and lr.uid = u.uid
+                                 and p.dateline > strftime('%s', 'now', '-3 years') -- filter here
+                               group by lr.uid, lr.mid)
+                         where rn <= 10),
+
+     recent_topics_json as (select uid,
+                                   json_group_array(json_object(
+                                           'title', title,
+                                           'id', id,
+                                           'dateline', dateline,
+                                           'spaceDisplayName', spaceDisplayName
+                                  )) as topic_list
+                            from recent_topics
+                            group by uid),
+
+     recent_posts_json as (select uid,
+                                  json_group_array(json_object(
+                                          'title', title,
+                                          'mid', mid,
+                                          'pid', pid,
+                                          'dateline', dateline,
+                                          'spaceDisplayName', spaceDisplayName
+                                  )) as post_list
+                           from recent_posts
+                           group by uid),
+
+     recent_likes_json as (select uid,
+                                  json_group_array(json_object(
+                                          'title', title,
+                                          'mid', mid,
+                                          'dateline', dateline,
+                                          'spaceDisplayName', spaceDisplayName,
+                                          'likeRevList', json(likeRevList)
+                                  )) as like_rev_list
+                           from recent_like_rev
+                           group by uid)
+
+-- Final aggregation: join all stats together
+select json_group_object(username, json(userStat)) as result
+from (select u.username,
+             json_object(
+                     '_meta', json_object(
+                        'expiredAt', (unixepoch()+2*3600) * 1000
+                     ),
+                     'type', :typeName,
+                     'postStat', json_object(
+                             'total', ifnull(ps.total, 0),
+                             'r7d', ifnull(ps.r7d, 0),
+                             'r30d', ifnull(ps.r30d, 0),
+                             'deleted', ifnull(ps.deleted, 0),
+                             'adminDeleted', ifnull(ps.adminDeleted, 0),
+                             'violative', ifnull(ps.violative, 0),
+                             'collapsed', ifnull(ps.collapsed, 0)
+                     ),
+                     'topicStat', json_object(
+                             'total', ifnull(ts.total, 0),
+                             'r7d', ifnull(ts.r7d, 0),
+                             'r30d', ifnull(ts.r30d, 0),
+                             'deleted', ifnull(ts.deleted, 0),
+                             'silent', ifnull(ts.silent, 0),
+                             'closed', ifnull(ts.closed, 0),
+                             'reopen', ifnull(ts.reopen, 0)
+                     ),
+                     'spaceStat', json(ifnull(ss.space_array, '[]')),
+                     'likeStat', json(ifnull(ls.likeStat, '{}')),
+                     'likeRevStat', json(ifnull(lr.likeRevStat, '{}')),
+                     'recentActivities', json_object(
+                             'topic',
+                             json(ifnull(rtj.topic_list, '[]')),
+                             'post',
+                             json(ifnull(rpj.post_list, '[]')),
+                             'likeRev',
+                             json(ifnull(rlj.like_rev_list, '[]'))
+                     )
+             ) as userStat
+      from user_map u
+               left join post_stats ps on ps.uid = u.uid
+               left join topic_stats ts on ts.uid = u.uid
+               left join like_stat_json ls on ls.uid = u.uid
+               left join like_rev_stat_json lr on lr.uid = u.uid
+               left join space_stats ss on ss.uid = u.uid
+               left join recent_topics_json rtj on rtj.uid = u.uid
+               left join recent_posts_json rpj on rpj.uid = u.uid
+               left join recent_likes_json rlj on rlj.uid = u.uid
+)
+"""

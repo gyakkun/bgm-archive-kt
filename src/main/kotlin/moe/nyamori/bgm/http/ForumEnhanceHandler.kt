@@ -3,6 +3,8 @@ package moe.nyamori.bgm.http
 import com.github.benmanes.caffeine.cache.CacheLoader
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+import com.google.gson.ToNumberPolicy
 import com.google.gson.reflect.TypeToken
 import io.javalin.http.Context
 import io.javalin.http.Handler
@@ -14,13 +16,18 @@ import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
 import java.time.Duration
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
 object ForumEnhanceHandler : Handler {
     private val LOGGER = LoggerFactory.getLogger(ForumEnhanceHandler::class.java)
-    private val GSON = Gson()
+    private val GSON = GsonBuilder()
+        .disableHtmlEscaping().serializeNulls()
+        .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+        .setObjectToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+        .create()
     @Suppress("UNCHECKED_CAST")
     private val STRING_OBJECT_TYPE_TOKEN =
         TypeToken.getParameterized(Map::class.java, String::class.java, Any::class.java) as TypeToken<Map<String, Any>>
@@ -128,7 +135,11 @@ object ForumEnhanceHandler : Handler {
         spaceType: SpaceType,
         usernameList: List<String>
     ): Future<Map<String, UserStat>> = VT_EXECUTOR.submit<Map<String, UserStat>> {
-//    ): Deferred<Map<String, UserStat>> = GlobalScope.async {
+        if(Dao.bgmDao is BgmDaoSqlite) {
+            val some = (Dao.bgmDao as BgmDaoSqlite).bigQueryUserStat(spaceType.id, spaceType.name.lowercase(), usernameList)
+            val jmap = GSON.fromJson(some, TypeToken.getParameterized(Map::class.java, String::class.java, UserStat::class.java))
+            System.err.println("debug")
+        }
         val allPostCountByTypeAndUsernameList = VT_EXECUTOR.submit<List<VAllPostCountRow>> {
             timingWrapper("getAllPostCountByTypeAndUsernameList") {
                 Dao.bgmDao.getAllPostCountByTypeAndUsernameList(spaceType.id, usernameList)
