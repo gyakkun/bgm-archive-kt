@@ -92,7 +92,9 @@ data class ConfigReadout(
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
     val repoList: List<RepoReadout>? = null,
 
-    val spotCheckSampleSizeByType: Map<String, Int>? = null
+    val spotCheckSampleSizeByType: Map<String, Int>? = null,
+
+    val gitRelatedLockTimeoutMs: Long? = null
 )
 
 data class RepoReadout(
@@ -247,5 +249,7 @@ fun ConfigReadout.toDto(): ConfigDto {
 
         repoList = finRepoList,
         spotCheckSampleSizeByType = prettySpotCheckSizeByType,
+
+        gitRelatedLockTimeoutMs = gitRelatedLockTimeoutMs ?: 25_000
     )
 }

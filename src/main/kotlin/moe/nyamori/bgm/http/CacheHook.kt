@@ -25,6 +25,7 @@ object CacheHook : Handler {
                         .forEach {
                             LOGGER.info("Building cache for {}", it.simpleName())
                             it.buildCache()
+                            LOGGER.info("End of building cache for {}", it.simpleName())
                         }
                 }
             } catch (th: Throwable) {
@@ -38,7 +39,5 @@ object CacheHook : Handler {
             }
         }.start()
         ctx.status(HttpStatus.OK)
-
-
     }
 }

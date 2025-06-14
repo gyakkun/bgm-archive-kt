@@ -56,6 +56,8 @@ interface IConfig {
     val repoList: List<RepoDto>
 
     val spotCheckSampleSizeByType: Map<SpaceType, Int>
+
+    val gitRelatedLockTimeoutMs: Long
 }
 
 data class ConfigDto(
@@ -106,6 +108,8 @@ data class ConfigDto(
     override val repoList: List<RepoDto>,
 
     override val spotCheckSampleSizeByType: Map<SpaceType, Int>,
+
+    override val gitRelatedLockTimeoutMs: Long,
 ) : IConfig
 
 data class RepoDto(

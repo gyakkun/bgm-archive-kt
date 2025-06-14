@@ -21,7 +21,7 @@ object CommitHook : Handler {
         val id = qid?.toIntOrNull() ?: -1
         Thread {
             try {
-                if (GIT_RELATED_LOCK.tryLock(10, TimeUnit.SECONDS)) {
+                if (GIT_RELATED_LOCK.tryLock(Config.gitRelatedLockTimeoutMs, TimeUnit.MILLISECONDS)) {
                     CommitToJsonProcessor.job(isAll, id)
                 }
             } catch (ex: Exception) {
