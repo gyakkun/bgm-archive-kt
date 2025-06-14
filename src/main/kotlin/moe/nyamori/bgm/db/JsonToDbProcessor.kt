@@ -2,6 +2,7 @@ package moe.nyamori.bgm.db
 
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
+import moe.nyamori.bgm.config.getCouplingJsonRepo
 import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
@@ -42,19 +43,26 @@ object JsonToDbProcessor {
             .distinct().size == allJsonRepoListSingleton.size)
     }
 
-    fun job(isAll: Boolean = false, id: Int = 0) {
+    fun job(isAll: Boolean = false, jsonRepoId: Int = 0) {
         val reposToProcess = mutableListOf<Repository>()
         if (isAll) {
             allJsonRepoListSingleton
                 .filter { it.hasCouplingArchiveRepo() && !it.toRepoDtoOrThrow().isStatic }
                 .map { reposToProcess.add(it) }
         } else {
-            if (id in allJsonRepoListSingleton.map { it.toRepoDtoOrThrow().id }
-                && allJsonRepoListSingleton.find { it.toRepoDtoOrThrow().id == id }!!.hasCouplingArchiveRepo()
+            if (jsonRepoId in allJsonRepoListSingleton.map { it.toRepoDtoOrThrow().id }
+                && allJsonRepoListSingleton.find { it.toRepoDtoOrThrow().id == jsonRepoId }!!.hasCouplingArchiveRepo()
             ) {
-                reposToProcess.add(allJsonRepoListSingleton[id])
+                val theJsonRepo =
+                    allJsonRepoListSingleton.find { it.toRepoDtoOrThrow().id == jsonRepoId }!!.getCouplingJsonRepo()!!
+                reposToProcess.add(theJsonRepo)
             }
         }
+
+        if (reposToProcess.isEmpty()) {
+            LOGGER.warn("no repo to process: isAll = {} , html repo id = {}", isAll, jsonRepoId)
+        }
+
         reposToProcess.forEach { jsonRepo ->
 
             val latestCommit = jsonRepo.getLatestCommitRef()
