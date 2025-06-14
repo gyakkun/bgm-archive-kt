@@ -40,7 +40,7 @@ object CommitToJsonProcessor {
 
     fun job(
         isAll: Boolean = false,
-        id: Int = 0
+        htmlRepoId: Int = 0
     ) {
         val reposToProcess = mutableListOf<Repository>()
         if (isAll) {
@@ -48,11 +48,16 @@ object CommitToJsonProcessor {
                 .filter { it.hasCouplingJsonRepo() && !it.toRepoDtoOrThrow().isStatic }
                 .map { reposToProcess.add(it) }
         } else {
-            if (id in GitHelper.allArchiveRepoListSingleton.map { it.toRepoDtoOrThrow().id }
-                && GitHelper.allArchiveRepoListSingleton.find { it.toRepoDtoOrThrow().id == id }!!.hasCouplingJsonRepo()
+            if (htmlRepoId in GitHelper.allArchiveRepoListSingleton.map { it.toRepoDtoOrThrow().id }
+                && GitHelper.allArchiveRepoListSingleton.find { it.toRepoDtoOrThrow().id == htmlRepoId }!!
+                    .hasCouplingJsonRepo()
             ) {
-                reposToProcess.add(GitHelper.allArchiveRepoListSingleton[id])
+                reposToProcess.add(GitHelper.allArchiveRepoListSingleton[htmlRepoId])
             }
+        }
+
+        if (reposToProcess.isEmpty()) {
+            log.warn("no repo to process: isAll = {} , html repo id = {}", isAll, htmlRepoId)
         }
 
         var shouldSpotCheck = true

@@ -6,23 +6,26 @@ import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.git.CommitToJsonProcessor
 import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
+import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
 
 object CommitHook : Handler {
+    private val LOGGER = LoggerFactory.getLogger(CommitHook::class.java)
     override fun handle(ctx: Context) {
         if (Config.disableCommitHook) {
             ctx.status(HttpStatus.BAD_REQUEST)
             return
         }
-        val isAll = "all" == ctx.queryParam("id")
-        val id = ctx.queryParam("id")?.toIntOrNull() ?: -1
+        val qid = ctx.queryParam("id")
+        val isAll = "all" == qid
+        val id = qid?.toIntOrNull() ?: -1
         Thread {
             try {
                 if (GIT_RELATED_LOCK.tryLock(10, TimeUnit.SECONDS)) {
                     CommitToJsonProcessor.job(isAll, id)
                 }
-            } catch (ignore: Exception) {
-
+            } catch (ex: Exception) {
+                LOGGER.error("ex when processing commit: query id = {} , ex: ", qid, ex)
             } finally {
                 if (GIT_RELATED_LOCK.isHeldByCurrentThread) {
                     GIT_RELATED_LOCK.unlock()
