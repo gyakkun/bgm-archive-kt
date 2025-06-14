@@ -3,7 +3,6 @@ package moe.nyamori.bgm.git
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import moe.nyamori.bgm.config.Config
-import moe.nyamori.bgm.config.expectedCommitPerDay
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.couplingArchiveRepo
@@ -165,9 +164,11 @@ object SpotChecker {
             genHiddenTopicMaskFile(archiveRepo, spaceType)
             return result
         }
-        val samplingSize =
-            (fakeTotalCount / (30 * (archiveRepo.expectedCommitPerDay / (2 * (SpaceType.entries.size)))))
-                .coerceAtLeast(MIN_SPOT_CHECK_SIZE).coerceAtMost(MAX_SPOT_CHECK_SIZE)
+        // we abandon the calculating approach
+        // val samplingSize =
+        //    (fakeTotalCount / (30 * (archiveRepo.expectedCommitPerDay / (2 * (SpaceType.entries.size)))))
+        //        .coerceAtLeast(MIN_SPOT_CHECK_SIZE).coerceAtMost(MAX_SPOT_CHECK_SIZE)
+        val samplingSize = Config.spotCheckSampleSizeByType[spaceType] ?: 10
         val r = Random()
 
         repeat(samplingSize.coerceAtMost(remainZeroCount)) {

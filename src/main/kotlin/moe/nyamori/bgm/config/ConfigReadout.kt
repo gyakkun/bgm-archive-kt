@@ -2,6 +2,7 @@ package moe.nyamori.bgm.config
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import moe.nyamori.bgm.model.SpaceType
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.*
@@ -90,6 +91,8 @@ data class ConfigReadout(
 
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
     val repoList: List<RepoReadout>? = null,
+
+    val spotCheckSampleSizeByType: Map<String, Int>? = null
 )
 
 data class RepoReadout(
@@ -188,6 +191,19 @@ fun ConfigReadout.toDto(): ConfigDto {
         res
     }
 
+    val defSpotCheckSizeMap = mapOf(
+        SpaceType.EP to 80,
+        SpaceType.GROUP to 35,
+        SpaceType.BLOG to 10,
+        SpaceType.SUBJECT to 10,
+        SpaceType.PERSON to 10,
+        SpaceType.CHARACTER to 10,
+    )
+    val prettySpotCheckSizeByType = defSpotCheckSizeMap + this.spotCheckSampleSizeByType
+        .orEmpty()
+        .mapNotNull { (k, v) -> runCatching { SpaceType.valueOf(k.uppercase()) to v }.getOrNull() }
+        .toMap()
+
     return ConfigDto(
         homeFolderAbsolutePath = finHome,
         prevProcessedCommitRevIdFileName = this.prevProcessedCommitRevIdFileName ?: "last_processed_commit_rev_id",
@@ -229,6 +245,7 @@ fun ConfigReadout.toDto(): ConfigDto {
 
         logCacheDetail = this.logCacheDetail ?: false,
 
-        repoList = finRepoList
+        repoList = finRepoList,
+        spotCheckSampleSizeByType = prettySpotCheckSizeByType,
     )
 }

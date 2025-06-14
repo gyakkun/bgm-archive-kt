@@ -2,6 +2,7 @@ package moe.nyamori.bgm.config
 
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.simpleName
+import moe.nyamori.bgm.model.SpaceType
 import org.eclipse.jgit.lib.Repository
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
@@ -53,6 +54,8 @@ interface IConfig {
 
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
     val repoList: List<RepoDto>
+
+    val spotCheckSampleSizeByType: Map<SpaceType, Int>
 }
 
 data class ConfigDto(
@@ -101,6 +104,8 @@ data class ConfigDto(
 
     // TODO: Add mutex lock for each repo to perform parse/build cache/etc. jobs
     override val repoList: List<RepoDto>,
+
+    override val spotCheckSampleSizeByType: Map<SpaceType, Int>,
 ) : IConfig
 
 data class RepoDto(
@@ -108,6 +113,7 @@ data class RepoDto(
     val path: String,
     val type: RepoType,
     val friendlyName: String,
+    @Deprecated("should use spotCheckSizeByType in config dto")
     val expectedCommitPerDay: Int,
     val optRepoIdCouplingWith: Int?,
     val isStatic: Boolean,
