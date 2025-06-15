@@ -10,8 +10,8 @@ import org.slf4j.LoggerFactory
 import java.text.SimpleDateFormat
 import java.util.*
 
-object BlogTopicParserR400 : Parser {
-    private val LOGGER: Logger = LoggerFactory.getLogger(BlogTopicParserR400.javaClass)
+object BlogTopicParserR547 : Parser {
+    private val LOGGER: Logger = LoggerFactory.getLogger(BlogTopicParserR547.javaClass)
     private val SDF_YYYY_M_D_HH_MM =
         SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA).apply { timeZone = TimeZone.getTimeZone("GMT+08:00") }
 
@@ -37,8 +37,8 @@ object BlogTopicParserR400 : Parser {
                 bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[3]/div[2][contains(@class,\"tags\")]") // nullable
             val blogRelatedSubjectUl = bodyNode.selOne("/div[1]/div[2]/div[1]/div[2]/div/ul[1]") // nullable
 
-            // comment list
-            val blogCommentListDiv: JXNode = bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[4]") // nullable
+            // comment list R547
+            val blogCommentListDiv: JXNode = bodyNode.selOne("//*[@id=\"comment_list\"]") // nullable
 
             val (blogTopicWithoutCommentList, blogPostUser) =
                 extractBlogInfo(topicId, blogTitleH1, blogPostDateSmallText, blogTagDiv, blogRelatedSubjectUl)

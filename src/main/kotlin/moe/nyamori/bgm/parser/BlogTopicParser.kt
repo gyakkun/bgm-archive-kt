@@ -4,6 +4,7 @@ import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.parser.blog.BlogTopicParserR398
 import moe.nyamori.bgm.parser.blog.BlogTopicParserR400
+import moe.nyamori.bgm.parser.blog.BlogTopicParserR547
 import moe.nyamori.bgm.util.ParserHelper
 import java.util.*
 
@@ -29,6 +30,7 @@ object BlogTopicParser : Parser {
         val treeMap = TreeMap<Int, Parser>()
         treeMap[398] = BlogTopicParserR398
         treeMap[400] = BlogTopicParserR400
+        treeMap[547] = BlogTopicParserR547
         return@run treeMap
     }
 }
