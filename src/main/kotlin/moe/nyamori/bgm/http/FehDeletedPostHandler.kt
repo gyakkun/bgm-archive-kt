@@ -81,7 +81,13 @@ object FehDeletedPostHandler : Handler {
         }
 
         val bsFunMaxPostGen = BinarySearchHelper.binarySearchFunctionGenerator<Long>(BinarySearchHelper.BSType.CEILING)
-        val filteredTsList = timestampList.filter { it >= earliestTsWithWantedPost }
+        val filteredTsList =
+            timestampList.filter { it >= earliestTsWithWantedPost
+                    // in some cases (e.g. group-416355), the topic is hidden for a while and later re-opened
+                    // but this will nude the efficiency of binary search
+                    // so we keep it as is
+                    // && !topicAtTs(it).isDeleted()
+            }
         val theWantedPostTs = bsFunMaxPostGen(filteredTsList) { ts ->
             val topic = topicAtTs(ts)
             val post = topic.getAllPosts().first { it.id == postId }
