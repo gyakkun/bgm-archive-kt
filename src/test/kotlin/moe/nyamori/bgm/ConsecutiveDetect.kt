@@ -49,7 +49,7 @@ object ConsecutiveDetect {
         // val total = SpotChecker.getMaxId(SpaceType.GROUP)
         val numThread = 6
         val latchArr = Array(numThread) { CountDownLatch(1) }
-        val total = SpotChecker.getMaxIdByVisitingAllFiles(spaceType)
+        val total = SpotChecker.getMaxIdByVisitingAllJsonFiles(spaceType)
         val part = (total / numThread) as Int
         val ngType = NGType.LOST
         for (t in 1..numThread) {

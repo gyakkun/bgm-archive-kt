@@ -3,9 +3,13 @@ package moe.nyamori.bgm.git
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
 import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.checkAndGetConfigDto
+import moe.nyamori.bgm.config.setConfigDelegate
+import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.couplingArchiveRepo
+import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLastCommitSha1StrExtGit
 import moe.nyamori.bgm.git.GitHelper.getRevCommitById
@@ -20,8 +24,12 @@ import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.time.Duration
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
+import java.time.temporal.ChronoField
 import java.util.*
 import java.util.function.Supplier
+import kotlin.math.max
 import kotlin.streams.toList
 import kotlin.text.Charsets.UTF_8
 
@@ -138,10 +146,10 @@ object SpotChecker {
 
     private fun randomSelectTopicIds(archiveRepo: Repository, spaceType: SpaceType): List<Int> {
         require(!archiveRepo.isBare) { "bare archive repo can't be applied to spot check" }
-        val maxId = getMaxIdAccordingToType(spaceType)
+        val maxId = getAndUpdateMaxIdAccordingToType(spaceType, archiveRepo)
         val result = mutableListOf<Int>()
         val spotCheckedBs = getSpotCheckedTopicMask(archiveRepo, spaceType, maxId)
-        val hiddenBs = getHiddenTopicMask(archiveRepo, spaceType)
+        val hiddenBs = getHiddenTopicMask(archiveRepo, spaceType, maxId)
 
         spotCheckedBs.or(hiddenBs)
         val remainZeroCount = spotCheckedBs.size() - spotCheckedBs.cardinality()
@@ -173,7 +181,7 @@ object SpotChecker {
             )
             // Reset the mask file
             LOGGER.info("Going to re generate hidden topic mask file for $spaceType.")
-            genHiddenTopicMaskFile(archiveRepo, spaceType)
+            genHiddenTopicMaskFile(archiveRepo, spaceType, maxId)
             return result
         }
         // we abandon the calculating approach
@@ -214,12 +222,13 @@ object SpotChecker {
         return getBitsetFromLongPlaintextFile(maskFile)
     }
 
-    private fun getHiddenTopicMask(archiveRepo: Repository, spaceType: SpaceType): BitSet {
+    private fun getHiddenTopicMask(archiveRepo: Repository, spaceType: SpaceType, optMaxId: Int? = null): BitSet {
+        val maxId = optMaxId ?: getAndUpdateMaxIdAccordingToType(spaceType, archiveRepo)
         val maskFile =
             File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
         if (!maskFile.exists()) {
             LOGGER.warn("Hidden topic mask file not found for $spaceType. Creating one.")
-            genHiddenTopicMaskFile(archiveRepo, spaceType)
+            genHiddenTopicMaskFile(archiveRepo, spaceType, maxId)
         }
         assert(maskFile.exists())
         return getBitsetFromLongPlaintextFile(maskFile)
@@ -241,9 +250,9 @@ object SpotChecker {
         return BitSet.valueOf(longArr)
     }
 
-    private fun genHiddenTopicMaskFile(archiveRepo: Repository, spaceType: SpaceType) {
+    private fun genHiddenTopicMaskFile(archiveRepo: Repository, spaceType: SpaceType, optMaxId: Int? = null) {
         LOGGER.info("Generating hidden topic mask file for $spaceType.")
-        val maxId = getMaxIdAccordingToType(spaceType)
+        val maxId = optMaxId ?: getAndUpdateMaxIdAccordingToType(spaceType, archiveRepo)
 
         // Note:
         // Ensure words being used in bitset (64bits/word) is enough.
@@ -254,12 +263,14 @@ object SpotChecker {
         // it will not be masked/treated as hidden.
         var newBs = BitSet(maxId + 2).apply { set(maxId + 1) }
         val visited = BitSet(maxId + 1)
-        walkThroughJson { (repo, relPath, fileContent) ->
+        walkThroughJson(
+            archiveRepo.couplingJsonRepo()?.let { listOf(it) }
+        ) { (repo, relPath, fileContentGetter) ->
             if (!relPath.contains(spaceType.name.lowercase())) return@walkThroughJson false
             if (!relPath.lowercase().endsWith("json")) return@walkThroughJson false
             if ((relPath.split("/").last().split(".").first().toIntOrNull() ?: -1) > maxId) return@walkThroughJson false
             if (relPath.hashCode() and 1023 == 1023) LOGGER.info("$relPath is processing at ${repo.simpleName()}")
-            val fileStr = fileContent.get()
+            val fileStr = fileContentGetter.get()
             val topic = GSON.fromJson(fileStr, Topic::class.java)
             visited.set(topic.id)
             if (topic.isBlogRedirect()/* Possibly reopen */) {
@@ -291,12 +302,25 @@ object SpotChecker {
         )
     }
 
-    private fun getMaxIdAccordingToType(spaceType: SpaceType) =
-        if (spaceType in listOf(SpaceType.EP, SpaceType.PERSON, SpaceType.CHARACTER)) {
-            getMaxIdByVisitingAllFiles(spaceType).coerceAtLeast(getMaxTopicIdFromTopicList(spaceType))
-        } else {
-            getMaxTopicIdFromTopicList(spaceType)
+    private fun getAndUpdateMaxIdAccordingToType(spaceType: SpaceType, optHtmlRepo: Repository? = null): Int {
+        val fromTopicList = getMaxTopicIdFromTopicList(spaceType) // could be -1 if anything wrong
+        val fromCache = TYPE_MAX_ID_MAP[spaceType] ?: -1
+        var res = max(fromTopicList, fromCache)
+        if (
+            spaceType in listOf(SpaceType.EP, SpaceType.PERSON, SpaceType.CHARACTER)
+            && (fromCache == -1 || fromTopicList == -1 || isDuring3amTo4amP0800())
+        ) {
+            res = getMaxIdByVisitingAllJsonFiles(
+                spaceType, optHtmlRepo
+            ).coerceAtLeast(res)
         }
+        TYPE_MAX_ID_MAP[spaceType] = res
+        return res
+    }
+
+    private fun isDuring3amTo4amP0800() = OffsetDateTime.now()
+        .atZoneSameInstant(ZoneOffset.ofHours(8))
+        .get(ChronoField.HOUR_OF_DAY) in 3..4
 
     /**
      * Merge the new and old hidden topic mask. These hidden topics are either deleted or closed by admin
@@ -360,32 +384,38 @@ object SpotChecker {
     }
 
     fun getMaxTopicIdFromTopicList(spaceType: SpaceType): Int {
-        val result = getTopicList(spaceType).max().coerceAtLeast(TYPE_MAX_ID_MAP[spaceType]!!)
-        TYPE_MAX_ID_MAP[spaceType] = result
-        LOGGER.info("Max id for $spaceType: $result")
+        val result = getTopicList(spaceType).max()
+        LOGGER.info("Max id for $spaceType from recent topic list: $result")
         return result
     }
 
 
     private fun walkThroughJson(
-        jsonRepoList: List<Repository> = allJsonRepoListSingleton,
+        jsonRepoList: List<Repository>? = emptyList(),
+        isSkipStatic: Boolean = true,
         handler: (RelPathAndContentSupp) -> Boolean
     ) {
         val timing = System.currentTimeMillis()
-        LOGGER.info("Walking through json repo folders.")
+        LOGGER.info("")
         // we should ensure the oldest repo to be iterated first, so we resort the repos here
-        val workingRepoList = allJsonRepoListSingleton.toMutableList().apply {
+        val workingRepoList = (if (jsonRepoList.isNullOrEmpty()) {
+            allJsonRepoListSingleton
+        } else jsonRepoList).toMutableList().apply {
             sortBy {
                 val lastCommitSha1 = it.getLastCommitSha1StrExtGit()
                 val revCommit = it.getRevCommitById(lastCommitSha1)
                 revCommit.authorIdent.whenAsInstant
             }
         }
-        LOGGER.info("Json repo folders: ${workingRepoList.map { it.absolutePathWithoutDotGit() }}")
+        LOGGER.info("Walking through json repo folders: ${workingRepoList.map { it.absolutePathWithoutDotGit() }}")
 
         workingRepoList.forEach outer@{ jsonRepo ->
             if (jsonRepo.isBare) {
-                LOGGER.error("Not support walking through bare repo: {}", jsonRepo.absolutePathWithoutDotGit())
+                LOGGER.debug("Not support walking through bare repo: {}", jsonRepo.absolutePathWithoutDotGit())
+                return@outer
+            }
+            if (jsonRepo.toRepoDtoOrThrow().isStatic && isSkipStatic) {
+                LOGGER.debug("skipping static repo {}", jsonRepo.simpleName())
                 return@outer
             }
             val headSha1 = jsonRepo.getLastCommitSha1StrExtGit()
@@ -403,11 +433,11 @@ object SpotChecker {
                         var line: String?
                         while (br.readLine().also { line = it } != null) {
                             val relPath = line!!
-                            val fileContent = {
+                            val fileContentGetter = {
                                 jsonRepo.getFileContentAsStringInACommit(headSha1, relPath)
                             }
                             runCatching {
-                                handler.invoke(RelPathAndContentSupp(jsonRepo, relPath, fileContent))
+                                handler.invoke(RelPathAndContentSupp(jsonRepo, relPath, fileContentGetter))
                             }.onFailure {
                                 LOGGER.error(
                                     "Ex when walking through ${jsonRepo.absolutePathWithoutDotGit()}${File.separator}${relPath}: ",
@@ -426,7 +456,7 @@ object SpotChecker {
             }
         }
         LOGGER.info(
-            "Finished walking through json repo folders. Timing: {}ms / {}",
+            "Finished walking through all json repo folders. Timing: {}ms / {}",
             System.currentTimeMillis() - timing,
             Duration.ofMillis(System.currentTimeMillis() - timing)
         )
@@ -441,6 +471,11 @@ object SpotChecker {
 
     @JvmStatic
     fun main(argv: Array<String>) {
+        var i = OffsetDateTime.now()
+            .atZoneSameInstant(ZoneOffset.ofHours(8))
+            .get(ChronoField.HOUR_OF_DAY)
+        System.err.println(i)
+        if (true) return
         // LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
         // repeat(10) { genSpotCheckListFile(SpaceType.SUBJECT) }
         // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
@@ -449,10 +484,15 @@ object SpotChecker {
 //        }
 //        randomSelectTopicIds(GitHelper.defaultArchiveRepoSingleton, spaceType = SpaceType.EP)
 //        genEmptyTopicMaskFile(SpaceType.EP)
+        val cfg = checkAndGetConfigDto()
+        setConfigDelegate(cfg)
         allJsonRepoListSingleton.forEach {
             if (it.couplingArchiveRepo() == null) return@forEach
             if (!it.simpleName().contains("gre")) return@forEach
             System.err.println(it.simpleName())
+//            genHiddenTopicMaskFile(it.couplingArchiveRepo()!!, SpaceType.PERSON)
+//            genHiddenTopicMaskFile(it.couplingArchiveRepo()!!, SpaceType.CHARACTER)
+            genHiddenTopicMaskFile(it.couplingArchiveRepo()!!, SpaceType.GROUP)
             genHiddenTopicMaskFile(it.couplingArchiveRepo()!!, SpaceType.EP)
         }
     }
@@ -469,9 +509,11 @@ object SpotChecker {
         LOGGER.info("bssize - $bsSize, bscar - $bsCar , bszero - $bsZero")
     }
 
-    fun getMaxIdByVisitingAllFiles(spaceType: SpaceType): Int {
+    fun getMaxIdByVisitingAllJsonFiles(spaceType: SpaceType, optHtmlRepo: Repository? = null): Int {
         var maxId = -1
-        walkThroughJson { (_, relPath, _) ->
+        walkThroughJson(
+            optHtmlRepo?.couplingJsonRepo()?.let { listOf(it) }
+        ) { (_, relPath, _) ->
             if (!relPath.contains(spaceType.name.lowercase())) return@walkThroughJson false
             if (!relPath.lowercase().endsWith("json")) return@walkThroughJson false
             maxId = Math.max(maxId, relPath.split("/").last().split(".").first().toIntOrNull() ?: -1)
