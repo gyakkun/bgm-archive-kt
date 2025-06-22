@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Path
+import java.time.Duration
 import java.util.*
 
 
@@ -118,7 +119,9 @@ object CommitToJsonProcessor {
                             return@breakable
                         }
 
-                        if (curCommit.fullMessage.startsWith("META") || curCommit.fullMessage.startsWith("init")) {
+                        if (curCommit.fullMessage.startsWith("META", ignoreCase = true)
+                            || curCommit.fullMessage.startsWith("init", ignoreCase = true)
+                        ) {
                             log.warn("Iterating meta or init commit for repo ${archiveRepo.simpleName()}: $curCommit")
                             return@forEachIndexed // continue
                         }
@@ -126,6 +129,14 @@ object CommitToJsonProcessor {
                         val commitSpaceType = extractSpaceTypeFromCommitOrThrow(curCommit)
                         if (firstCommitSpaceType == null) firstCommitSpaceType = commitSpaceType
                         val changedHtmlFilePathList = archiveRepo.findChangedFilePaths(prev, curCommit)
+
+                        log.info(
+                            "Processing repo = ${archiveRepo.simpleName()}, commit msg = ${
+                                curCommit.shortMessage
+                            } , commit id = ${
+                                curCommit.sha1Str().substring(0, 8)
+                            }"
+                        )
 
                         for (pathIdx in changedHtmlFilePathList.indices) {
                             val path = changedHtmlFilePathList[pathIdx]
@@ -139,11 +150,7 @@ object CommitToJsonProcessor {
                                     continue
                                 }
                                 if (!path.endsWith("html")) continue
-                                log.warn(
-                                    "Cur commit id: ${
-                                        curCommit.name().substring(0, 8)
-                                    }, path: ${archiveRepo.simpleName()}/$path , message:  ${curCommit.shortMessage}"
-                                )
+                                log.info("Parsing path: $path")
                                 val htmlSpaceType = extractSpaceTypeFromRelPathOrThrow(path)
 
                                 if (htmlSpaceType != commitSpaceType) {
@@ -169,7 +176,7 @@ object CommitToJsonProcessor {
 
                                 if (isSuccess) {
                                     noGoodIdTreeSet.remove(topicId)
-                                    log.info("Parsing $htmlSpaceType-$topicId succeeded, repo - ${archiveRepo.simpleName()}")
+                                    log.debug("Parsing $htmlSpaceType-$topicId succeeded, repo - ${archiveRepo.simpleName()}")
                                     if (resultTopicEntity?.display == true) {
                                         log.info("topic id $htmlSpaceType-$topicId, title: ${resultTopicEntity.title}")
                                     }
@@ -181,10 +188,7 @@ object CommitToJsonProcessor {
                             } catch (ex: Exception) {
                                 log.error(
                                     "Exception occurs when handling ${archiveRepo.simpleName()}/$path, commit - ${
-                                        curCommit.name.substring(
-                                            0,
-                                            8
-                                        )
+                                        curCommit.sha1Str().substring(0, 8)
                                     } - ${curCommit.shortMessage}", ex
                                 )
                             }
@@ -196,10 +200,7 @@ object CommitToJsonProcessor {
                         if (noGoodIdTreeSet.isNotEmpty()) {
                             log.error(
                                 "NG LIST during repo - ${archiveRepo.simpleName()}, commit - ${
-                                    curCommit.name.substring(
-                                        0,
-                                        8
-                                    )
+                                    curCommit.sha1Str().substring(0, 8)
                                 } -  ${curCommit.shortMessage}:\n $noGoodIdTreeSet"
                             )
                         }
@@ -209,17 +210,19 @@ object CommitToJsonProcessor {
                         outerTimingForCommit = System.currentTimeMillis() - outerTimingForCommit
                         if (outerTimingForCommit >= spotCheckerTimeoutThresholdMs) {
                             log.error(
-                                "Process commit taking longer than expected (threshold:${spotCheckerTimeoutThresholdMs}ms). Skipping generating spot check file. Cur commit: ${
-                                    curCommit.sha1Str()
-                                }"
+                                "Process commit taking longer than expected (threshold:${
+                                    spotCheckerTimeoutThresholdMs
+                                }ms). Skipping generating spot check file. Cur commit: ${
+                                    curCommit.sha1Str().substring(0, 8)
+                                } - ${curCommit.shortMessage}"
                             )
                             shouldSpotCheck = false
                         }
                         if (commitIdx != 0) {
                             log.warn(
                                 "Not processing the first commit. Not generating spot check file for safety. Cur commit: ${
-                                    curCommit.sha1Str()
-                                }"
+                                    curCommit.sha1Str().substring(0, 8)
+                                } - ${curCommit.shortMessage}"
                             )
                             shouldSpotCheck = false
                         }
@@ -245,8 +248,8 @@ object CommitToJsonProcessor {
                 }.onFailure {
                     if (shouldSpotCheck) {
                         log.error("Failed at spot check. SpaceType=${firstCommitSpaceType!!}")
+                    }
                 }
-            }
             }
         }
     }
@@ -351,7 +354,7 @@ object CommitToJsonProcessor {
                 log.warn("Done removing json files for commit : {}", archiveCommit.shortMessage)
             }
         }
-        log.info("Timing: $timing for git add/commit ${archiveCommit.fullMessage}")
+        log.info("Timing: $timing ms / ${Duration.ofMillis(timing)} for git add/commit ${archiveCommit.shortMessage}")
     }
 
     private fun removeJsonFiles(jsonRepo: Repository, changedHtmlFilePathList: List<String>) {
