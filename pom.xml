@@ -18,7 +18,7 @@
         <kotlin.compiler.jvmTarget>${lts.jdk.version}</kotlin.compiler.jvmTarget>
         <maven.compiler.source>${lts.jdk.version}</maven.compiler.source>
         <maven.compiler.target>${lts.jdk.version}</maven.compiler.target>
-        <kt.major.version>2.1.21</kt.major.version>
+        <kt.major.version>2.2.0</kt.major.version>
         <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
     </properties>
 
