@@ -153,7 +153,7 @@ object SpotChecker {
 
         spotCheckedBs.or(hiddenBs)
         val remainZeroCount = spotCheckedBs.size() - spotCheckedBs.cardinality()
-        val fakeTotalCount = (hiddenBs.size() - hiddenBs.cardinality()).coerceAtLeast(remainZeroCount)
+        val fakeTotalCount = (hiddenBs.size() - hiddenBs.cardinality()).coerceAtLeast(spotCheckedBs.size() - hiddenBs.cardinality())
         LOGGER.info(
             "Current approximate not spot-checked count: $spaceType - $remainZeroCount / $fakeTotalCount ," +
                     " spot-checked ratio: ${
