@@ -328,8 +328,10 @@ object HttpServer {
         val syncHealth = java.util.concurrent.atomic.AtomicBoolean(true)
         val now = Instant.now()
         val lastCommits = GitHelper.allRepoInDisplayOrder
-            .map { it.folderName() to it.getLatestCommitRef() }
-            .associate { (folderName, commit) ->
+            .map { it to it.getLatestCommitRef() }
+            .associate { (repo, commit) ->
+                val folderName = repo.folderName()
+                val dto = repo.toRepoDtoOrThrow()
                 @Suppress("unused")
                 folderName to object {
                     val commitMsg = commit.shortMessage.trim()
@@ -341,7 +343,9 @@ object HttpServer {
                         _commitTime,
                         now
                     ).also {
-                        if ("old" !in folderName && it.minusMinutes(15L).isPositive) {
+                        if (("old" !in folderName) && !dto.isStatic
+                            && it.minusMinutes(15L).isPositive
+                        ) {
                             syncHealth.set(false)
                         }
                     }.toHumanReadable()
