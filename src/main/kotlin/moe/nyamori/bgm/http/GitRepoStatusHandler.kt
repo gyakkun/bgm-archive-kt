@@ -11,7 +11,6 @@ import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import moe.nyamori.bgm.util.getSelfVersion
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.time.Duration
 import kotlin.math.absoluteValue
 import kotlin.math.ln
 import kotlin.math.pow
@@ -54,22 +53,6 @@ object HumanReadable {
     }
 
     fun Long.commaFormatted() = "%,d".format(this)
-    fun Duration.toHumanReadable() = this.toString()
-        .replace("PT", "")
-        .replace("\\.\\d+".toRegex(), "")
-        .replace("[a-zA-Z]".toRegex()) { it.value + " " }
-        .replace("\\d+(?=H)".toRegex()) {
-            it.value
-                .toIntOrNull()
-                ?.let {
-                    val d = it / 24
-                    val h = it % 24
-                    "${d}D $h".takeIf { d > 0 }
-                }
-                ?: it.value
-        }
-        .removeSuffix(" ")
-        .lowercase()
 }
 
 

@@ -18,12 +18,12 @@ import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
-import moe.nyamori.bgm.http.HumanReadable.toHumanReadable
-import moe.nyamori.bgm.http.JvmStatusHandler.toUtcP0800
+import moe.nyamori.bgm.util.toHumanReadable
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.getSelfVersion
+import moe.nyamori.bgm.util.prettyMsTs
 import org.eclipse.jetty.http.HttpGenerator
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -340,10 +340,10 @@ object HttpServer {
                     val commitMsg = commit.shortMessage.trim()
 
                     @Transient
-                    private val _commitTime = Instant.ofEpochMilli(commit.timestampHint()).toUtcP0800()
-                    val commitTime = _commitTime.toString()
+                    private val _msTsHint = commit.timestampHint()
+                    val commitTime = prettyMsTs(_msTsHint)
                     val elapsed = Duration.between(
-                        _commitTime.toInstant(),
+                        Instant.ofEpochMilli(_msTsHint),
                         now
                     ).also {
                         if (("old" !in folderName) && !dto.isStatic
@@ -373,11 +373,11 @@ object HttpServer {
         ctx.prettyJson(object {
             var isAvailable = isAvailable
             val version = getSelfVersion()
-            val startTime = JvmStatusHandler.prettyMsTs(ManagementFactory.getRuntimeMXBean().startTime)
+            val startTime = prettyMsTs(ManagementFactory.getRuntimeMXBean().startTime)
             val holes = holes.filter { it.value.isNotEmpty() }
             val lastCommits = lastCommits
             val lastDownTimestamp = HttpServer.lastDownTimestamp.let {
-                if (it == Long.MAX_VALUE) "long time ago" else Instant.ofEpochMilli(it).toString()
+                if (it == Long.MAX_VALUE) "long time ago" else prettyMsTs(it)
             }
         }, printLog = !isAvailable)
     }
