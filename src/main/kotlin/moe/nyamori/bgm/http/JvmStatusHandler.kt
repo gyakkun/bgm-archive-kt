@@ -10,12 +10,16 @@ import io.javalin.http.Handler
 import io.javalin.json.JavalinJackson
 import io.javalin.json.toJsonString
 import moe.nyamori.bgm.http.HumanReadable.commaFormatted
+import moe.nyamori.bgm.http.HumanReadable.toHumanReadable
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadableBytes
 import org.slf4j.LoggerFactory
 import java.lang.management.ManagementFactory
 import java.net.InetAddress
 import java.sql.Timestamp
+import java.time.Duration
 import java.time.Instant
+import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import kotlin.math.abs
 
 
@@ -73,18 +77,23 @@ object JvmStatusHandler : Handler {
                                 if (Long::class.java.isAssignableFrom(this.type.rawClass)) {
                                     val v = this.get(bean) as Long /* value*/
                                     when (k) {
-                                        in nanosFields -> gen.writeStringField(k, "${v.commaFormatted()} ns")
-                                        in millisFields -> gen.writeStringField(k, "${v.commaFormatted()} ms")
+                                        in nanosFields -> gen.writeStringField(
+                                            k,
+                                            "${v.commaFormatted()} ns / ${Duration.ofNanos(v).toHumanReadable()}"
+                                        )
+
+                                        in millisFields -> gen.writeStringField(
+                                            k,
+                                            "${v.commaFormatted()} ms / ${Duration.ofMillis(v).toHumanReadable()}"
+                                        )
                                         in timestampFields -> {
                                             if (abs(v - System.currentTimeMillis()) <= 365L * 86400 * 1000) {
-                                                gen.writeStringField(k, Timestamp(v).toInstant().toString())
+                                                gen.writeStringField(k, prettyMsTs(v))
                                             } else {
                                                 val actualTs = ManagementFactory.getRuntimeMXBean().startTime + v
-                                                val diffNow = System.currentTimeMillis() - actualTs
                                                 gen.writeStringField(
                                                     k,
-                                                    "T-${diffNow.commaFormatted()} ms , T+${v.commaFormatted()} ms - "
-                                                            + Timestamp(actualTs).toInstant().toString()
+                                                    prettyMsTs(actualTs)
                                                 )
                                             }
                                         }
@@ -109,6 +118,17 @@ object JvmStatusHandler : Handler {
             })
         })
     }
+
+    fun prettyMsTs(msTs: Long): String {
+        val now = System.currentTimeMillis()
+        val diffNow = now - msTs
+        val v = msTs - ManagementFactory.getRuntimeMXBean().startTime // orig v
+        return "${Timestamp(msTs).toInstant().toUtcP0800()} , T-${diffNow.commaFormatted()} ms / -${
+            Duration.ofMillis(diffNow).toHumanReadable()
+        } , ST+${v.commaFormatted()} ms / +${Duration.ofMillis(v).toHumanReadable()}"
+    }
+
+    fun Instant.toUtcP0800(): OffsetDateTime = Instant.ofEpochSecond(epochSecond).atOffset(ZoneOffset.ofHours(8))
 
     override fun handle(ctx: Context) {
         val res = object {

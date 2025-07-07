@@ -19,13 +19,16 @@ import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadable
+import moe.nyamori.bgm.http.JvmStatusHandler.toUtcP0800
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.RangeHelper
+import moe.nyamori.bgm.util.getSelfVersion
 import org.eclipse.jetty.http.HttpGenerator
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
+import java.lang.management.ManagementFactory
 import java.net.URI
 import java.time.Duration
 import java.time.Instant
@@ -337,10 +340,10 @@ object HttpServer {
                     val commitMsg = commit.shortMessage.trim()
 
                     @Transient
-                    private val _commitTime = Instant.ofEpochMilli(commit.timestampHint())
+                    private val _commitTime = Instant.ofEpochMilli(commit.timestampHint()).toUtcP0800()
                     val commitTime = _commitTime.toString()
                     val elapsed = Duration.between(
-                        _commitTime,
+                        _commitTime.toInstant(),
                         now
                     ).also {
                         if (("old" !in folderName) && !dto.isStatic
@@ -369,6 +372,8 @@ object HttpServer {
         @Suppress("unused")
         ctx.prettyJson(object {
             var isAvailable = isAvailable
+            val version = getSelfVersion()
+            val startTime = JvmStatusHandler.prettyMsTs(ManagementFactory.getRuntimeMXBean().startTime)
             val holes = holes.filter { it.value.isNotEmpty() }
             val lastCommits = lastCommits
             val lastDownTimestamp = HttpServer.lastDownTimestamp.let {

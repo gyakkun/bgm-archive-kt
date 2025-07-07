@@ -8,6 +8,7 @@ import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadableBytes
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
+import moe.nyamori.bgm.util.getSelfVersion
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.Duration
@@ -18,6 +19,7 @@ import kotlin.math.pow
 object GitRepoStatusHandler : Handler {
     override fun handle(ctx: Context) {
         val res = object {
+            val version = getSelfVersion()
             val gitRepositories = GitHelper.allRepoInDisplayOrder
                 .associate {
                     it.folderName() to run {
