@@ -10,6 +10,7 @@ import moe.nyamori.bgm.config.getCouplingArchiveRepo
 import moe.nyamori.bgm.config.getCouplingJsonRepo
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
+import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.diff.DiffEntry.DEV_NULL
@@ -27,6 +28,7 @@ import org.eclipse.jgit.treewalk.TreeWalk
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.charset.StandardCharsets
+import kotlin.time.Duration.Companion.nanoseconds
 
 object GitHelper {
     private val log = LoggerFactory.getLogger(GitHelper.javaClass)
@@ -46,6 +48,7 @@ object GitHelper {
 
     val allRepoInDisplayOrder by lazy {
         allArchiveRepoListSingleton
+            .sortedBy { -1L * it.getRevCommitById(it.getLastCommitSha1StrExtGit()).timestampHint() }
             .filter { it.hasCouplingJsonRepo() }
             .map { listOf(it, it.couplingJsonRepo()!!) }
             .flatten()
