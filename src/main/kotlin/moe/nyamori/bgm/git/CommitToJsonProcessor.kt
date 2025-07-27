@@ -46,7 +46,7 @@ object CommitToJsonProcessor {
         val reposToProcess = mutableListOf<Repository>()
         if (isAll) {
             GitHelper.allArchiveRepoListSingleton
-                .filter { it.hasCouplingJsonRepo() && !it.toRepoDtoOrThrow().isStatic }
+                .filter { it.hasCouplingJsonRepo() && !it.toRepoDtoOrThrow().optIsStatic }
                 .map { reposToProcess.add(it) }
         } else {
             if (htmlRepoId in GitHelper.allArchiveRepoListSingleton.map { it.toRepoDtoOrThrow().id }

@@ -116,12 +116,10 @@ data class RepoDto(
     val id: Int,
     val path: String,
     val type: RepoType,
-    val friendlyName: String,
-    @Deprecated("should use spotCheckSizeByType in config dto")
-    val expectedCommitPerDay: Int,
+    val optFriendlyName: String,
     val optRepoIdCouplingWith: Int?,
-    val isStatic: Boolean,
-    val mutexTimeoutMs: Long,
+    val optIsStatic: Boolean,
+    val optMutexTimeoutMs: Long,
 ) {
     @Transient
     private val lock = ReentrantLock()
@@ -131,8 +129,8 @@ data class RepoDto(
 
     fun <T> withLock(action: () -> T): T {
         try {
-            if (!lock.tryLock(mutexTimeoutMs, TimeUnit.MILLISECONDS)) {
-                throw IllegalStateException("Failed to acquire lock after $mutexTimeoutMs ms")
+            if (!lock.tryLock(optMutexTimeoutMs, TimeUnit.MILLISECONDS)) {
+                throw IllegalStateException("Failed to acquire lock after $optMutexTimeoutMs ms")
             }
             return action()
         } finally {
@@ -140,9 +138,6 @@ data class RepoDto(
         }
     }
 }
-
-val Repository.expectedCommitPerDay: Int
-    get() = toRepoDtoOrThrow().expectedCommitPerDay
 
 fun Repository.toRepoDtoOrThrow(): RepoDto {
     val that = this

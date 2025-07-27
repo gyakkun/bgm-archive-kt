@@ -102,7 +102,6 @@ data class RepoReadout(
     val path: String?,
     val type: String?,
     val optFriendlyName: String?,
-    val optExpectedCommitPerDay: Int?,
     val optRepoIdCouplingWith: Int?,
     val optIsStatic: Boolean?,
     val optMutexTimeoutMs: Long?,
@@ -171,7 +170,6 @@ fun ConfigReadout.toDto(): ConfigDto {
                     RepoType.valueOf(r.type.uppercase()),
                     r.optFriendlyName
                         ?: Path(finRepoPath).name /* The last part of the name, FIXME what if it's a dot git folder? */,
-                    r.optExpectedCommitPerDay ?: 150,
                     r.optRepoIdCouplingWith,
                     r.optIsStatic ?: true,
                     r.optMutexTimeoutMs ?: 5_000L

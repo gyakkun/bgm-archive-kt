@@ -416,7 +416,7 @@ object SpotChecker {
                 LOGGER.debug("Not support walking through bare repo: {}", jsonRepo.absolutePathWithoutDotGit())
                 return@outer
             }
-            if (jsonRepo.toRepoDtoOrThrow().isStatic && isSkipStatic) {
+            if (jsonRepo.toRepoDtoOrThrow().optIsStatic && isSkipStatic) {
                 LOGGER.debug("skipping static repo {}", jsonRepo.simpleName())
                 return@outer
             }

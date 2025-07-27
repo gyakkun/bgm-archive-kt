@@ -11,7 +11,7 @@ object TopicListHelper {
     fun getTopicList(spaceType: SpaceType): List<Int> {
         var result = listOf(-1)
         GitHelper.allArchiveRepoListSingleton.forEach { repo ->
-            if (repo.toRepoDtoOrThrow().isStatic) return@forEach
+            if (repo.toRepoDtoOrThrow().optIsStatic) return@forEach
             runCatching {
                 val topicListFile = repo.getFileContentAsStringInACommit(
                     repo.getPrevProcessedArchiveCommitRef().sha1Str(),

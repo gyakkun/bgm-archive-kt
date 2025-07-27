@@ -47,7 +47,7 @@ object JsonToDbProcessor {
         val reposToProcess = mutableListOf<Repository>()
         if (isAll) {
             allJsonRepoListSingleton
-                .filter { it.hasCouplingArchiveRepo() && !it.toRepoDtoOrThrow().isStatic }
+                .filter { it.hasCouplingArchiveRepo() && !it.toRepoDtoOrThrow().optIsStatic }
                 .map { reposToProcess.add(it) }
         } else {
             if (jsonRepoId in allJsonRepoListSingleton.map { it.toRepoDtoOrThrow().id }

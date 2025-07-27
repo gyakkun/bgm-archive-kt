@@ -346,7 +346,7 @@ object HttpServer {
                         Instant.ofEpochMilli(_msTsHint),
                         now
                     ).also {
-                        if (("old" !in folderName) && !dto.isStatic
+                        if (("old" !in folderName) && !dto.optIsStatic
                             && it.minusMinutes(15L).isPositive
                         ) {
                             syncHealth.set(false)
