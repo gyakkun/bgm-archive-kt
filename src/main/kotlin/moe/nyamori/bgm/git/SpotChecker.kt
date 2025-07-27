@@ -50,13 +50,6 @@ object SpotChecker {
     const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 100
     const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
     val HOLE_CHECK_SKIP_TYPE = listOf(SpaceType.EP, SpaceType.CHARACTER, SpaceType.PERSON)
-    private val HOLE_CHECKED_TYPE_SET = mutableSetOf<SpaceType>()
-
-    @Deprecated("user HOLE_CHECK_SIZE_PER_TYPE")
-    val HOLE_CHECKED_SET_SIZE_LIMIT: Int
-        get() {
-            return HOLE_CHECKED_TYPE_SET.size.coerceAtLeast(1) * 25
-        }
 
     // TODO: Make it configurable
     const val HOLE_CHECK_SIZE_PER_TYPE: Int = 25
@@ -72,34 +65,40 @@ object SpotChecker {
         if (Config.disableSpotCheck) return
         LOGGER.info("Generating spot check list file $SPOT_CHECK_BITSET_FILE_NAME for $spaceType.")
         val scList = randomSelectTopicIds(archiveRepo, spaceType)
+        val holesInTopicListRange = checkIfHolesInTopicListRange(spaceType, getTopicList(spaceType))
+        writeSpotCheckFile(archiveRepo, spaceType, scList + holesInTopicListRange)
+    }
+
+    fun writeSpotCheckFile(archiveRepo: Repository, spaceType: SpaceType, topicList: List<Int>) {
+        LOGGER.info(
+            "Writing spot check file for repo {}, space type {}",
+            archiveRepo.absolutePathWithoutDotGit(),
+            spaceType
+        )
         val scFile =
             File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_LIST_FILE_NAME")
         if (!scFile.exists()) {
             LOGGER.error("Spot check list file for $spaceType not found! Creating one.")
             scFile.createNewFile()
         }
-        val holesInTopicListRange = checkIfHolesInTopicListRange(spaceType, getTopicList(spaceType))
-
         FileWriter(scFile).use { fw ->
             BufferedWriter(fw).use { bw ->
-                scList.forEach {
-                    bw.write(it.toString())
-                    bw.write("\n")
-                }
-                holesInTopicListRange.forEach {
+                topicList.forEach {
                     bw.write(it.toString())
                     bw.write("\n")
                 }
                 bw.flush()
             }
         }
+        LOGGER.info(
+            "Done writing spot check file for repo {}, space type {}",
+            archiveRepo.absolutePathWithoutDotGit(),
+            spaceType
+        )
     }
-
 
     private val HOLE_CHECKED_SET_BY_TYPE = mutableMapOf<SpaceType, MutableSet<Int>>()
 
-    @Deprecated("use HOLE_CHECKED_SET_BY_TYPE")
-    private val HOLE_CHECKED_SET = HashSet<Pair<SpaceType, Int>>() // Maintain in memory
     fun checkIfHolesInTopicListRange(spaceType: SpaceType, topicList: List<Int>): List<Int> {
         if (spaceType in HOLE_CHECK_SKIP_TYPE) return emptyList()
         val checkedIds = HOLE_CHECKED_SET_BY_TYPE.computeIfAbsent(spaceType) { mutableSetOf() }
@@ -173,6 +172,9 @@ object SpotChecker {
                 result.add(tmpId)
             }
             LOGGER.info("The last batch to spot check for $spaceType: $result")
+            LOGGER.info("Writing spot check file earlier due to the long time bitmask regen may take.")
+            writeSpotCheckFile(archiveRepo, spaceType, result)
+            LOGGER.info("Done writing spot check file before bitmask regen")
             // Reset the bitset file
             LOGGER.info("Writing empty spot check bitset file for $spaceType.")
             writeBitsetToFile(
