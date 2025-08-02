@@ -79,68 +79,38 @@ object FileHistoryLookup {
         jsonCommitList: List<CommitHashAndTimestampAndMsg>,
         archiveCommitList: List<CommitHashAndTimestampAndMsg>
     ): TreeMap<Long, ChatamPair> {
-        // A sentinel to simulate null handling
-        val dummyChatamPair = ChatamPair(
-            spaceType, -1,
-            CommitHashAndTimestampAndMsg(
-                allJsonRepoListSingleton.first(),
-                "", -1L, -1L, ""
-            ),
-            CommitHashAndTimestampAndMsg(
-                allArchiveRepoListSingleton.first(),
-                "", -1L, -1L, ""
-            )
-        )
-        val jsonChatamByTsTm = TreeMap(jsonCommitList.associateBy { it.timestampHint() })
+        val jsonChatamByTs = jsonCommitList.associateBy { it.timestampHint() }
         val tsList = archiveCommitList
             .filter {
-                if (spaceType !in setOf(SpaceType.CHARACTER, SpaceType.PERSON)) {
-                    return@filter jsonChatamByTsTm.contains(it.timestampHint())
-                            // Special handling
-                            || (jsonChatamByTsTm.isNotEmpty() && it.msg.startsWith("META"))
-                } else {
-                    return@filter true
-                }
+                jsonChatamByTs.contains(it.timestampHint())
+                        // Special handling
+                        || (jsonChatamByTs.isNotEmpty() && it.msg.startsWith("META"))
             }
             .associate { htmlChatam ->
-                val thePairedJsonChatam = jsonChatamByTsTm[htmlChatam.timestampHint()] ?: run {
-                    if (spaceType !in setOf(SpaceType.CHARACTER, SpaceType.PERSON)) {
-                        // This special handling means that we can't find a paired json commit with the same
-                        // timestamp in the html commit. We use ceiling to find the next commit of the least great
-                        // timestamp in json repo of the same path to ensure the json file for this html file exists.
-                        // If still not exists then finally we will fall back to the first json file (tm.firstEntry().value)
-                        // We don't worry about if the json list is empty because the previous filter will prevent
-                        // this from happening.
-                        //
-                        // This special handling is mainly for the first batch of historical data of GROUP topics.
-                        // See the commit "META: ADD HISTORICAL DATA." in bgm-archive-old repo.
-                        log.warn(
-                            "Seems we need to do special handling for commit: {} , timestampHint = {}",
-                            htmlChatam.msg.trim(),
-                            Instant.ofEpochMilli(htmlChatam.timestampHint())
-                        )
-                        val res = jsonChatamByTsTm.ceilingEntry(htmlChatam.timestampHint())?.value
-                            ?: jsonChatamByTsTm.firstEntry().value
-                        log.warn(
-                            "Html commit {} mapped to json commit {}. Time diff (html-json) = {}",
-                            htmlChatam.msg.trim(),
-                            res.msg.trim(),
-                            Duration.ofMillis(htmlChatam.timestampHint() - res.timestampHint())
-                        )
-                        res
-                    } else {
-                        // We do special handling for character and person because there are extra info
-                        // that is not counted into hashing in json files. We keep this info by remaining
-                        // all html commits, later when extracting timestamps from these pairs,
-                        // if it's "isHtml=true", then we return all. If it's for json only, then we
-                        // do further filtering to get the distinct result. See getJsonTimestampList()
-                        if (jsonChatamByTsTm.isEmpty()) return@associate -1L to dummyChatamPair
-                        // We use floor here because the newer html, if it has nothing changed in comments and description
-                        // of the character/person, should be mapped to the next least old json commit.
-                        val res = jsonChatamByTsTm.floorEntry(htmlChatam.timestampHint())?.value
-                            ?: jsonChatamByTsTm.firstEntry().value
-                        res
-                    }
+                val thePairedJsonChatam = jsonChatamByTs[htmlChatam.timestampHint()] ?: run {
+                    // This special handling means that we can't find a paired json commit with the same
+                    // timestamp in the html commit. We use ceiling to find the next commit of the least great
+                    // timestamp in json repo of the same path to ensure the json file for this html file exists.
+                    // If still not exists then finally we will fall back to the first json file (tm.firstEntry().value)
+                    // We don't worry about if the json list is empty because the previous filter will prevent
+                    // this from happening.
+                    //
+                    // This special handling is mainly for the first batch of historical data of GROUP topics.
+                    // See the commit "META: ADD HISTORICAL DATA." in bgm-archive-old repo.
+                    log.warn(
+                        "Seems we need to do special handling for commit: {} , timestampHint = {}",
+                        htmlChatam.msg.trim(),
+                        Instant.ofEpochMilli(htmlChatam.timestampHint())
+                    )
+                    val tm = TreeMap(jsonChatamByTs)
+                    val res = tm.ceilingEntry(htmlChatam.timestampHint())?.value ?: tm.firstEntry().value
+                    log.warn(
+                        "Html commit {} mapped to json commit {}. Time diff (html-json) = {}",
+                        htmlChatam.msg.trim(),
+                        res.msg.trim(),
+                        Duration.ofMillis(htmlChatam.timestampHint() - res.timestampHint())
+                    )
+                    res
                 }
 
                 // This is to extract the accurate timestamp from meta_ts.txt file
@@ -182,7 +152,7 @@ object FileHistoryLookup {
                     topicId,
                     thePairedJsonChatam, htmlChatam
                 )
-            }.filter { it.value !== dummyChatamPair }
+            }
         return TreeMap<Long, ChatamPair>().apply { putAll(tsList) }
     }
 
@@ -431,28 +401,7 @@ object FileHistoryLookup {
     }
 
     fun getJsonTimestampList(spaceType: SpaceType, topicId: Int): SortedSet<Long> {
-        if (spaceType !in setOf(SpaceType.CHARACTER, SpaceType.PERSON)) {
-            return spaceTypeTopicIdPairToChatamPairCache.get(spaceType to topicId).navigableKeySet()
-        }
-        val raw = spaceTypeTopicIdPairToChatamPairCache.get(spaceType to topicId)
-        // we need to get the json commit out of the list
-        val exactTsToJsonCommit = raw.mapValues { it.value.json }
-        // Due to our special handling for person and character, this is possible:
-        // html exact ts : json commit ts
-        // 0123 : 0125
-        // 1234 : 1235
-        // 2345 : 1235
-        // 3456 : 1235
-        // 5678 : 5679
-        // We need to return 0123, 1234, 5678
-        val jsonCommitToTsList =
-            exactTsToJsonCommit.entries.groupBy { it.value } // group by k = json commit, v = original entry
-                .mapValues {
-                    it.value// unwrap the original entry
-                        .map { it.key } // unwrap the timestamps
-                        .minOf { it } // the min exact timestamp of all html commits
-                }
-        return jsonCommitToTsList.values.toSortedSet()
+        return spaceTypeTopicIdPairToChatamPairCache.get(spaceType to topicId).navigableKeySet()
     }
 }
 
