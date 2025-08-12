@@ -36,7 +36,7 @@ object ParserHelper {
         if (split.size <= 1) return null
         val split2 = split.last().split(".")
         if (split2.size <= 1) return null
-        return split2[0].toIntOrNull()
+        return split2[0].toCharArray().takeWhile { it.isDigit() }.joinToString("").toIntOrNull()
     }
 
     private val CSS_REV_REGEX = Regex("css\\?r(\\d+)+")

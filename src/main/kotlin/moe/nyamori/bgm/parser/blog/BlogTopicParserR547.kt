@@ -126,7 +126,8 @@ object BlogTopicParserR547 : Parser {
     private fun getUidFromAvatarBgOrSrc(userAvatarImgSrc: String): Int {
         return userAvatarImgSrc.substring(userAvatarImgSrc.lastIndexOf("/") + 1, userAvatarImgSrc.lastIndexOf("jpg"))
             .toCharArray()
-            .filter { it.isDigit() }.joinToString(separator = "").let {
+            .takeWhile { it.isDigit() }
+            .joinToString(separator = "").let {
                 if (it.isBlank()) {
                     return@let -1
                 }
