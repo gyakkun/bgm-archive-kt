@@ -31,7 +31,8 @@ object ParserHelper {
         }
     }
 
-    fun getUidFromBgStyle(topPostUserBgStyle: String): Int? {
+    fun getUidFromBgStyle(topPostUserBgStyle: String?): Int? {
+        if (topPostUserBgStyle == null) return null
         val split = topPostUserBgStyle.split("/")
         if (split.size <= 1) return null
         val split2 = split.last().split(".")
