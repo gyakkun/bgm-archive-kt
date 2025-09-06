@@ -65,4 +65,7 @@ enum class SpaceType(val id: Int) {
     CHARACTER(300) // TBC
 }
 
+val SpaceType.likeTypeId: Int
+    get() = if (this == SpaceType.BLOG) 21 else this.id
+
 fun SpaceType.lowercaseName(): String = this.name.lowercase()
