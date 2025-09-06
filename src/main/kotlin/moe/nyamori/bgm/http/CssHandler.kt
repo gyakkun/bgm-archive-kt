@@ -27,6 +27,7 @@ open class CssHandler(
                                 ?: ctx.path()
                             )
                 )
+                return
             }
             return@let revList.ceiling(it)
         }
