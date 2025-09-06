@@ -11,7 +11,6 @@ import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.db.*
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.model.likeTypeId
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
 import java.time.Duration
@@ -164,12 +163,12 @@ object ForumEnhanceHandler : Handler {
         }
         val likesSumByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikesSumRow>> {
             timingWrapper("getLikesSumByTypeAndUsernameList") {
-                Dao.bgmDao.getLikesSumByTypeAndUsernameList(spaceType.likeTypeId, usernameList)
+                Dao.bgmDao.getLikesSumByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likeRevSumByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikesSumRow>> {
             timingWrapper("getLikeRevSumByTypeAndUsernameList") {
-                Dao.bgmDao.getLikeRevSumByTypeAndUsernameList(spaceType.likeTypeId, usernameList)
+                Dao.bgmDao.getLikeRevSumByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val postCountSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VPostCountSpaceRow>> {
@@ -214,17 +213,17 @@ object ForumEnhanceHandler : Handler {
         }
         val likeRevCountForSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikeRevCountSpaceRow>> {
             timingWrapper("getLikeRevStatForSpaceByTypeAndUsernameList") {
-                Dao.bgmDao.getLikeRevStatForSpaceByTypeAndUsernameList(spaceType.likeTypeId, usernameList)
+                Dao.bgmDao.getLikeRevStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val likeCountForSpaceByTypeAndUsernameList = VT_EXECUTOR.submit<List<VLikeCountSpaceRow>> {
             timingWrapper("getLikeStatForSpaceByTypeAndUsernameList") {
-                Dao.bgmDao.getLikeStatForSpaceByTypeAndUsernameList(spaceType.likeTypeId, usernameList)
+                Dao.bgmDao.getLikeStatForSpaceByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val userLatestLikeRevByTypeAndUsernameList = VT_EXECUTOR.submit<List<VUserLatestLikeRevRow>> {
             timingWrapper("getUserLatestLikeRevByTypeAndUsernameList") {
-                Dao.bgmDao.getUserLatestLikeRevByTypeAndUsernameList(spaceType.likeTypeId, usernameList)
+                Dao.bgmDao.getUserLatestLikeRevByTypeAndUsernameList(spaceType.id, usernameList)
             }
         }
         val vAllPostCountRows = allPostCountByTypeAndUsernameList.get()
