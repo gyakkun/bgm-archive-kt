@@ -78,29 +78,36 @@ object TopicJsonHelper {
     fun getLikeListFromTopic(topic: Topic): List<Like> {
         if (!isValidTopic(topic)) return emptyList()
         if (topic.space?.meta?.get("data_likes_list") == null) return emptyList()
+        val isBlog = topic.space?.type == SpaceType.BLOG
+        val blogId = topic.id
         return runCatching {
             val dataLikesList = topic.space!!.meta!!["data_likes_list"] as Map<String, Any?>
             dataLikesList.map {
-                val pid = it.key.toInt()
+                val pidReadout = it.key.toInt()
+                val isBlogMainPost = isBlog && pidReadout == blogId
+                val pid = if (isBlogMainPost) -blogId else pidReadout
                 val faces = it.value
                 if (faces is Map<*, *>) {
                     val res = ArrayList<Like>()
                     (faces as Map<String, Any?>).forEach {
                         val m = it.value as Map<String, Any?>
-                        val mid = somethingToInt(m["main_id"])
+                        // TODO : Duplicate code refactor
+                        val mid = if (isBlogMainPost) blogId else somethingToInt(m["main_id"])
                         val value = somethingToInt(m["value"])
                         val total = getTotal(m)
-                        res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
+                        val like  = Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total)
+                        res.add(like)
                     }
                     return@map res
                 } else if (faces is List<*>) {
                     val res = ArrayList<Like>()
                     (faces as List<Map<String, Any?>>).forEach {
                         val m = it
-                        val mid = somethingToInt(m["main_id"])
+                        val mid = if (isBlogMainPost) blogId else somethingToInt(m["main_id"])
                         val value = somethingToInt(m["value"])
                         val total = getTotal(m)
-                        res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
+                        val like = Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total)
+                        res.add(like)
                     }
                     return@map res
                 } else {
@@ -115,24 +122,28 @@ object TopicJsonHelper {
     fun getLikeRevListFromTopic(topic: Topic): List<LikeRevUsername> {
         if (!isValidTopic(topic)) return emptyList()
         if (topic.space?.meta?.get("data_likes_list") == null) return emptyList()
+        val isBlog = topic.space?.type == SpaceType.BLOG
+        val blogId = topic.id
         return runCatching {
 
             val dataLikesList = topic.space!!.meta!!["data_likes_list"] as Map<String, Any?>
             dataLikesList.map {
-                val pid = it.key.toInt()
+                val pidReadout = it.key.toInt()
+                val isBlogMainPost = isBlog && pidReadout == blogId
+                val pid = if (isBlogMainPost) -blogId else pidReadout
                 val faces = it.value
                 if (faces is Map<*, *>) {
                     val res = ArrayList<LikeRevUsername>()
                     (faces as Map<String, Any?>).forEach {
                         val m = it.value as Map<String, Any?>
-                        if (extractLikesRevFromMap(m, res, topic, pid)) return@forEach
+                        if (extractLikesRevFromMap(m, res, topic, pid, isBlogMainPost, blogId)) return@forEach
                     }
                     return@map res
                 } else if (faces is List<*>) {
                     val res = ArrayList<LikeRevUsername>()
                     (faces as List<Map<String, Any?>>).forEach {
                         val m = it
-                        if (extractLikesRevFromMap(m, res, topic, pid)) return@forEach
+                        if (extractLikesRevFromMap(m, res, topic, pid, isBlogMainPost, blogId)) return@forEach
                     }
                     return@map res
                 } else {
@@ -148,9 +159,11 @@ object TopicJsonHelper {
         m: Map<String, Any?>,
         res: ArrayList<LikeRevUsername>,
         topic: Topic,
-        pid: Int
+        pid: Int,
+        isBlogMainPost: Boolean,
+        blogId: Int
     ): Boolean {
-        val mid = somethingToInt(m["main_id"])
+        val mid = if(isBlogMainPost) blogId else somethingToInt(m["main_id"])
         val value = somethingToInt(m["value"])
         val users = (m["users"] as List<Map<String, Any?>>?) ?: return true
         users.forEach {
