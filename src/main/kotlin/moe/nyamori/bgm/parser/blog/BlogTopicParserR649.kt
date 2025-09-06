@@ -1,5 +1,7 @@
 package moe.nyamori.bgm.parser.blog
 
+import com.google.gson.JsonObject
+import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.parser.Parser
 import moe.nyamori.bgm.util.ParserHelper
@@ -42,8 +44,17 @@ object BlogTopicParserR649 : Parser {
             // comment list R547
             val blogCommentListDiv: JXNode = bodyNode.selOne("//*[@id=\"comment_list\"]") // nullable
 
+            var meta: Map<String, Any>? = null
+            val dataLikesList = extractDataLikeList(htmlFileString) // may be introduced in the future, keep it for now
+
+            if (dataLikesList != null) {
+                val dataLikesListJson = GitHelper.GSON.fromJson(dataLikesList, JsonObject::class.java)
+                meta = mutableMapOf()
+                meta.put("data_likes_list", dataLikesListJson)
+            }
+
             val (blogTopicWithoutCommentList, blogPostUser) =
-                extractBlogInfo(topicId, blogTitleH1, blogPostDateSmallText, blogTagDiv, blogRelatedSubjectDiv, authorUserCardDiv)
+                extractBlogInfo(topicId, blogTitleH1, blogPostDateSmallText, blogTagDiv, blogRelatedSubjectDiv, authorUserCardDiv, meta)
 
             val blogPostList: MutableList<Post> =
                 extractBlogEntryAndCommentList(
@@ -69,7 +80,8 @@ object BlogTopicParserR649 : Parser {
         blogPostDateSmallText: JXNode,
         blogTagDiv: JXNode?,
         blogRelatedSubjectDiv: JXNode?,
-        authorUserCardDiv: JXNode
+        authorUserCardDiv: JXNode,
+        meta: Map<String, Any>?
     ): Pair<Topic, User> {
         val blogTitle = blogTitleH1.selOne("/text()").asString()
         // val avatarAnchor: JXNode = blogTitleH1.selOne("/span/a[1]")
@@ -99,7 +111,8 @@ object BlogTopicParserR649 : Parser {
                 id = blogId,
                 space = Blog(
                     tags = tagList,
-                    relatedSubjectIds = relatedSubjectIdList
+                    relatedSubjectIds = relatedSubjectIdList,
+                    meta = meta
                 ),
 
                 uid = blogPostUser.id,
@@ -109,6 +122,14 @@ object BlogTopicParserR649 : Parser {
                 topPostPid = -blogId
             ), blogPostUser
         )
+    }
+
+    private fun extractDataLikeList(htmlFileString: String): String? {
+        return htmlFileString.lineSequence()
+            .filter { it.startsWith("var data_likes_list = {") && it.endsWith("};") }
+            .firstOrNull()
+            ?.substringAfter("=")
+            ?.substringBeforeLast(";")
     }
 
     private fun extractBlogPostUser(authorUserCardDiv: JXNode): User {
