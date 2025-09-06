@@ -18,12 +18,12 @@ import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
-import moe.nyamori.bgm.util.toHumanReadable
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.getSelfVersion
 import moe.nyamori.bgm.util.prettyMsTs
+import moe.nyamori.bgm.util.toHumanReadable
 import org.eclipse.jetty.http.HttpGenerator
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -205,6 +205,8 @@ object HttpServer {
                     get("/deleted_post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
                     get("/deleted-post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
                 }
+                get("/min/g=css", BgmCssHandler)
+                get("/css/mobile.css", MobileCssHandler)
                 get("/*") { // redirect all
                     it.redirect(
                         "https://bgm.tv" + (
