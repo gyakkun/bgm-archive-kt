@@ -1,13 +1,9 @@
 package moe.nyamori.bgm.parser
 
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.model.Subject
 import moe.nyamori.bgm.parser.blog.BlogTopicParserR398
 import moe.nyamori.bgm.parser.blog.BlogTopicParserR400
-import moe.nyamori.bgm.parser.subject.SubjectTopicParserR398
-import moe.nyamori.bgm.parser.subject.SubjectTopicParserR400
-import moe.nyamori.bgm.parser.subject.SubjectTopicParserR402
-import moe.nyamori.bgm.parser.subject.SubjectTopicParserR412
+import moe.nyamori.bgm.parser.blog.BlogTopicParserR649
 import moe.nyamori.bgm.util.ParserHelper
 import org.junit.jupiter.api.Test
 
@@ -34,6 +30,16 @@ class BlogParserTest {
         }
     }
 
+    @Test
+    fun testR649() {
+        val ins = ParserHelper.javaClass.getResourceAsStream("/html_samples/blog/649.html")
+        if (ins == null) return
+        ins.use {
+            val htmlString = String(it.readAllBytes(), Charsets.UTF_8)
+            val (blogPost, success) = BlogTopicParserR649.parseTopic(htmlString, 313741, SpaceType.BLOG)
+            assert(success)
+        }
+    }
 
     @Test
     fun testR412() {

@@ -5,6 +5,7 @@ import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.parser.blog.BlogTopicParserR398
 import moe.nyamori.bgm.parser.blog.BlogTopicParserR400
 import moe.nyamori.bgm.parser.blog.BlogTopicParserR547
+import moe.nyamori.bgm.parser.blog.BlogTopicParserR649
 import moe.nyamori.bgm.util.ParserHelper
 import java.util.*
 
@@ -31,6 +32,7 @@ object BlogTopicParser : Parser {
         treeMap[398] = BlogTopicParserR398
         treeMap[400] = BlogTopicParserR400
         treeMap[547] = BlogTopicParserR547
+        treeMap[649] = BlogTopicParserR649
         return@run treeMap
     }
 }
