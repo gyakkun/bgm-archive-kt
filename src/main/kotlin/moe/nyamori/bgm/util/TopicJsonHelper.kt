@@ -87,8 +87,8 @@ object TopicJsonHelper {
                     val res = ArrayList<Like>()
                     (faces as Map<String, Any?>).forEach {
                         val m = it.value as Map<String, Any?>
-                        val mid = (m["main_id"] as Double).toInt()
-                        val value = (m["value"] as String).toInt()
+                        val mid = somethingToInt(m["main_id"])
+                        val value = somethingToInt(m["value"])
                         val total = getTotal(m)
                         res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
                     }
@@ -97,8 +97,8 @@ object TopicJsonHelper {
                     val res = ArrayList<Like>()
                     (faces as List<Map<String, Any?>>).forEach {
                         val m = it
-                        val mid = (m["main_id"] as Double).toInt()
-                        val value = (m["value"] as String).toInt()
+                        val mid = somethingToInt(m["main_id"])
+                        val value = somethingToInt(m["value"])
                         val total = getTotal(m)
                         res.add(Like(type = topic.space!!.type.id, mid = mid, pid = pid, value = value, total = total))
                     }
@@ -150,8 +150,8 @@ object TopicJsonHelper {
         topic: Topic,
         pid: Int
     ): Boolean {
-        val mid = (m["main_id"] as Double).toInt()
-        val value = (m["value"] as String).toInt()
+        val mid = somethingToInt(m["main_id"])
+        val value = somethingToInt(m["value"])
         val users = (m["users"] as List<Map<String, Any?>>?) ?: return true
         users.forEach {
             if (it["username"] == null) return@forEach
@@ -176,16 +176,18 @@ object TopicJsonHelper {
     }
 
     private fun getTotal(likeItemMap: Map<String, Any?>): Int {
-        return if (likeItemMap["total"] is String) {
-            (likeItemMap["total"] as String).toInt()
-        } else if (likeItemMap["total"] is Double) {
-            (likeItemMap["total"] as Double).toInt()
-        } else if (likeItemMap["total"] is Long) {
-            (likeItemMap["total"] as Long).toInt()
-        } else if (likeItemMap["total"] is Int) {
-            (likeItemMap["total"] as Int)
-        } else {
-            0 // Fallback
+        return runCatching {
+            somethingToInt(likeItemMap["total"])
+        }.getOrDefault(0)  // Fallback
+    }
+
+    private fun somethingToInt(something: Any?):Int {
+        return when (something) {
+            is String -> something.toInt()
+            is Double -> something.toInt()
+            is Long -> something.toInt()
+            is Int -> something
+            else -> throw IllegalArgumentException("$something can't be converted to int")
         }
     }
 }
