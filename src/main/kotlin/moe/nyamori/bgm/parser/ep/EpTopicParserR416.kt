@@ -63,7 +63,7 @@ object EpTopicParserR416 : Parser {
         val epId = extractEpisodeRealId(realEpisodeIdAnchor) ?: topicId
         val epDescHtmlPost = extractEpisodeDescHtmlToPost(episodeDescDiv)
         val commentPostList = extractCommentPostList(commentListDiv, epId)
-        val dataLikesList = extractDataLikeList(htmlFileString)
+        val dataLikesList = ParserHelper.extractDataLikeList(htmlFileString)
 
         if (onAirDateStr != null) {
             meta.put("onAirDate", onAirDateStr)
@@ -102,13 +102,6 @@ object EpTopicParserR416 : Parser {
             true
         )
 
-    }
-
-    private fun extractDataLikeList(htmlFileString: String): String? {
-        return htmlFileString.lineSequence().filter { it.startsWith("var data_likes_list = {") && it.endsWith("};") }
-            .firstOrNull()
-            ?.substringAfter("=")
-            ?.substringBeforeLast(";")
     }
 
     private fun extractCommentPostList(commentListDiv: Element?, epId: Int): List<Post> {

@@ -92,4 +92,12 @@ object ParserHelper {
         return null
     }
 
+    fun extractDataLikeList(htmlFileString: String): String? {
+        return htmlFileString.lineSequence()
+            .filter { it.contains("var data_likes_list = {") && it.contains("};") }
+            .firstOrNull()
+            ?.substringAfter("=")
+            ?.substringBeforeLast(";")
+    }
+
 }

@@ -60,7 +60,7 @@ class MonoTopicParserR430(
         val spaceDisplayName = characterName!!
         val characterDescHtmlPost = extractCharacterDescHtmlToPost(characterDescDiv)
         val commentPostList = extractCommentPostList(commentListDiv, characterId)
-        val dataLikesList = extractDataLikeList(htmlFileString) // may be introduced in the future, keep it for now
+        val dataLikesList = ParserHelper.extractDataLikeList(htmlFileString) // may be introduced in the future, keep it for now
 
         if (dataLikesList != null) {
             val dataLikesListJson = GitHelper.GSON.fromJson(dataLikesList, JsonObject::class.java)
@@ -106,14 +106,6 @@ class MonoTopicParserR430(
             true
         )
 
-    }
-
-    private fun extractDataLikeList(htmlFileString: String): String? {
-        return htmlFileString.lineSequence()
-            .filter { it.startsWith("var data_likes_list = {") && it.endsWith("};") }
-            .firstOrNull()
-            ?.substringAfter("=")
-            ?.substringBeforeLast(";")
     }
 
     private fun extractCommentPostList(commentListDiv: Element?, characterId: Int): List<Post> {

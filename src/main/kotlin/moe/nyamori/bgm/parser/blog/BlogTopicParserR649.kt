@@ -45,7 +45,7 @@ object BlogTopicParserR649 : Parser {
             val blogCommentListDiv: JXNode = bodyNode.selOne("//*[@id=\"comment_list\"]") // nullable
 
             var meta: Map<String, Any>? = null
-            val dataLikesList = extractDataLikeList(htmlFileString) // may be introduced in the future, keep it for now
+            val dataLikesList = ParserHelper.extractDataLikeList(htmlFileString) // may be introduced in the future, keep it for now
 
             if (dataLikesList != null) {
                 val dataLikesListJson = GitHelper.GSON.fromJson(dataLikesList, JsonObject::class.java)
@@ -122,14 +122,6 @@ object BlogTopicParserR649 : Parser {
                 topPostPid = -blogId
             ), blogPostUser
         )
-    }
-
-    private fun extractDataLikeList(htmlFileString: String): String? {
-        return htmlFileString.lineSequence()
-            .filter { it.startsWith("var data_likes_list = {") && it.endsWith("};") }
-            .firstOrNull()
-            ?.substringAfter("=")
-            ?.substringBeforeLast(";")
     }
 
     private fun extractBlogPostUser(authorUserCardDiv: JXNode): User {
@@ -341,7 +333,7 @@ object BlogTopicParserR649 : Parser {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        val htmlStr = File("E:\\[ToBak]\\Desktop_Win10\\360398.html").readText(StandardCharsets.UTF_8)
+        val htmlStr = File("E:\\[ToBak]\\Desktop_Win10\\291373.html").readText(StandardCharsets.UTF_8)
         val some = BlogTopicParserR649.parseTopic(htmlStr,360398, SpaceType.BLOG)
         System.err.println("debug")
     }

@@ -55,7 +55,7 @@ object GroupTopicParserR430 : Parser {
         val groupDisplayName = extractGroupDisplayName(groupNameAnchor)
         val topPost = extractCommentPostRecursively(topPostDiv, topicId)
         val commentPostList = extractCommentPostList(commentListDiv, topicId)
-        val dataLikesList = extractDataLikeList(htmlFileString) // may be introduced in the future, keep it for now
+        val dataLikesList = ParserHelper.extractDataLikeList(htmlFileString) // may be introduced in the future, keep it for now
 
         if (dataLikesList != null) {
             val dataLikesListJson = GitHelper.GSON.fromJson(dataLikesList, JsonObject::class.java)
@@ -101,14 +101,6 @@ object GroupTopicParserR430 : Parser {
             }
         }
         return result
-    }
-
-    private fun extractDataLikeList(htmlFileString: String): String? {
-        return htmlFileString.lineSequence()
-            .filter { it.startsWith("var data_likes_list = {") && it.endsWith("};") }
-            .firstOrNull()
-            ?.substringAfter("=")
-            ?.substringBeforeLast(";")
     }
 
     private fun extractCommentPostList(commentListDiv: Element?, topicId: Int): List<Post> {
