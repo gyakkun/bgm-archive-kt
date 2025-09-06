@@ -60,7 +60,7 @@ enum class SpaceType(val id: Int) {
     GROUP(8),
     SUBJECT(10),
     EP(11),
-    BLOG(100), // TBC
+    BLOG(21),
     PERSON(200), // TBC
     CHARACTER(300) // TBC
 }
