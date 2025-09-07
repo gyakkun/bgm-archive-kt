@@ -6,44 +6,59 @@ import org.slf4j.LoggerFactory
 import java.util.*
 
 open class CssHandler(
-    private val path: String,
+    val path: String,
     private val resourcePath: String,
     private val revList: TreeSet<Int>,
 ) : Handler {
-    private val LOGGER = LoggerFactory.getLogger(CssHandler::class.java)
+    private val LOGGER = LoggerFactory.getLogger(this::class.java.name)
     override fun handle(ctx: Context) {
         val revParam = ctx.queryParamMap().keys.filter { it.matches("r\\d+".toRegex()) }
-        var theVer = revParam.last().substring(1).toInt()
+        if (revParam.isEmpty()) {
+            redirectToOrigin(ctx)
+            return
+        }
         if (revParam.size > 1) {
             LOGGER.warn("requesting multiple revisions of css: $revParam, picking the first one ${revParam.first()}")
         }
-        if (!revParam.isEmpty()) theVer = revParam.last().substring(1).toInt().let {
+        val readout = revParam.first().substring(1).toInt()
+        val selected = readout.let {
             if (it < revList.first) return@let revList.first
             if (it > revList.last) {
-                ctx.redirect(
-                    "https://bgm.tv" + (
-                            ctx.queryString()
-                                ?.let { qs -> "${ctx.path()}?$qs" }
-                                ?: ctx.path()
-                            )
-                )
+                redirectToOrigin(ctx)
                 return
             }
             return@let revList.ceiling(it)
         }
-        ctx.header("x-css-provider", "bgm-archive-kt")
-        ctx.header("x-css-rev", "$theVer")
-        LOGGER.info("requesting css rev $revParam , responding with css $theVer")
-        CssHandler::class.java.getResourceAsStream("/$resourcePath/$theVer")?.let {
+        ctx.header("x-css-proxy", "bgm-archive-kt")
+        ctx.header("x-css-handler", "${this::class.java.name}")
+        ctx.header("x-css-request-rev", "$readout")
+        ctx.header("x-css-selected-rev", "$selected")
+        LOGGER.info("requesting css rev $readout , responding with css $selected")
+        CssHandler::class.java.getResourceAsStream("$resourcePath/$selected")?.let {
             ctx.writeSeekableStream(it, "text/css; charset=utf-8")
         }
     }
+
+    private fun redirectToOrigin(ctx: Context) {
+        ctx.redirect(
+            "https://bgm.tv" + (
+                    ctx.queryString()
+                        ?.let { qs -> "${ctx.path()}?$qs" }
+                        ?: ctx.path()
+                    )
+        )
+    }
 }
 
-object BgmCssHandler : CssHandler("/min/g=css", "bgmcss", BGM_CSS_LIST)
-object MobileCssHandler : CssHandler("/css/mobile.css", "mobilecss", MOBILE_CSS_LIST)
+object MinGCssHandler : CssHandler("/min/g=css", "/css/min_g", MIN_G_CSS_LIST)
+object CssMobileHandler : CssHandler("/css/mobile.css", "/css/css_mobile", CSS_MOBILE_LIST)
+object CssDistBangumiMinHandler : CssHandler(
+    "/css/dist/bangumi.min.css",
+    "/css/bangumi_dist_min",
+    CSS_BANGUMI_DIST_LIST
+)
 
-private val BGM_CSS_LIST = listOf(
+private val MIN_G_CSS_LIST = listOf(
     551,
     552,
     554,
@@ -87,8 +102,10 @@ private val BGM_CSS_LIST = listOf(
     639,
     640,
     641,
-    649,
 ).let { TreeSet(it) }
-private val MOBILE_CSS_LIST = listOf(
-    351, 473, 476, 551,554
+private val CSS_MOBILE_LIST = listOf(
+    351, 473, 476, 551, 554
+).let { TreeSet(it) }
+private val CSS_BANGUMI_DIST_LIST = listOf(
+    646, 648, 649, 650
 ).let { TreeSet(it) }

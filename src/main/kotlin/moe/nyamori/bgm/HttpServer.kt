@@ -205,8 +205,9 @@ object HttpServer {
                     get("/deleted_post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
                     get("/deleted-post/{type}/{topicId}/{postId}", FehDeletedPostHandler)
                 }
-                get("/min/g=css", BgmCssHandler)
-                get("/css/mobile.css", MobileCssHandler)
+                get(MinGCssHandler.path, MinGCssHandler)
+                get(CssMobileHandler.path, CssMobileHandler)
+                get(CssDistBangumiMinHandler.path, CssDistBangumiMinHandler)
                 get("/*") { // redirect all
                     it.redirect(
                         "https://bgm.tv" + (
