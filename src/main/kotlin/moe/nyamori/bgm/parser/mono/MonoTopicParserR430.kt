@@ -5,6 +5,7 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.parser.Parser
 import moe.nyamori.bgm.util.ParserHelper
+import moe.nyamori.bgm.util.ParserHelper.getUidFromBgStyle
 import moe.nyamori.bgm.util.PostToStateHelper
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
@@ -195,15 +196,8 @@ class MonoTopicParserR430(
         val uidFromAvatarBg = postDiv.select("a.avatar > span").first().let outer@{
             if (it == null) return@outer null
             val style = it.attr("style")
-            val uidStr = style.split("/").let inner@{ splitArr ->
-                if (splitArr.isEmpty()) return@inner null
-                val charArr = splitArr[splitArr.size - 1].toCharArray()
-                if (charArr.isEmpty() || !charArr[0].isDigit()) return@inner null
-                val anotherSplit = splitArr[splitArr.size - 1].split(".")
-                if (anotherSplit.isEmpty()) return@inner null
-                return@inner anotherSplit[0].trim()
-            }
-            return@outer uidStr?.toIntOrNull()
+            val uid = getUidFromBgStyle(style)
+            return@outer uid
         }
         // if (uidFromReplyAction != null) return uidFromReplyAction
         if (uidFromAvatarBg != null) return uidFromAvatarBg
