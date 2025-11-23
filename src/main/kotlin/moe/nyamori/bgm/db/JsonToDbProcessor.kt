@@ -54,13 +54,13 @@ object JsonToDbProcessor {
                 && allJsonRepoListSingleton.find { it.toRepoDtoOrThrow().id == jsonRepoId }!!.hasCouplingArchiveRepo()
             ) {
                 val theJsonRepo =
-                    allJsonRepoListSingleton.find { it.toRepoDtoOrThrow().id == jsonRepoId }!!.getCouplingJsonRepo()!!
+                    allJsonRepoListSingleton.find { it.toRepoDtoOrThrow().id == jsonRepoId }!!
                 reposToProcess.add(theJsonRepo)
             }
         }
 
         if (reposToProcess.isEmpty()) {
-            LOGGER.warn("no repo to process: isAll = {} , html repo id = {}", isAll, jsonRepoId)
+            LOGGER.warn("no repo to process: isAll = {} , json repo id = {}", isAll, jsonRepoId)
         }
 
         reposToProcess.forEach { jsonRepo ->
