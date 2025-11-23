@@ -549,7 +549,7 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
             :t.sid,
             :t.name,
             :t.displayName
-        ) on conflict(type,sid) do nothing
+        ) on conflict(type,sid) do update set display_name = :t.displayName
     """
     )
     @Transaction
