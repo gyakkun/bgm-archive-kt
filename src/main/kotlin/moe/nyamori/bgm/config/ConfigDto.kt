@@ -188,7 +188,7 @@ data class SpaceBlock(
     val blockRange: BlockRange?
 ) {
     fun validateOrNull() = runCatching {
-        val type = SpaceType.valueOf(spaceType!!)
+        val type = SpaceType.valueOf(spaceType!!.uppercase())
         val name = spaceName!!
         val ignore = blockRange!!.toInstantPairOrNull()
         SpaceBlock(type.name, name, blockRange)
