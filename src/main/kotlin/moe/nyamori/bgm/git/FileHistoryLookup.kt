@@ -63,7 +63,16 @@ object FileHistoryLookup {
         val jsonCommitList = getAllChatamByRelativePath(jsonRelPath)
         val htmlCommitList = getAllChatamByRelativePath(htmlRelPath)
         val etfmt = extractExactTimestampFromMetaTs(spaceType, topicId, jsonCommitList, htmlCommitList)
-        return etfmt
+        // filter out blocked range
+        val filtered = etfmt.filterKeys { msTs ->
+            Config.blockRangeList
+                .mapNotNull { it.toInstantPairOrNull() }
+                .none { pair ->
+                    val inst = Instant.ofEpochMilli(msTs)
+                    inst <= pair.second && inst >= pair.first
+                }
+        }
+        return TreeMap(filtered)
     }
 
     data class ChatamPair(
@@ -78,7 +87,7 @@ object FileHistoryLookup {
         topicId: Int,
         jsonCommitList: List<CommitHashAndTimestampAndMsg>,
         archiveCommitList: List<CommitHashAndTimestampAndMsg>
-    ): TreeMap<Long, ChatamPair> {
+    ): Map<Long, ChatamPair> {
         val jsonChatamByTs = jsonCommitList.associateBy { it.timestampHint() }
         val tsList = archiveCommitList
             .filter {
@@ -153,7 +162,7 @@ object FileHistoryLookup {
                     thePairedJsonChatam, htmlChatam
                 )
             }
-        return TreeMap<Long, ChatamPair>().apply { putAll(tsList) }
+        return tsList
     }
 
     val notLogRelPathSuffix = setOf("meta_ts.txt")

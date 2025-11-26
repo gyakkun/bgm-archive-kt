@@ -94,7 +94,9 @@ data class ConfigReadout(
 
     val spotCheckSampleSizeByType: Map<String, Int>? = null,
 
-    val gitRelatedLockTimeoutMs: Long? = null
+    val gitRelatedLockTimeoutMs: Long? = null,
+
+    val blockRangeList: List<BlockRange>? = null,
 )
 
 data class RepoReadout(
@@ -248,6 +250,8 @@ fun ConfigReadout.toDto(): ConfigDto {
         repoList = finRepoList,
         spotCheckSampleSizeByType = prettySpotCheckSizeByType,
 
-        gitRelatedLockTimeoutMs = gitRelatedLockTimeoutMs ?: 25_000
+        gitRelatedLockTimeoutMs = gitRelatedLockTimeoutMs ?: 25_000,
+
+        blockRangeList = this.blockRangeList ?: emptyList()
     )
 }

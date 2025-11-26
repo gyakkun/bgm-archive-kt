@@ -4,6 +4,7 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.SpaceType
 import org.eclipse.jgit.lib.Repository
+import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 
@@ -58,6 +59,8 @@ interface IConfig {
     val spotCheckSampleSizeByType: Map<SpaceType, Int>
 
     val gitRelatedLockTimeoutMs: Long
+
+    val blockRangeList: List<BlockRange>
 }
 
 data class ConfigDto(
@@ -110,6 +113,8 @@ data class ConfigDto(
     override val spotCheckSampleSizeByType: Map<SpaceType, Int>,
 
     override val gitRelatedLockTimeoutMs: Long,
+
+    override val blockRangeList: List<BlockRange>
 ) : IConfig
 
 data class RepoDto(
@@ -173,4 +178,29 @@ fun Repository.getCouplingArchiveRepo(): Repository? {
 
 enum class RepoType {
     HTML, JSON
+}
+
+// ISO-8601 Timestamp
+data class BlockRange(
+    val startTime: String?,
+    val endTime: String?,
+) {
+    private fun isValid(): Boolean {
+        val (sZdt, eZdt) = _extract()
+        return (sZdt != null && eZdt != null)
+    }
+
+    fun toInstantPairOrNull(): Pair<java.time.Instant, java.time.Instant>? {
+        if (!isValid()) return null
+        val (sZdt, eZdt) = _extract()
+        return (sZdt!!.toInstant() to eZdt!!.toInstant())
+    }
+
+    private fun _extract() = run {
+        runCatching {
+            ZonedDateTime.parse(startTime)
+        }.getOrNull() to runCatching {
+            ZonedDateTime.parse(endTime)
+        }.getOrNull()
+    }
 }
