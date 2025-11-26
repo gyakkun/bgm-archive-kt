@@ -21,10 +21,14 @@ class FileHistory(private val spaceType: SpaceType) : Handler {
             // }
             val isHtml = ctx.queryParam("isHtml")?.toBooleanStrictOrNull() ?: false
             val topicId = ctx.pathParam("topicId").toInt()
-            val timestampList = if (isHtml) FileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
-            else FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
+            val timestampList = if (isHtml) {
+                FileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
+            } else {
+                FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
+            }
+            val filtered = filterBySpaceBlockList(this.spaceType, topicId, timestampList)
             ctx.header(CACHE_CONTROL, "max-age=3600")
-            ctx.json(timestampList)
+            ctx.json(filtered)
         } catch (ex: Exception) {
             log.error("Ex: ", ex)
             throw ex

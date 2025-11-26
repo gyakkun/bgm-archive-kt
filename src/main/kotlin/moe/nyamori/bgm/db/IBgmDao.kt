@@ -113,6 +113,8 @@ interface IBgmDao {
 
     fun getTopicListByTypeAndTopicId(type: Int, topicId: Int): List<TopicRow>
 
+    fun getSpaceNamingMappingByTypeAndSid(type:Int, sid:Int): List<SpaceNameMappingData>
+
     fun getAllPostCountByTypeAndUsernameList(
         t: Int,
         l: Iterable<String>

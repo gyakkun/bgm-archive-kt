@@ -4,6 +4,8 @@ import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.Header.CACHE_CONTROL
 import io.javalin.http.HttpStatus
+import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.SpaceType
@@ -11,6 +13,7 @@ import moe.nyamori.bgm.model.lowercaseName
 import moe.nyamori.bgm.util.HttpHelper
 import moe.nyamori.bgm.util.ParserHelper.getStyleRevNumberFromHtmlString
 import org.slf4j.LoggerFactory
+import java.time.Instant
 import java.util.*
 import java.util.concurrent.TimeUnit
 
@@ -27,6 +30,7 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
             }
             try {
                 val topicId = ctx.pathParam("topicId").toInt()
+
                 val timestampPathParam = ctx.pathParam("timestamp")
                 val timestamp =
                     if (timestampPathParam == "latest") Long.MAX_VALUE
@@ -37,10 +41,9 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                 } else {
                     FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
                 }
-                val ts = TreeSet<Long>().apply {
-                    addAll(timestampList)
-                }
-                if (ts.isEmpty()) {
+                val filtered = filterBySpaceBlockList(this.spaceType, topicId, timestampList)
+                val treeSet = TreeSet(filtered)
+                if (treeSet.isEmpty()) {
                     ctx.status(HttpStatus.BAD_REQUEST)
                     ctx.html(
                         """<html><body><p>No content found for ${spaceType.lowercaseName()}/$topicId (yet).</p></body>
@@ -48,10 +51,10 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                     )
                     return
                 }
-                if (!ts.contains(timestamp)) {
-                    var floorTimestamp = ts.floor(timestamp)
+                if (!treeSet.contains(timestamp)) {
+                    var floorTimestamp = treeSet.floor(timestamp)
                     if (floorTimestamp == null) {
-                        floorTimestamp = ts.first()
+                        floorTimestamp = treeSet.first()
                     }
                     ctx.redirect(
                         if (isHtml) {
@@ -118,4 +121,30 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
         )
         return result
     }
+}
+
+internal fun filterBySpaceBlockList(
+    spaceType: SpaceType,
+    topicId: Int,
+    timestampList: SortedSet<Long>
+): List<Long?> {
+    val topicDtoList = Dao.bgmDao.getTopicListByTypeAndTopicId(spaceType.id, topicId)
+    val topicDto = topicDtoList.first()
+    val spaceNameMapping = Dao.bgmDao.getSpaceNamingMappingByTypeAndSid(spaceType.id, topicDto.sid)
+    val blockers = Config.spaceBlockList
+        .mapNotNull {
+            it.validateOrNull()
+        }.filter {
+            spaceType.name.equals(it.spaceType, true)
+                    && spaceNameMapping.isNotEmpty()
+                    && spaceNameMapping.first().name == it.spaceName
+        }
+    val filtered = timestampList.filter { ts ->
+        val ins = Instant.ofEpochMilli(ts)
+        blockers.none {
+            val (startIns, endIns) = it.blockRange?.toInstantPairOrNull() ?: return@none false
+            ins in startIns..endIns
+        }
+    }
+    return filtered
 }

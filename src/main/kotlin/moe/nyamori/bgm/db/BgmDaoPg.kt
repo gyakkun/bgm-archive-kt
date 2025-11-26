@@ -601,6 +601,13 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
     @RegisterKotlinMapper(PostRow::class)
     override fun getTopicListByTypeAndTopicId(@Bind("type") type: Int, @Bind("topicId") topicId: Int): List<TopicRow>
 
+    @SqlQuery(
+        """
+            select * from ba_space_naming_mapping where type = :type and sid = :sid
+        """
+    )
+    @RegisterKotlinMapper(SpaceNameMappingData::class)
+    override fun getSpaceNamingMappingByTypeAndSid(@Bind("type") type:Int, @Bind("sid") sid:Int): List<SpaceNameMappingData>
 
     // View queries
     @SqlQuery(

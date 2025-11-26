@@ -61,6 +61,7 @@ interface IConfig {
     val gitRelatedLockTimeoutMs: Long
 
     val blockRangeList: List<BlockRange>
+    val spaceBlockList: List<SpaceBlock>
 }
 
 data class ConfigDto(
@@ -114,7 +115,8 @@ data class ConfigDto(
 
     override val gitRelatedLockTimeoutMs: Long,
 
-    override val blockRangeList: List<BlockRange>
+    override val blockRangeList: List<BlockRange>,
+    override val spaceBlockList: List<SpaceBlock>,
 ) : IConfig
 
 data class RepoDto(
@@ -180,27 +182,31 @@ enum class RepoType {
     HTML, JSON
 }
 
+data class SpaceBlock(
+    val spaceType: String?,
+    val spaceName: String?,
+    val blockRange: BlockRange?
+) {
+    fun validateOrNull() = runCatching {
+        val type = SpaceType.valueOf(spaceType!!)
+        val name = spaceName!!
+        val ignore = blockRange!!.toInstantPairOrNull()
+        SpaceBlock(type.name, name, blockRange)
+    }.getOrNull()
+}
+
 // ISO-8601 Timestamp
 data class BlockRange(
     val startTime: String?,
     val endTime: String?,
 ) {
-    private fun isValid(): Boolean {
-        val (sZdt, eZdt) = _extract()
-        return (sZdt != null && eZdt != null)
-    }
 
-    fun toInstantPairOrNull(): Pair<java.time.Instant, java.time.Instant>? {
-        if (!isValid()) return null
-        val (sZdt, eZdt) = _extract()
-        return (sZdt!!.toInstant() to eZdt!!.toInstant())
-    }
+    fun toInstantPairOrNull(): Pair<java.time.Instant, java.time.Instant>? = runCatching {
+        val (sZdt, eZdt) = extract()
+        return (sZdt.toInstant() to eZdt.toInstant())
+    }.getOrNull()
 
-    private fun _extract() = run {
-        runCatching {
-            ZonedDateTime.parse(startTime)
-        }.getOrNull() to runCatching {
-            ZonedDateTime.parse(endTime)
-        }.getOrNull()
+    private fun extract(): Pair<ZonedDateTime, ZonedDateTime> {
+        return ZonedDateTime.parse(startTime!!) to ZonedDateTime.parse(endTime!!)
     }
 }

@@ -97,6 +97,7 @@ data class ConfigReadout(
     val gitRelatedLockTimeoutMs: Long? = null,
 
     val blockRangeList: List<BlockRange>? = null,
+    val spaceBlockList: List<SpaceBlock>? = null,
 )
 
 data class RepoReadout(
@@ -252,6 +253,7 @@ fun ConfigReadout.toDto(): ConfigDto {
 
         gitRelatedLockTimeoutMs = gitRelatedLockTimeoutMs ?: 25_000,
 
-        blockRangeList = this.blockRangeList ?: emptyList()
+        blockRangeList = this.blockRangeList ?: emptyList(),
+        spaceBlockList = this.spaceBlockList ?: emptyList(),
     )
 }
