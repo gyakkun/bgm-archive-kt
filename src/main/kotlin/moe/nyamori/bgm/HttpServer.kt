@@ -72,7 +72,7 @@ object HttpServer {
                 }
             }
             config.requestLogger.http { ctx, timingMs ->
-                val reqSalt: Long = ctx.attribute("reqSalt") ?: return@http
+                val reqSalt: String = ctx.attribute("reqSalt") ?: return@http
                 if (timingMs >= 3000) LOGGER.error(
                     "[{}] Timing {}ms. Super long for req: {}", reqSalt, timingMs.toLong(), ctx.fullUrl()
                 )
