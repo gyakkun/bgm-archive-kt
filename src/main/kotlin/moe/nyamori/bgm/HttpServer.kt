@@ -398,14 +398,22 @@ object HttpServer {
         }, printLog = !isAvailable)
     }
 
-    private fun ip(ctx: Context) = ctx.header("X-Forwarded-For")?.split(",")?.get(0) ?: ctx.ip()
+    private fun ip(ctx: Context): String {
+        val candidates = sequenceOf(
+            sequenceOf("x-forwarded-for" to ctx.header("X-Forwarded-For")?.split(",")?.get(0)),
+            ctx.req().getHeaders("Forwarded").asSequence().map { "forwarded" to it },
+            sequenceOf("cf-connecting-ip" to ctx.header("cf-connecting-ip"))
+        ).flatten().toList()
+        LOGGER.info("Candidates: {}", candidates.joinToString("\n") { str -> "\t$str" })
+        return candidates.firstNotNullOfOrNull { it.second } ?: ctx.ip()
+    }
+
     private fun Context.isLocalhost() = ip(this).let {
         it == "localhost"
                 || it == "127.0.0.1"
                 || it == "[0:0:0:0:0:0:0:1]"
                 || it == "0:0:0:0:0:0:0:1"
     }
-
 
     private fun customizeHttpMsg() = runCatching {
         val m = mapOf(
