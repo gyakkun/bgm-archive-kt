@@ -26,9 +26,12 @@ import moe.nyamori.bgm.util.prettyMsTs
 import moe.nyamori.bgm.util.toHumanReadable
 import org.eclipse.jetty.http.HttpGenerator
 import org.slf4j.LoggerFactory
+import sun.net.util.IPAddressUtil
 import java.io.File
 import java.io.FileWriter
 import java.lang.management.ManagementFactory
+import java.net.Inet6Address
+import java.net.InetAddress
 import java.net.URI
 import java.time.Duration
 import java.time.Instant
@@ -400,12 +403,29 @@ object HttpServer {
 
     private fun ip(ctx: Context): String {
         val candidates = sequenceOf(
-            sequenceOf("x-forwarded-for" to ctx.header("X-Forwarded-For")?.split(",")?.get(0)),
-            ctx.req().getHeaders("Forwarded").asSequence().map { "forwarded" to it },
-            sequenceOf("cf-connecting-ip" to ctx.header("cf-connecting-ip"))
+            sequenceOf("x-forwarded-for" to ctx.header("X-Forwarded-For")?.split(",")?.firstOrNull()?.toSanitizeIpAddr()),
+            ctx.req().getHeaders("forwarded").asSequence().map { "forwarded" to forwardedHeaderToIpOrNull(it) },
+            sequenceOf("cf-connecting-ip" to ctx.header("cf-connecting-ip")?.toSanitizeIpAddr())
         ).flatten().toList()
-        LOGGER.info("Candidates: {}", candidates.joinToString("\n") { str -> "\t$str" })
+        LOGGER.info("Candidates: \n{}", candidates.joinToString("\n") { str -> "\t$str" })
         return candidates.firstNotNullOfOrNull { it.second } ?: ctx.ip()
+    }
+
+    private fun forwardedHeaderToIpOrNull(forwardedHeader: String?): String? {
+        return forwardedHeader?.split(";")
+            ?.firstOrNull { it.startsWith("for=") }
+            ?.substring("for=".length)
+            ?.lowercase()
+            ?.replace("[^\\[\\]0-9a-f:.]".toRegex(), "")
+            ?.toSanitizeIpAddr()
+    }
+
+    private fun String.toSanitizeIpAddr(): String? {
+        return InetAddress.getByName(this)
+            ?.let { inetAddr ->
+                if (inetAddr is Inet6Address) "[${inetAddr.hostAddress}]"
+                else inetAddr.hostAddress
+            }
     }
 
     private fun Context.isLocalhost() = ip(this).let {
