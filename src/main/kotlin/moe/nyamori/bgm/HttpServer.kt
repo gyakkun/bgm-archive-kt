@@ -225,7 +225,7 @@ object HttpServer {
             }
         }.beforeMatched {
             if (it.matchedPath() == "/*") return@beforeMatched
-            if (it.isLocalhost()) return@beforeMatched
+            // if (it.isLocalhost()) return@beforeMatched
             val crawlers =
                 listOf("bingbot", "googlebot", "yandexbot", "applebot", "duckduckbot", "spider", "company")
             if (true == it.userAgent()
@@ -237,7 +237,20 @@ object HttpServer {
             }
             val reqSalt = System.currentTimeMillis() and 2047
             it.attribute("reqSalt", reqSalt)
-            LOGGER.info("[{}] Req: {} {} {}", reqSalt, ip(it), it.method(), it.fullUrl())
+            val fullHeaders = it.req().headerNames.asSequence().map { hn ->
+                val hdrs = it.req().getHeaders(hn).toList()
+                if (hdrs.size == 1) return@map hn to hdrs[0]
+                else return@map hn to hdrs
+            }.toMap()
+            LOGGER.info(
+                "[{}] Req: ip guess={}, method={},  full url={}, remote addr={}, header map={}",
+                reqSalt,
+                ip(it),
+                it.method(),
+                it.fullUrl(),
+                it.req().remoteAddr,
+                fullHeaders.entries.joinToString(separator = "\n") { str -> "\t$str" }
+            )
         }.start(Config.httpHost, Config.httpPort)
 
         if (Config.enableCrankerConnector) {
