@@ -190,7 +190,7 @@ data class SpaceBlock(
     fun validateOrNull() = runCatching {
         val type = SpaceType.valueOf(spaceType!!.uppercase())
         val name = spaceName!!
-        val ignore = blockRange!!.toInstantPairOrNull()
+        val ignore = blockRange!!.toInstantPairOrNull()!!
         SpaceBlock(type.name, name, blockRange)
     }.getOrNull()
 }
