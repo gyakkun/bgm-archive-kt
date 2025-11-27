@@ -129,7 +129,7 @@ internal fun filterBySpaceBlockList(
     timestampList: SortedSet<Long>
 ): List<Long?> {
     val topicDtoList = Dao.bgmDao.getTopicListByTypeAndTopicId(spaceType.id, topicId)
-    val topicDto = topicDtoList.first()
+    val topicDto = topicDtoList.firstOrNull() ?: return emptyList()
     val spaceNameMapping = Dao.bgmDao.getSpaceNamingMappingByTypeAndSid(spaceType.id, topicDto.sid)
     val blockers = Config.spaceBlockList
         .mapNotNull {
