@@ -26,7 +26,6 @@ import moe.nyamori.bgm.util.prettyMsTs
 import moe.nyamori.bgm.util.toHumanReadable
 import org.eclipse.jetty.http.HttpGenerator
 import org.slf4j.LoggerFactory
-import sun.net.util.IPAddressUtil
 import java.io.File
 import java.io.FileWriter
 import java.lang.management.ManagementFactory
@@ -37,6 +36,7 @@ import java.time.Duration
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 object HttpServer {
     private val LOGGER = LoggerFactory.getLogger(HttpServer::class.java)
@@ -46,6 +46,13 @@ object HttpServer {
         // env var E_BGM_ARCHIVE_CONFIG_PATH
         // or
         // sys prop config.path
+        val launchId = Instant.ofEpochMilli(System.currentTimeMillis()).toString()
+            .replace("[^0-9]".toRegex(), "")
+            .substring(4, 12)
+            .toInt()
+            .toString(16)
+            .uppercase()
+        val reqCounter = AtomicInteger(0)
         val cfg = checkAndGetConfigDto()
         setConfigDelegate(cfg)
         writeDbPersistKeyIfNecessary(cfg)
@@ -238,22 +245,37 @@ object HttpServer {
             ) {
                 throw ImATeapotResponse()
             }
-            val reqSalt = System.currentTimeMillis() and 2047
+            val reqSalt = launchId +
+                    "-" +
+                    ((System.currentTimeMillis() - ManagementFactory.getRuntimeMXBean().startTime) / 100).toString(16)
+                        .uppercase().padStart(7, '0') +
+                    "-" +
+                    reqCounter.getAndIncrement().toString()
             it.attribute("reqSalt", reqSalt)
-            val fullHeaders = it.req().headerNames.asSequence().map { hn ->
-                val hdrs = it.req().getHeaders(hn).toList()
-                if (hdrs.size == 1) return@map hn to hdrs[0]
-                else return@map hn to hdrs
-            }.toMap()
-            LOGGER.info(
-                "[{}] Req: ip guess={}, method={},  full url={}, remote addr={}, header map={}",
-                reqSalt,
-                ip(it),
-                it.method(),
-                it.fullUrl(),
-                it.req().remoteAddr,
-                fullHeaders.entries.joinToString(separator = "\n") { str -> "\t$str" }
-            )
+
+            if(LOGGER.isDebugEnabled) {
+                val fullHeaders = it.req().headerNames.asSequence().map { hn ->
+                    val hdrs = it.req().getHeaders(hn).toList()
+                    if (hdrs.size == 1) return@map hn to hdrs[0]
+                    else return@map hn to hdrs
+                }.toMap()
+                LOGGER.debug(
+                    "[{}] Req: IP={}, method={}, full url={}, header map=\n{}",
+                    reqSalt,
+                    ip(it),
+                    it.method(),
+                    it.fullUrl(),
+                    fullHeaders.entries.joinToString(separator = "\n") { str -> "\t$str" }
+                )
+            } else {
+                LOGGER.info(
+                    "[{}] IP={}, {} {}",
+                    reqSalt,
+                    ip(it),
+                    it.method(),
+                    it.fullUrl(),
+                )
+            }
         }.start(Config.httpHost, Config.httpPort)
 
         if (Config.enableCrankerConnector) {
@@ -403,12 +425,24 @@ object HttpServer {
 
     private fun ip(ctx: Context): String {
         val candidates = sequenceOf(
-            sequenceOf("x-forwarded-for" to ctx.header("X-Forwarded-For")?.split(",")?.firstOrNull()?.toSanitizeIpAddr()),
+            sequenceOf(
+                "x-forwarded-for" to ctx.header("X-Forwarded-For")?.split(",")?.firstOrNull()?.takeIfIsValidIpAddress()
+            ),
             ctx.req().getHeaders("forwarded").asSequence().map { "forwarded" to forwardedHeaderToIpOrNull(it) },
-            sequenceOf("cf-connecting-ip" to ctx.header("cf-connecting-ip")?.toSanitizeIpAddr())
+            sequenceOf("cf-connecting-ip" to ctx.header("cf-connecting-ip")?.takeIfIsValidIpAddress())
         ).flatten().toList()
-        LOGGER.info("Candidates: \n{}", candidates.joinToString("\n") { str -> "\t$str" })
+        if (LOGGER.isDebugEnabled) {
+            LOGGER.debug("IP Candidates: \n{}", candidates.joinToString("\n") { str -> "\t$str" })
+        }
         return candidates.firstNotNullOfOrNull { it.second } ?: ctx.ip()
+    }
+
+    private fun String.takeIfIsValidIpAddress(): String? {
+        return this.toIpAddrOrNull()
+            ?.let {
+                if (it is Inet6Address) "[${it.hostAddress}]"
+                else it.hostAddress
+            }
     }
 
     private fun forwardedHeaderToIpOrNull(forwardedHeader: String?): String? {
@@ -417,16 +451,12 @@ object HttpServer {
             ?.substring("for=".length)
             ?.lowercase()
             ?.replace("[^\\[\\]0-9a-f:.]".toRegex(), "")
-            ?.toSanitizeIpAddr()
+            ?.takeIfIsValidIpAddress()
     }
 
-    private fun String.toSanitizeIpAddr(): String? {
-        return InetAddress.getByName(this)
-            ?.let { inetAddr ->
-                if (inetAddr is Inet6Address) "[${inetAddr.hostAddress}]"
-                else inetAddr.hostAddress
-            }
-    }
+    private fun String.toIpAddrOrNull(): InetAddress? = runCatching {
+        InetAddress.getByName(this)
+    }.getOrNull()
 
     private fun Context.isLocalhost() = ip(this).let {
         it == "localhost"
