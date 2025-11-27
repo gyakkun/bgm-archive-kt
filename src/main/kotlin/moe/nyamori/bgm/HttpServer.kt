@@ -235,24 +235,10 @@ object HttpServer {
             }
         }.beforeMatched {
             if (it.matchedPath() == "/*") return@beforeMatched
-            // if (it.isLocalhost()) return@beforeMatched
-            val crawlers =
-                listOf("bingbot", "googlebot", "yandexbot", "applebot", "duckduckbot", "spider", "company")
-            if (true == it.userAgent()
-                    ?.let { ua ->
-                        crawlers.any { crwl -> ua.contains(crwl, true) }
-                    }
-            ) {
-                throw ImATeapotResponse()
-            }
-            val reqSalt = launchId +
-                    "-" +
-                    ((System.currentTimeMillis() - ManagementFactory.getRuntimeMXBean().startTime) / 100).toString(16)
-                        .uppercase().padStart(7, '0') +
-                    "-" +
-                    reqCounter.getAndIncrement().toString()
+            if (it.isLocalhost()) return@beforeMatched
+            notRecordingCrawler(it)
+            val reqSalt = genSalt(launchId, reqCounter)
             it.attribute("reqSalt", reqSalt)
-
             if(LOGGER.isDebugEnabled) {
                 val fullHeaders = it.req().headerNames.asSequence().map { hn ->
                     val hdrs = it.req().getHeaders(hn).toList()
@@ -311,6 +297,25 @@ object HttpServer {
             {
                 app.stop()
             })
+    }
+
+    private fun genSalt(launchId: String, reqCounter: AtomicInteger): String = launchId +
+            "-" +
+            ((System.currentTimeMillis() - ManagementFactory.getRuntimeMXBean().startTime) / 100).toString(16)
+                .uppercase().padStart(7, '0') +
+            "-" +
+            reqCounter.getAndIncrement().toString()
+
+    private fun notRecordingCrawler(context: Context) {
+        val crawlers =
+            listOf("bingbot", "googlebot", "yandexbot", "applebot", "duckduckbot", "spider", "company")
+        if (true == context.userAgent()
+                ?.let { ua ->
+                    crawlers.any { crwl -> ua.contains(crwl, true) }
+                }
+        ) {
+            throw ImATeapotResponse()
+        }
     }
 
     private fun writeConfigToConfigFolder(cfg: ConfigDto) {
@@ -458,12 +463,7 @@ object HttpServer {
         InetAddress.getByName(this)
     }.getOrNull()
 
-    private fun Context.isLocalhost() = ip(this).let {
-        it == "localhost"
-                || it == "127.0.0.1"
-                || it == "[0:0:0:0:0:0:0:1]"
-                || it == "0:0:0:0:0:0:0:1"
-    }
+    private fun Context.isLocalhost() = ip(this).toIpAddrOrNull()?.isLoopbackAddress ?: false
 
     private fun customizeHttpMsg() = runCatching {
         val m = mapOf(
