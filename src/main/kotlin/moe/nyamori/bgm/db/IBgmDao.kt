@@ -221,6 +221,8 @@ interface IBgmDao {
 
     fun getAllTopicIdByType(type: Int): ArrayList<Int>
 
+    fun getAllTopicIdByTypeAndState(type: Int, state: Int): ArrayList<Int>
+
     fun getMaxTopicIdByType(type: Int): Int
 
     fun _TRUNCATE_ALL_META(): Int

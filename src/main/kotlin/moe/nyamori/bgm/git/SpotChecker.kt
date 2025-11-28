@@ -6,9 +6,9 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.checkAndGetConfigDto
 import moe.nyamori.bgm.config.setConfigDelegate
 import moe.nyamori.bgm.config.toRepoDtoOrThrow
+import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
-import moe.nyamori.bgm.git.GitHelper.couplingArchiveRepo
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLastCommitSha1StrExtGit
@@ -23,6 +23,7 @@ import moe.nyamori.bgm.util.TopicListHelper.getTopicList
 import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 import java.io.*
+import java.nio.file.Path
 import java.time.Duration
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -152,7 +153,8 @@ object SpotChecker {
 
         spotCheckedBs.or(hiddenBs)
         val remainZeroCount = spotCheckedBs.size() - spotCheckedBs.cardinality()
-        val fakeTotalCount = (hiddenBs.size() - hiddenBs.cardinality()).coerceAtLeast(spotCheckedBs.size() - hiddenBs.cardinality())
+        val fakeTotalCount =
+            (hiddenBs.size() - hiddenBs.cardinality()).coerceAtLeast(spotCheckedBs.size() - hiddenBs.cardinality())
         LOGGER.info(
             "Current approximate not spot-checked count: $spaceType - $remainZeroCount / $fakeTotalCount ," +
                     " spot-checked ratio: ${
@@ -473,30 +475,39 @@ object SpotChecker {
 
     @JvmStatic
     fun main(argv: Array<String>) {
-        var i = OffsetDateTime.now()
-            .atZoneSameInstant(ZoneOffset.ofHours(8))
-            .get(ChronoField.HOUR_OF_DAY)
-        System.err.println(i)
-        if (true) return
-        // LOGGER.info("max id for group ${getMaxId(SpaceType.GROUP)}")
-        // repeat(10) { genSpotCheckListFile(SpaceType.SUBJECT) }
-        // System.err.println(randomSelectTopicIds(SpaceType.GROUP))
-//        SpaceType.values().forEach {
-//            genHiddenTopicMaskFile(it)
-//        }
-//        randomSelectTopicIds(GitHelper.defaultArchiveRepoSingleton, spaceType = SpaceType.EP)
-//        genEmptyTopicMaskFile(SpaceType.EP)
         val cfg = checkAndGetConfigDto()
         setConfigDelegate(cfg)
-        allJsonRepoListSingleton.forEach {
-            if (it.couplingArchiveRepo() == null) return@forEach
-            if (!it.simpleName().contains("gre")) return@forEach
-            System.err.println(it.simpleName())
-//            genHiddenTopicMaskFile(it.couplingArchiveRepo()!!, SpaceType.PERSON)
-//            genHiddenTopicMaskFile(it.couplingArchiveRepo()!!, SpaceType.CHARACTER)
-            genHiddenTopicMaskFile(it.couplingArchiveRepo()!!, SpaceType.GROUP)
-            genHiddenTopicMaskFile(it.couplingArchiveRepo()!!, SpaceType.EP)
+        val allNormalIds = Dao.bgmDao.getAllTopicIdByTypeAndState(SpaceType.GROUP.id, 0)
+        val maxId = Dao.bgmDao.getMaxTopicIdByType(SpaceType.GROUP.id) + 1
+        val bitset = BitSet(maxId)
+        allNormalIds.forEach { bitset.set(it) }
+        val reversed = (bitset.clone() as BitSet).apply { flip(0, maxId) }
+        val abnormalIds = arrayListOf<Int>()
+        reversed.stream().forEach { abnormalIds.add(it) }
+        val holes = RangeHelper.summaryRanges(abnormalIds)
+        val bigholes = holes.filter {
+            if (it.size == 1) return@filter false
+            return@filter it[1] - it[0] >= 100
         }
+        val bigholeMaskedBs = BitSet(maxId)
+        bigholeMaskedBs.set(maxId)
+        bigholes.forEach { hole ->
+            for (bit in hole[0]..hole[1]) {
+                bigholeMaskedBs.set(bit)
+            }
+        }
+        val normalMaskedBs = BitSet(maxId)
+        allNormalIds.forEach { normalId -> normalMaskedBs.set(normalId) }
+        // this will be the hidden_topic_mask
+        writeBitsetToFile(
+            bigholeMaskedBs,
+            Path.of(System.getProperty("user.home"), "bigholesmasked.group.txt").toFile()
+        )
+        // this will be the spot_check_bitset
+        writeBitsetToFile(
+            normalMaskedBs,
+            Path.of(System.getProperty("user.home"), "allnormalmasked.group.txt").toFile()
+        )
     }
 
     private fun checkEmptyTopicMaskBitsetFile(archiveRepo: Repository, spaceType: SpaceType) {

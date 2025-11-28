@@ -984,6 +984,9 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
     @SqlQuery("select id from ba_topic where type = ?")
     override fun getAllTopicIdByType(type: Int): ArrayList<Int>
 
+    @SqlQuery("select id from ba_topic where type = :type and state = :state")
+    override fun getAllTopicIdByTypeAndState(@Bind("type") type: Int, @Bind("state") state: Int): ArrayList<Int>
+
     @SqlQuery("select max(id) from ba_topic where type = ?")
     override fun getMaxTopicIdByType(type: Int): Int
 
