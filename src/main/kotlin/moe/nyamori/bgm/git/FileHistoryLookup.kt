@@ -388,7 +388,7 @@ object FileHistoryLookup {
                 val diffSec = diff / 1000
                 val logSec = diffSec % 60
                 val logMin = diffSec / 60
-                log.info("Diff=${logMin}m${logSec}s for json ${topicId.toJsonRelPath(spaceType)} in ${it.json.repo.folderName()} : ${it.json.hash}")
+                log.debug("Diff=${logMin}m${logSec}s for json ${topicId.toJsonRelPath(spaceType)} in ${it.json.repo.folderName()} : ${it.json.hash}")
                 it to it.json.repo.getFileContentAsStringInACommit(
                     it.json.hash,
                     it.topicId.toJsonRelPath(it.spaceType),
