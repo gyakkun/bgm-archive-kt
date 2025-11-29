@@ -185,8 +185,9 @@ internal fun filterBySpaceBlockList(
     val res = timestampList.subSet(timestampList.first, lastTsNotBlocked + 1L)
     val sizeDiff = timestampList.size - res.size
     if (sizeDiff != 0) SBLOGGER.info(
-        "Blocked {} topics for {} topic {} : {} - {}",
+        "Blocked {}/{} captures for {} topic {} : {} - {}",
         sizeDiff,
+        timestampList.size,
         spaceType,
         topicId,
         spaceNameMapping.firstOrNull()?.displayName,
