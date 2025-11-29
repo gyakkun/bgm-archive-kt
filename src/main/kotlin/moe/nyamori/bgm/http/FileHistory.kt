@@ -26,7 +26,8 @@ class FileHistory(private val spaceType: SpaceType) : Handler {
             } else {
                 FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
             }
-            val filtered = filterBySpaceBlockList(this.spaceType, topicId, timestampList)
+            val filtered =
+                filterBySpaceBlockList(this.spaceType, topicId, timestampList, ctx.header("x-bak-unblock-code"))
             ctx.header(CACHE_CONTROL, "max-age=3600")
             ctx.json(filtered)
         } catch (ex: Exception) {

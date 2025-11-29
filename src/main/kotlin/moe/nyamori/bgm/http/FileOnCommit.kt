@@ -47,7 +47,7 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                 } else {
                     FileHistoryLookup.getJsonTimestampList(spaceType, topicId)
                 }
-                val filtered = filterBySpaceBlockList(this.spaceType, topicId, timestampList)
+                val filtered = filterBySpaceBlockList(this.spaceType, topicId, timestampList, ctx.header("x-bak-unblock-code"))
                 val treeSet = TreeSet(filtered)
                 if (treeSet.isEmpty()) {
                     ctx.status(HttpStatus.BAD_REQUEST)
@@ -134,8 +134,10 @@ private val SBLOGGER = LoggerFactory.getLogger("SpaceBlocker")
 internal fun filterBySpaceBlockList(
     spaceType: SpaceType,
     topicId: Int,
-    timestampList: SortedSet<Long>
+    timestampList: SortedSet<Long>,
+    unblockCode: String? = null
 ): List<Long?> {
+    if (Config.unblockCode != null && unblockCode == Config.unblockCode) return timestampList.toList()
     if (timestampList.isEmpty()) return emptyList()
     val topicDtoList = Dao.bgmDao.getTopicListByTypeAndTopicId(spaceType.id, topicId)
     val topicDto = topicDtoList.firstOrNull() ?: return emptyList()
