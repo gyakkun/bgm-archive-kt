@@ -1,5 +1,7 @@
 package moe.nyamori.bgm.http
 
+import com.google.gson.GsonBuilder
+import com.google.gson.ToNumberPolicy
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.Header.CACHE_CONTROL
@@ -8,10 +10,14 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.git.GitHelper.simpleName
+import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.model.lowercaseName
+import moe.nyamori.bgm.util.BinarySearchHelper
 import moe.nyamori.bgm.util.HttpHelper
 import moe.nyamori.bgm.util.ParserHelper.getStyleRevNumberFromHtmlString
+import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.util.*
@@ -128,10 +134,11 @@ internal fun filterBySpaceBlockList(
     topicId: Int,
     timestampList: SortedSet<Long>
 ): List<Long?> {
+    if (timestampList.isEmpty()) return emptyList()
     val topicDtoList = Dao.bgmDao.getTopicListByTypeAndTopicId(spaceType.id, topicId)
     val topicDto = topicDtoList.firstOrNull() ?: return emptyList()
     val spaceNameMapping = Dao.bgmDao.getSpaceNamingMappingByTypeAndSid(spaceType.id, topicDto.sid)
-    val blockers = Config.spaceBlockList
+    val validBlockers = Config.spaceBlockList
         .mapNotNull {
             it.validateOrNull()
         }.filter {
@@ -139,12 +146,53 @@ internal fun filterBySpaceBlockList(
                     && spaceNameMapping.isNotEmpty()
                     && spaceNameMapping.first().name == it.spaceName
         }
-    val filtered = timestampList.filter { ts ->
-        val ins = Instant.ofEpochMilli(ts)
-        blockers.none {
-            val (startIns, endIns) = it.blockRange?.toInstantPairOrNull() ?: return@none false
-            ins in startIns..endIns
+    if (validBlockers.isEmpty()) return timestampList.toList()
+
+    // We assume that a thread can be moved to a blocked space
+    // some time in the future.
+    // Reference the feh deleted post handler
+    val GSON = GsonBuilder()
+        .setNumberToNumberStrategy(ToNumberPolicy.LONG_OR_DOUBLE)
+        .registerTypeAdapterFactory(
+            SealedTypeAdapterFactory.of(Space::class)
+        ).create()
+    val cache = HashMap<Long, Topic>()
+    val topicAtTs = fun(ts: Long): Topic {
+        return cache.computeIfAbsent(ts) {
+            GSON.fromJson(
+                FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
+                    spaceType, topicId, ts
+                ), Topic::class.java
+            )
         }
     }
-    return filtered
+
+    // Use binary search to find the last/max timestamp that it's not blocked
+    // aka ceiling
+    val bsFunMaxNonBlockPostGen =
+        BinarySearchHelper.binarySearchFunctionGenerator<Long>(BinarySearchHelper.BSType.CEILING)
+
+    val lastTsNotBlocked = bsFunMaxNonBlockPostGen(timestampList.toList()) { ts ->
+        val ins = Instant.ofEpochMilli(ts)
+        val topicAtm = topicAtTs(ts)
+        // return true if it's NOT blocked
+        validBlockers.none { b ->
+            val (startIns, endIns) = b.blockRange?.toInstantPairOrNull()
+                ?: return@none false
+            (topicAtm.space?.name == b.spaceName && ins in startIns..endIns)
+        }
+    }
+    if (lastTsNotBlocked == null) return emptyList()
+    val res = timestampList.subSet(timestampList.first, lastTsNotBlocked + 1L)
+    return res.toList()
+
+    // val filtered = timestampList.filter { ts ->
+    //     val ins = Instant.ofEpochMilli(ts)
+    //     blockers.none {
+    //         val (startIns, endIns) = it.blockRange?.toInstantPairOrNull()
+    //             ?: return@none false
+    //         ins in startIns..endIns
+    //     }
+    // }
+    // return filtered
 }
