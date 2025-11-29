@@ -129,6 +129,8 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
     }
 }
 
+private val SBLOGGER = LoggerFactory.getLogger("SpaceBlocker")
+
 internal fun filterBySpaceBlockList(
     spaceType: SpaceType,
     topicId: Int,
@@ -156,15 +158,12 @@ internal fun filterBySpaceBlockList(
         .registerTypeAdapterFactory(
             SealedTypeAdapterFactory.of(Space::class)
         ).create()
-    val cache = HashMap<Long, Topic>()
     val topicAtTs = fun(ts: Long): Topic {
-        return cache.computeIfAbsent(ts) {
-            GSON.fromJson(
-                FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
-                    spaceType, topicId, ts
-                ), Topic::class.java
-            )
-        }
+        return GSON.fromJson(
+            FileHistoryLookup.getJsonFileContentAsStringAtTimestamp(
+                spaceType, topicId, ts
+            ), Topic::class.java
+        )
     }
 
     // Use binary search to find the last/max timestamp that it's not blocked
@@ -184,15 +183,14 @@ internal fun filterBySpaceBlockList(
     }
     if (lastTsNotBlocked == null) return emptyList()
     val res = timestampList.subSet(timestampList.first, lastTsNotBlocked + 1L)
+    val sizeDiff = timestampList.size - res.size
+    if (sizeDiff != 0) SBLOGGER.info(
+        "Blocked {} topics for {} topic {} : {} - {}",
+        sizeDiff,
+        spaceType,
+        topicId,
+        spaceNameMapping.firstOrNull()?.displayName,
+        topicDto.title
+    )
     return res.toList()
-
-    // val filtered = timestampList.filter { ts ->
-    //     val ins = Instant.ofEpochMilli(ts)
-    //     blockers.none {
-    //         val (startIns, endIns) = it.blockRange?.toInstantPairOrNull()
-    //             ?: return@none false
-    //         ins in startIns..endIns
-    //     }
-    // }
-    // return filtered
 }
