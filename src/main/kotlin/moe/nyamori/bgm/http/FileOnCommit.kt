@@ -35,13 +35,20 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                 return
             }
             try {
-                val topicId = ctx.pathParam("topicId").toInt()
+                val topicId = ctx.pathParam("topicId").toIntOrNull()
+                if (topicId == null) {
+                    ctx.status(HttpStatus.BAD_REQUEST)
+                    return
+                }
 
                 val timestampPathParam = ctx.pathParam("timestamp")
                 val timestamp =
                     if (timestampPathParam == "latest") Long.MAX_VALUE
                     else if (timestampPathParam.toLongOrNull() != null) timestampPathParam.toLong()
-                    else -1L
+                    else {
+                        ctx.status(HttpStatus.BAD_REQUEST)
+                        return
+                    }
                 val timestampList = if (isHtml) {
                     FileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
                 } else {

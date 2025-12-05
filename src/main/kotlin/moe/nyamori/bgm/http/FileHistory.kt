@@ -3,6 +3,7 @@ package moe.nyamori.bgm.http
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.Header.CACHE_CONTROL
+import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.HttpHelper.GIT_RELATED_LOCK
@@ -20,7 +21,11 @@ class FileHistory(private val spaceType: SpaceType) : Handler {
             //    return
             // }
             val isHtml = ctx.queryParam("isHtml")?.toBooleanStrictOrNull() ?: false
-            val topicId = ctx.pathParam("topicId").toInt()
+            val topicId = ctx.pathParam("topicId").toIntOrNull()
+            if (topicId == null) {
+                ctx.status(HttpStatus.BAD_REQUEST)
+                return
+            }
             val timestampList = if (isHtml) {
                 FileHistoryLookup.getArchiveTimestampList(spaceType, topicId)
             } else {

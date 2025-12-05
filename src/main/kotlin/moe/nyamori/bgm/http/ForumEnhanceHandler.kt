@@ -11,6 +11,7 @@ import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.db.*
 import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.lowercaseName
 import moe.nyamori.bgm.util.HttpHelper
 import org.slf4j.LoggerFactory
 import java.time.Duration
@@ -101,7 +102,7 @@ object ForumEnhanceHandler : Handler {
                 .map { it.name.lowercase() }
         ) {
             ctx.status(HttpStatus.BAD_REQUEST)
-            ctx.result("Field \"type\" should be one of group, subject and blog")
+            ctx.result("Field \"type\" should be one of the following: ${SpaceType.entries.joinToString { it.lowercaseName() }}")
             return null
         }
         val spaceType = SpaceType.valueOf((bodyMap["type"] as String).uppercase())
