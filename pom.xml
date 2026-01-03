@@ -19,7 +19,6 @@
         <maven.compiler.source>${lts.jdk.version}</maven.compiler.source>
         <maven.compiler.target>${lts.jdk.version}</maven.compiler.target>
         <kt.major.version>2.3.0</kt.major.version>
-        <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
     </properties>
 
     <dependencyManagement>
