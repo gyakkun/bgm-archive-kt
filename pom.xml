@@ -14,11 +14,11 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <kotlin.code.style>official</kotlin.code.style>
-        <lts.jdk.version>21</lts.jdk.version>
+        <lts.jdk.version>25</lts.jdk.version>
         <kotlin.compiler.jvmTarget>${lts.jdk.version}</kotlin.compiler.jvmTarget>
         <maven.compiler.source>${lts.jdk.version}</maven.compiler.source>
         <maven.compiler.target>${lts.jdk.version}</maven.compiler.target>
-        <kt.major.version>2.2.21</kt.major.version>
+        <kt.major.version>2.3.0</kt.major.version>
         <kotlin.compiler.incremental>true</kotlin.compiler.incremental>
     </properties>
 
