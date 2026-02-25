@@ -7,7 +7,11 @@ import com.hsbc.cranker.connector.RouterEventListener
 import com.hsbc.cranker.connector.RouterRegistration
 import io.javalin.Javalin
 import io.javalin.apibuilder.ApiBuilder.*
+import io.javalin.compression.Brotli
+import io.javalin.compression.CompressionStrategy
+import io.javalin.compression.Gzip
 import io.javalin.http.*
+import io.javalin.plugin.bundled.RateLimitPlugin
 import moe.nyamori.bgm.config.*
 import moe.nyamori.bgm.config.Config.bgmHealthStatus500TimeoutThresholdMs
 import moe.nyamori.bgm.db.DSProvider
@@ -59,8 +63,11 @@ object HttpServer {
         writeConfigToConfigFolder(cfg)
         customizeHttpMsg()
         val app = Javalin.create { config ->
-            config.useVirtualThreads = true
-            config.http.brotliAndGzipCompression()
+            config.registerPlugin(RateLimitPlugin { cfg ->
+                cfg.keyFunction = { ctx -> bestGuessIp(ctx) + ctx.method() + ctx.endpoint().path }
+            })
+            config.concurrency.useVirtualThreads = true
+            config.http.compressionStrategy = CompressionStrategy(Brotli(), Gzip())
             // Global json pretty
             // config.jsonMapper(JavalinJackson().updateMapper{
             //     it.enable(SerializationFeature.INDENT_OUTPUT)
@@ -85,7 +92,7 @@ object HttpServer {
                     LOGGER.error("[{}] Req failed with code {}", reqSalt, ctx.statusCode())
                 }
             }
-            config.router.apiBuilder {
+            config.routes.apiBuilder {
                 get("/status", GitRepoStatusHandler)
                 get("/status/git", GitRepoStatusHandler)
                 get("/status/jvm", JvmStatusHandler)
@@ -233,36 +240,39 @@ object HttpServer {
                     }
                 }
             }
-        }.beforeMatched {
-            if (it.matchedPath() == "/*") return@beforeMatched
-            if (it.isLocalhost()) return@beforeMatched
-            notRecordingCrawler(it)
-            val reqSalt = genSalt(launchId, reqCounter)
-            it.attribute("reqSalt", reqSalt)
-            if(LOGGER.isDebugEnabled) {
-                val fullHeaders = it.req().headerNames.asSequence().map { hn ->
-                    val hdrs = it.req().getHeaders(hn).toList()
-                    if (hdrs.size == 1) return@map hn to hdrs[0]
-                    else return@map hn to hdrs
-                }.toMap()
-                LOGGER.debug(
-                    "[{}] Req: IP={}, method={}, full url={}, header map=\n{}",
-                    reqSalt,
-                    ip(it),
-                    it.method(),
-                    it.fullUrl(),
-                    fullHeaders.entries.joinToString(separator = "\n") { str -> "\t$str" }
-                )
-            } else {
-                LOGGER.info(
-                    "[{}] IP={}, {} {}",
-                    reqSalt,
-                    ip(it),
-                    it.method(),
-                    it.fullUrl(),
-                )
+           config.routes.beforeMatched {
+                if (it.endpoint().path == "/*") return@beforeMatched
+                if (it.isLocalhost()) return@beforeMatched
+                notRecordingCrawler(it)
+                val reqSalt = genSalt(launchId, reqCounter)
+                it.attribute("reqSalt", reqSalt)
+                if(LOGGER.isDebugEnabled) {
+                    val fullHeaders = it.req().headerNames.asSequence().map { hn ->
+                        val hdrs = it.req().getHeaders(hn).toList()
+                        if (hdrs.size == 1) return@map hn to hdrs[0]
+                        else return@map hn to hdrs
+                    }.toMap()
+                    LOGGER.debug(
+                        "[{}] Req: IP={}, method={}, full url={}, header map=\n{}",
+                        reqSalt,
+                        bestGuessIp(it),
+                        it.method(),
+                        it.fullUrl(),
+                        fullHeaders.entries.joinToString(separator = "\n") { str -> "\t$str" }
+                    )
+                } else {
+                    LOGGER.info(
+                        "[{}] IP={}, {} {}",
+                        reqSalt,
+                        bestGuessIp(it),
+                        it.method(),
+                        it.fullUrl(),
+                    )
+                }
             }
-        }.start(Config.httpHost, Config.httpPort)
+        }
+
+       .start(Config.httpHost, Config.httpPort)
 
         if (Config.enableCrankerConnector) {
             LOGGER.info("Starting cranker connector")
@@ -428,13 +438,13 @@ object HttpServer {
         }, printLog = !isAvailable)
     }
 
-    private fun ip(ctx: Context): String {
+    private fun bestGuessIp(ctx: Context): String {
         val candidates = sequenceOf(
+            sequenceOf("cf-connecting-ip" to ctx.header("cf-connecting-ip")?.takeIfIsValidIpAddress()),
             sequenceOf(
                 "x-forwarded-for" to ctx.header("X-Forwarded-For")?.split(",")?.firstOrNull()?.takeIfIsValidIpAddress()
             ),
             ctx.req().getHeaders("forwarded").asSequence().map { "forwarded" to forwardedHeaderToIpOrNull(it) },
-            sequenceOf("cf-connecting-ip" to ctx.header("cf-connecting-ip")?.takeIfIsValidIpAddress())
         ).flatten().toList()
         if (LOGGER.isDebugEnabled) {
             LOGGER.debug("IP Candidates: \n{}", candidates.joinToString("\n") { str -> "\t$str" })
@@ -463,7 +473,7 @@ object HttpServer {
         InetAddress.getByName(this)
     }.getOrNull()
 
-    private fun Context.isLocalhost() = ip(this).toIpAddrOrNull()?.isLoopbackAddress ?: false
+    private fun Context.isLocalhost() = bestGuessIp(this).toIpAddrOrNull()?.isLoopbackAddress ?: false
 
     private fun customizeHttpMsg() = runCatching {
         val m = mapOf(

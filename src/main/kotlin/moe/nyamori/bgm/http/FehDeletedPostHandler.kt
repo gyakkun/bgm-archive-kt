@@ -5,7 +5,7 @@ import com.google.gson.ToNumberPolicy
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
-import io.javalin.http.util.NaiveRateLimit
+import io.javalin.plugin.bundled.RateLimitPlugin
 import moe.nyamori.bgm.git.FileHistoryLookup
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
@@ -24,7 +24,7 @@ object FehDeletedPostHandler : Handler {
         ).create()
     private val LOGGER = LoggerFactory.getLogger(FehDeletedPostHandler::class.java)
     override fun handle(ctx: Context) {
-        NaiveRateLimit.requestPerTimeUnit(ctx, 20, TimeUnit.MINUTES)
+        ctx.with(RateLimitPlugin::class).requestPerTimeUnit(20, TimeUnit.MINUTES)
         try {
             if (!HttpHelper.DB_READ_SEMAPHORE.tryAcquire(30, TimeUnit.SECONDS)) {
                 ctx.status(HttpStatus.GATEWAY_TIMEOUT)
