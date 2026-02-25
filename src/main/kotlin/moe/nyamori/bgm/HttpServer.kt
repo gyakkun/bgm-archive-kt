@@ -491,27 +491,8 @@ object HttpServer {
             val res = pp[code]!!
             val rlf = res.javaClass.getDeclaredField("_responseLine").apply { isAccessible = true }
             val rsnf = res.javaClass.getDeclaredField("_reason").apply { isAccessible = true }
-            val rsn = msg // msg.toByteArray()
+            val rsn = msg
             val rl = "HTTP/1.1 $code $msg\r\n".toByteArray()
-
-            // val MODIFIERS: VarHandle
-            // val lookup = MethodHandles.privateLookupIn(Field::class.java, MethodHandles.lookup())
-            // MODIFIERS = lookup.findVarHandle(Field::class.java, "modifiers", Int::class.javaPrimitiveType)
-//
-            // MODIFIERS.set(rlf, rlf.modifiers and Modifier.FINAL.inv())
-            // MODIFIERS.set(rsnf, rsnf.modifiers and Modifier.FINAL.inv())
-
-            // val modifiersField = Field::class.java.getDeclaredField("modifiers")
-            // modifiersField.setAccessible(true)
-            // modifiersField.set(rlf, rlf.modifiers and Modifier.FINAL.inv())
-            // modifiersField.set(rsnf, rsnf.modifiers and Modifier.FINAL.inv())
-
-            // val rlvh = MethodHandles.privateLookupIn(res.javaClass, MethodHandles.lookup())
-            //     .findVarHandle(res.javaClass,"_responseLine", ByteArray::class.java)
-            // val rsnvh = MethodHandles.privateLookupIn(res.javaClass, MethodHandles.lookup())
-            //     .findVarHandle(res.javaClass,"_reason", ByteArray::class.java)
-            // rlvh.set(res, rl)
-            // rsnvh.set(res, rsn)
 
             rlf.set(res, rl)
             rsnf.set(res, rsn)
