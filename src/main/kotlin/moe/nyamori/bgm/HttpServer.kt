@@ -32,10 +32,7 @@ import org.eclipse.jetty.http.HttpGenerator
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileWriter
-import java.lang.invoke.MethodHandles
 import java.lang.management.ManagementFactory
-import java.lang.reflect.Field
-import java.lang.reflect.Modifier
 import java.net.Inet6Address
 import java.net.InetAddress
 import java.net.URI
@@ -244,34 +241,43 @@ object HttpServer {
                     }
                 }
             }
-           config.routes.beforeMatched {
-                if (it.endpoint().path == "/*") return@beforeMatched
-                if (it.isLocalhost()) return@beforeMatched
-                notRecordingCrawler(it)
-                val reqSalt = genSalt(launchId, reqCounter)
-                it.attribute("reqSalt", reqSalt)
-                if(LOGGER.isDebugEnabled) {
-                    val fullHeaders = it.req().headerNames.asSequence().map { hn ->
-                        val hdrs = it.req().getHeaders(hn).toList()
-                        if (hdrs.size == 1) return@map hn to hdrs[0]
-                        else return@map hn to hdrs
-                    }.toMap()
-                    LOGGER.debug(
-                        "[{}] Req: IP={}, method={}, full url={}, header map=\n{}",
-                        reqSalt,
-                        bestGuessIp(it),
-                        it.method(),
-                        it.fullUrl(),
-                        fullHeaders.entries.joinToString(separator = "\n") { str -> "\t$str" }
-                    )
+            config.router.handlerWrapper { endpoint ->
+                if (endpoint.path != "*" && endpoint.path != "/*") {
+                    Handler { ctx ->
+                        if (ctx.isLocalhost()) {
+                            endpoint.handler.handle(ctx)
+                            return@Handler
+                        }
+                        notRecordingCrawler(ctx)
+                        val reqSalt = genSalt(launchId, reqCounter)
+                        ctx.attribute("reqSalt", reqSalt)
+                        if (LOGGER.isDebugEnabled) {
+                            val fullHeaders = ctx.req().headerNames.asSequence().map { hn ->
+                                val hdrs = ctx.req().getHeaders(hn).toList()
+                                if (hdrs.size == 1) return@map hn to hdrs[0]
+                                else return@map hn to hdrs
+                            }.toMap()
+                            LOGGER.debug(
+                                "[{}] Req: IP={}, method={}, full url={}, header map=\n{}",
+                                reqSalt,
+                                bestGuessIp(ctx),
+                                ctx.method(),
+                                ctx.fullUrl(),
+                                fullHeaders.entries.joinToString(separator = "\n") { str -> "\t$str" }
+                            )
+                        } else {
+                            LOGGER.info(
+                                "[{}] IP={}, {} {}",
+                                reqSalt,
+                                bestGuessIp(ctx),
+                                ctx.method(),
+                                ctx.fullUrl(),
+                            )
+                        }
+                        endpoint.handler.handle(ctx)
+                    }
                 } else {
-                    LOGGER.info(
-                        "[{}] IP={}, {} {}",
-                        reqSalt,
-                        bestGuessIp(it),
-                        it.method(),
-                        it.fullUrl(),
-                    )
+                    endpoint.handler
                 }
             }
         }
