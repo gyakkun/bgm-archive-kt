@@ -981,14 +981,13 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
                    bsnm.name         as space_name,
                    bsnm.display_name as space_display_name,
                    sum(bl.total)        count
-            from ba_likes bl -- So far ba_likes is the smallest table
-                     inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
-                     inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
-                     inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
-                     inner join ba_user bu on bp.uid = bu.id
+            from ba_user bu 
+                 inner join ba_likes bl on bl.uid = bu.id
+                 inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id	  
+                 inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
             where bu.username in
                   (<l>)
-              and bl.type = :t
+              and bl.type = :t and bt.state != 1
             group by bl.type, username, bsnm.name
             having count > 0;
         """
