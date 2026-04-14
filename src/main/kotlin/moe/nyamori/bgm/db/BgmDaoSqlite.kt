@@ -100,19 +100,6 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     @Transaction
     // WARN: No generated key back from sqlite jdbc driver
     override fun batchUpsertFileRelativePathForCache(@Bind("t") fileRelativePaths: List<String>): IntArray
-//    {
-//        return Dao.bgmDao.withHandle<List<Long>, Exception> {
-//            val batch = it.prepareBatch(
-//                """
-//                insert into ba_cache_file_relative_path (file_relative_path) values (?)
-//                on conflict do nothing;
-//        """.trimIndent()
-//            );
-//            fileRelativePaths.forEach { batch.add(it) }
-//            val res = batch.executePreparedBatch("id")
-//            return@withHandle res.mapTo(Long::class.java).list()
-//        }
-//    }
 
     @SqlUpdate(
         """
@@ -611,7 +598,11 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     // View queries
     @SqlQuery(
         """
-            select * from ba_v_all_post_count_group_by_type_uid_state where type = :t and username in (<l>)
+            select bp.type, bp.uid, bu.username, bp.state, count(1) count
+            from ba_post bp
+            inner join ba_user bu on bp.uid = bu.id
+            where bp.type = :t and bp.uid in (select id from ba_user where username in (<l>))
+            group by bp.type, bp.uid, bp.state, bu.username
         """
     )
     @RegisterKotlinMapper(VAllPostCountRow::class)
@@ -622,7 +613,11 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_all_topic_count_group_by_type_uid_state where type = :t and username in (<l>)
+            select bt.type, bt.uid, bu.username, bt.state, count(1) count
+            from ba_topic bt
+            inner join ba_user bu on bt.uid = bu.id
+            where bt.type = :t and bt.uid in (select id from ba_user where username in (<l>))
+            group by bt.type, bt.uid, bt.state, bu.username
         """
     )
     @RegisterKotlinMapper(VAllTopicCountRow::class)
@@ -634,7 +629,12 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_all_post_count_30d_group_by_type_uid_state where type = :t and username in (<l>)
+            select bp.type, bp.uid, bu.username, bp.state, count(1) count
+            from ba_post bp
+            inner join ba_user bu on bp.uid = bu.id
+            where bp.type = :t and bp.uid in (select id from ba_user where username in (<l>))
+              and bp.dateline >= ((select unixepoch() - 86400*30))
+            group by bp.type, bp.uid, bp.state, bu.username
         """
     )
     @RegisterKotlinMapper(VAllPostCount30dRow::class)
@@ -645,7 +645,12 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_all_topic_count_30d_group_by_type_uid_state where type = :t and username in (<l>)
+            select bt.type, bt.uid, bu.username, bt.state, count(1) count
+            from ba_topic bt
+            inner join ba_user bu on bt.uid = bu.id
+            where bt.type = :t and bt.uid in (select id from ba_user where username in (<l>))
+              and bt.dateline >= ((select unixepoch() - 86400*30))
+            group by bt.type, bt.uid, bt.state, bu.username
         """
     )
     @RegisterKotlinMapper(VAllTopicCount30dRow::class)
@@ -656,7 +661,12 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_all_post_count_7d_group_by_type_uid_state where type = :t and username in (<l>)
+            select bp.type, bp.uid, bu.username, bp.state, count(1) count
+            from ba_post bp
+            inner join ba_user bu on bp.uid = bu.id
+            where bp.type = :t and bp.uid in (select id from ba_user where username in (<l>))
+              and bp.dateline >= ((select unixepoch() - 86400*7))
+            group by bp.type, bp.uid, bp.state, bu.username
         """
     )
     @RegisterKotlinMapper(VAllPostCount7dRow::class)
@@ -667,7 +677,12 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_all_topic_count_7d_group_by_type_uid_state where type = :t and username in (<l>)
+            select bt.type, bt.uid, bu.username, bt.state, count(1) count
+            from ba_topic bt
+            inner join ba_user bu on bt.uid = bu.id
+            where bt.type = :t and bt.uid in (select id from ba_user where username in (<l>))
+              and bt.dateline >= ((select unixepoch() - 86400*7))
+            group by bt.type, bt.uid, bt.state, bu.username
         """
     )
     @RegisterKotlinMapper(VAllTopicCount7dRow::class)
@@ -703,7 +718,12 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_post_count_group_by_type_space_uid_state where username in (<l>) and type=:t
+            select bp.type, bp.uid, bsnm.name, bsnm.display_name, bu.username, bp.state, count(1) count
+            from ba_post bp
+            inner join ba_user bu on bp.uid = bu.id
+            inner join ba_space_naming_mapping bsnm on bp.type = bsnm.type and bp.sid = bsnm.sid
+            where bp.type = :t and bp.uid in (select id from ba_user where username in (<l>))
+            group by bp.type, bp.uid, bp.state, bp.sid, bsnm.name, bsnm.display_name, bu.username
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
@@ -714,7 +734,13 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_post_count_30d_group_by_type_space_uid_state where username in (<l>) and type=:t
+            select bp.type, bp.uid, bsnm.name, bsnm.display_name, bu.username, bp.state, count(1) count
+            from ba_post bp
+            inner join ba_user bu on bp.uid = bu.id
+            inner join ba_space_naming_mapping bsnm on bp.type = bsnm.type and bp.sid = bsnm.sid
+            where bp.type = :t and bp.uid in (select id from ba_user where username in (<l>))
+              and bp.dateline >= ((select unixepoch() - 86400*30))
+            group by bp.type, bp.uid, bp.state, bp.sid, bsnm.name, bsnm.display_name, bu.username
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
@@ -725,7 +751,13 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_post_count_7d_group_by_type_space_uid_state where username in (<l>) and type=:t
+            select bp.type, bp.uid, bsnm.name, bsnm.display_name, bu.username, bp.state, count(1) count
+            from ba_post bp
+            inner join ba_user bu on bp.uid = bu.id
+            inner join ba_space_naming_mapping bsnm on bp.type = bsnm.type and bp.sid = bsnm.sid
+            where bp.type = :t and bp.uid in (select id from ba_user where username in (<l>))
+              and bp.dateline >= ((select unixepoch() - 86400*7))
+            group by bp.type, bp.uid, bp.state, bp.sid, bsnm.name, bsnm.display_name, bu.username
         """
     )
     @RegisterKotlinMapper(VPostCountSpaceRow::class)
@@ -737,7 +769,12 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_topic_count_group_by_type_space_uid_state where username in (<l>) and type = :t  
+            select bt.type, bt.uid, bt.state, bsnm.name, bsnm.display_name, bu.username, count(1) count
+            from ba_topic bt
+            inner join ba_user bu on bt.uid = bu.id
+            inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+            where bt.type = :t and bt.uid in (select id from ba_user where username in (<l>))
+            group by bt.type, bt.uid, bt.sid, bt.state, bsnm.name, bsnm.display_name, bu.username
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
@@ -749,7 +786,13 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_topic_count_30d_group_by_type_space_uid_state where type = :t and username in (<l>)
+            select bt.type, bt.uid, bt.state, bsnm.name, bsnm.display_name, bu.username, count(1) count
+            from ba_topic bt
+            inner join ba_user bu on bt.uid = bu.id
+            inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+            where bt.type = :t and bt.uid in (select id from ba_user where username in (<l>))
+              and bt.dateline >= ((select unixepoch() - 86400*30))
+            group by bt.type, bt.uid, bt.sid, bt.state, bsnm.name, bsnm.display_name, bu.username
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
@@ -761,7 +804,13 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from ba_v_topic_count_7d_group_by_type_space_uid_state where username in (<l>) and type = :t 
+            select bt.type, bt.uid, bt.state, bsnm.name, bsnm.display_name, bu.username, count(1) count
+            from ba_topic bt
+            inner join ba_user bu on bt.uid = bu.id
+            inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+            where bt.type = :t and bt.uid in (select id from ba_user where username in (<l>))
+              and bt.dateline >= ((select unixepoch() - 86400*7))
+            group by bt.type, bt.uid, bt.sid, bt.state, bsnm.name, bsnm.display_name, bu.username
         """
     )
     @RegisterKotlinMapper(VTopicCountSpaceRow::class)
