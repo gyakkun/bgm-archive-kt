@@ -751,14 +751,14 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
                                 bu.username   as username,
                                 bsnm.sid      as sid,
                                 sum(bl.total) as count
-                         from ba_likes_rev bl -- So far ba_likes is the smallest table
-                                  inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
-                                  inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
-                             -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
-                                  inner join ba_user bu on bl.uid = bu.id
+                         from ba_user bu
+                              inner join ba_post bp on bp.uid = bu.id
+                              inner join ba_likes bl on bp.type = bl.type and bl.mid = bp.mid and bp.id = bl.pid 
+                              inner join ba_topic bt on bt.type = bl.type and bl.mid = bt.id
+                              inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
                          where bu.username in
                                (<l>)
-                           and bl.type = :t
+                           and bl.type = :t and bt.state != 1 and bp.state != 1
                          group by bl.type, username, bsnm.sid
                          having sum(bl.total) > 0)
             select tmp.*,
