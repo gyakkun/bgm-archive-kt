@@ -897,7 +897,7 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
                               inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
                          where bu.username in
                                (<l>)
-                           and bl.type = :t
+                           and bl.type = :t and bt.state != 1
                          group by bl.type, username, bsnm.sid
                          having sum(bl.total) > 0)
             select tmp.type as type, tmp.username as username, bsnm2.name as space_name , bsnm2.display_name as space_display_name,  tmp.count as count
