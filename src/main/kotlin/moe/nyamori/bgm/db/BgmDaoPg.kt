@@ -684,10 +684,10 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
                    bl.value    as face_key,
                    bu.username as username,
                    sum(bl.total)  count
-            from ba_likes bl -- So far ba_likes is the smallest table
+            from  ba_user bu 
+                     inner join ba_likes_rev bl on bl.uid = bu.id  -- bl_r will be larger and larger
                      inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
                      inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
-                     inner join ba_user bu on bp.uid = bu.id
             where bu.username in
                   (<l>)
               and bl.type = :t
@@ -696,101 +696,107 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
-    override fun getLikesSumByTypeAndUsernameList(
+    override fun getLikeRevSumByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikesSumRow>
 
+
     @SqlQuery(
         """
-            select * from ba_v_post_count_group_by_type_space_uid_state where username in (<l>) and type=:t
-        """
+            with tmp as (select bl.type             as type,
+                                bu.username         as username,
+                                bsnm.sid            as sid,
+                                sum(bl.total)       as count
+                         from ba_user bu 
+                              inner join ba_likes_rev bl on bl.uid = bu.id
+                              inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id	  
+                              inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+                         where bu.username in
+                               (<l>)
+                           and bl.type = :t and bt.state != 1
+                         group by bl.type, username, bsnm.sid
+                         having sum(bl.total) > 0)
+            select tmp.type as type, tmp.username as username, bsnm2.name as space_name , bsnm2.display_name as space_display_name,  tmp.count as count
+            from tmp
+                     inner join ba_space_naming_mapping bsnm2
+                                on tmp.type = bsnm2.type and tmp.sid = bsnm2.sid;
+    """
     )
-    @RegisterKotlinMapper(VPostCountSpaceRow::class)
-    override fun getPostCountSpaceByTypeAndUsernameList(
+    @RegisterKotlinMapper(VLikeRevCountSpaceRow::class)
+    override fun getLikeRevStatForSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
-    ): List<VPostCountSpaceRow>
+    ): List<VLikeRevCountSpaceRow>
+
 
     @SqlQuery(
         """
-            select * from ba_v_post_count_30d_group_by_type_space_uid_state where username in (<l>) and type=:t
+            with tmp as (select bl.type       as type,
+                                bu.username   as username,
+                                bsnm.sid      as sid,
+                                sum(bl.total) as count
+                         from ba_likes_rev bl -- So far ba_likes is the smallest table
+                                  inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
+                                  inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
+                             -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
+                                  inner join ba_user bu on bl.uid = bu.id
+                         where bu.username in
+                               (<l>)
+                           and bl.type = :t
+                         group by bl.type, username, bsnm.sid
+                         having sum(bl.total) > 0)
+            select tmp.*,
+                   bsnm2.display_name as space_display_name,
+                   bsnm2.name         as space_name
+            from tmp
+                     inner join ba_space_naming_mapping bsnm2
+                                on bsnm2.type = tmp.type and bsnm2.sid = tmp.sid;
         """
     )
-    @RegisterKotlinMapper(VPostCountSpaceRow::class)
-    override fun getPostCountSpace30dByTypeAndUsernameList(
+    @RegisterKotlinMapper(VLikeCountSpaceRow::class)
+    override fun getLikeStatForSpaceByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
-    ): List<VPostCountSpaceRow>
-
-    @SqlQuery(
-        """
-            select * from ba_v_post_count_7d_group_by_type_space_uid_state where username in (<l>) and type=:t
-        """
-    )
-    @RegisterKotlinMapper(VPostCountSpaceRow::class)
-    override fun getPostCountSpace7dByTypeAndUsernameList(
-        @Bind("t") type: Int,
-        @BindList("l") l: Iterable<String>
-    ): List<VPostCountSpaceRow>
+    ): List<VLikeCountSpaceRow>
 
 
     @SqlQuery(
         """
-            select * from ba_v_topic_count_group_by_type_space_uid_state where username in (<l>) and type = :t  
-        """
-    )
-    @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    override fun getTopicCountSpaceByTypeAndUsernameList(
-        @Bind("t") type: Int,
-        @BindList("l") l: Iterable<String>
-    ): List<VTopicCountSpaceRow>
-
-
-    @SqlQuery(
-        """
-            select * from ba_v_topic_count_30d_group_by_type_space_uid_state where type = :t and username in (<l>)
-        """
-    )
-    @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    override fun getTopicCountSpace30dByTypeAndUsernameList(
-        @Bind("t") type: Int,
-        @BindList("l") l: Iterable<String>
-    ): List<VTopicCountSpaceRow>
-
-
-    @SqlQuery(
-        """
-            select * from ba_v_topic_count_7d_group_by_type_space_uid_state where username in (<l>) and type = :t 
-        """
-    )
-    @RegisterKotlinMapper(VTopicCountSpaceRow::class)
-    override fun getTopicCountSpace7dByTypeAndUsernameList(
-        @Bind("t") type: Int,
-        @BindList("l") l: Iterable<String>
-    ): List<VTopicCountSpaceRow>
-
-
-    @SqlQuery(
-        """
-            select * from
-            (select bp.*,
-                   bt.title,
+            WITH user_filtered_posts AS (
+                SELECT bp.id, bp.mid, bp.uid, bp.type, bp.dateline, 
+                       bt.title, bt.state as topic_state, bt.sid,
+                       row_number() over (partition by bp.uid, bp.mid order by bp.dateline desc, bp.id desc) as rn_reply
+                FROM ba_post bp
+                INNER JOIN ba_topic bt ON bt.id = bp.mid AND bt.type = bp.type AND bt.top_post_pid != bp.id
+                WHERE bp.type = :t
+                  AND bp.uid IN (SELECT id FROM ba_user WHERE username IN (<l>))
+                  AND bp.dateline >= ((SELECT EXTRACT(EPOCH FROM NOW())::bigint) - 86400*365*3)
+            ),
+            latest_replies AS (
+                SELECT id, mid, uid, type, dateline, title, topic_state, sid
+                FROM user_filtered_posts
+                WHERE rn_reply = 1
+            ),
+            top_recent_topics AS (
+                SELECT id, mid, uid, type, dateline, title, topic_state, sid
+                FROM (
+                    SELECT id, mid, uid, type, dateline, title, topic_state, sid,
+                           row_number() over (partition by uid order by dateline desc, id desc) as rn_topic
+                    FROM latest_replies
+                )
+                WHERE rn_topic <= 10
+            )
+            SELECT bp.*,
+                   trt.title,
                    bu.username,
-                   bt.state as topic_state,
+                   trt.topic_state,
                    bsnm.display_name as space_display_name,
-                   rank() over (partition by bp.type,bp.mid, bp.uid order by bp.dateline desc,bp.id desc) rank_reply_asc
-            from ba_user bu
-            inner join ba_post bp on bu.id = bp.uid
-            inner join ba_topic bt on bp.mid = bt.id and bp.type = bt.type and bt.top_post_pid!=bp.id
-            left  join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid 
-            where bp.type = :t
-              -- and bt.state != 1
-              -- and bp.state != 1
-              and bp.uid in (select bu.id
-                          from ba_user bu
-                          where bu.username in (<l>)))
-            where rank_reply_asc = 1 and dateline >= (((select EXTRACT(EPOCH FROM NOW())::bigint) - 86400*365*3))
+                   1 as rank_reply_asc
+            FROM top_recent_topics trt
+            INNER JOIN ba_post bp ON bp.id = trt.id AND bp.type = trt.type AND bp.mid = trt.mid
+            INNER JOIN ba_user bu ON bu.id = bp.uid
+            LEFT JOIN ba_space_naming_mapping bsnm ON bsnm.type = trt.type AND bsnm.sid = trt.sid
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
@@ -879,69 +885,10 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
         """
     )
     @RegisterKotlinMapper(VLikesSumRow::class)
-    override fun getLikeRevSumByTypeAndUsernameList(
+    override fun getLikesSumByTypeAndUsernameList(
         @Bind("t") type: Int,
         @BindList("l") l: Iterable<String>
     ): List<VLikesSumRow>
-
-
-    @SqlQuery(
-        """
-            with tmp as (select bl.type             as type,
-                                bu.username         as username,
-                                bsnm.sid            as sid,
-                                sum(bl.total)       as count
-                         from ba_user bu 
-                              inner join ba_likes_rev bl on bl.uid = bu.id
-                              inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id	  
-                              inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
-                         where bu.username in
-                               (<l>)
-                           and bl.type = :t and bt.state != 1
-                         group by bl.type, username, bsnm.sid
-                         having sum(bl.total) > 0)
-            select tmp.type as type, tmp.username as username, bsnm2.name as space_name , bsnm2.display_name as space_display_name,  tmp.count as count
-            from tmp
-                     inner join ba_space_naming_mapping bsnm2
-                                on tmp.type = bsnm2.type and tmp.sid = bsnm2.sid;
-    """
-    )
-    @RegisterKotlinMapper(VLikeRevCountSpaceRow::class)
-    override fun getLikeRevStatForSpaceByTypeAndUsernameList(
-        @Bind("t") type: Int,
-        @BindList("l") l: Iterable<String>
-    ): List<VLikeRevCountSpaceRow>
-
-
-    @SqlQuery(
-        """
-            with tmp as (select bl.type       as type,
-                                bu.username   as username,
-                                bsnm.sid      as sid,
-                                sum(bl.total) as count
-                         from ba_likes_rev bl -- So far ba_likes is the smallest table
-                                  inner join ba_topic bt on bl.type = bt.type and bl.mid = bt.id and bt.state != 1
-                                  inner join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid
-                             -- inner join ba_post bp on bp.id = bl.pid and bp.type = bl.type and bp.state != 1
-                                  inner join ba_user bu on bl.uid = bu.id
-                         where bu.username in
-                               (<l>)
-                           and bl.type = :t
-                         group by bl.type, username, bsnm.sid
-                         having sum(bl.total) > 0)
-            select tmp.*,
-                   bsnm2.display_name as space_display_name,
-                   bsnm2.name         as space_name
-            from tmp
-                     inner join ba_space_naming_mapping bsnm2
-                                on bsnm2.type = tmp.type and bsnm2.sid = tmp.sid;
-        """
-    )
-    @RegisterKotlinMapper(VLikeCountSpaceRow::class)
-    override fun getLikeStatForSpaceByTypeAndUsernameList(
-        @Bind("t") type: Int,
-        @BindList("l") l: Iterable<String>
-    ): List<VLikeCountSpaceRow>
 
 
     @SqlQuery(
@@ -993,4 +940,3 @@ interface BgmDaoPg : Transactional<BgmDaoPg>, IBgmDao {
     @Transaction
     override fun _TRUNCATE_ALL_META():Int
 }
-

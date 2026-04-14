@@ -773,24 +773,40 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
 
     @SqlQuery(
         """
-            select * from
-            (select bp.*,
-                   bt.title,
+            WITH user_filtered_posts AS (
+                SELECT bp.id, bp.mid, bp.uid, bp.type, bp.dateline, 
+                       bt.title, bt.state as topic_state, bt.sid,
+                       row_number() over (partition by bp.uid, bp.mid order by bp.dateline desc, bp.id desc) as rn_reply
+                FROM ba_post bp
+                INNER JOIN ba_topic bt ON bt.id = bp.mid AND bt.type = bp.type AND bt.top_post_pid != bp.id
+                WHERE bp.type = :t
+                  AND bp.uid IN (SELECT id FROM ba_user WHERE username IN (<l>))
+                  AND bp.dateline >= ((SELECT unixepoch() - 86400*365*3))
+            ),
+            latest_replies AS (
+                SELECT id, mid, uid, type, dateline, title, topic_state, sid
+                FROM user_filtered_posts
+                WHERE rn_reply = 1
+            ),
+            top_recent_topics AS (
+                SELECT id, mid, uid, type, dateline, title, topic_state, sid
+                FROM (
+                    SELECT id, mid, uid, type, dateline, title, topic_state, sid,
+                           row_number() over (partition by uid order by dateline desc, id desc) as rn_topic
+                    FROM latest_replies
+                )
+                WHERE rn_topic <= 10
+            )
+            SELECT bp.*,
+                   trt.title,
                    bu.username,
-                   bt.state as topic_state,
+                   trt.topic_state,
                    bsnm.display_name as space_display_name,
-                   rank() over (partition by bp.type,bp.mid, bp.uid order by bp.dateline desc,bp.id desc) rank_reply_asc
-            from ba_user bu
-            inner join ba_post bp on bu.id = bp.uid
-            inner join ba_topic bt on bp.mid = bt.id and bp.type = bt.type and bt.top_post_pid!=bp.id
-            left  join ba_space_naming_mapping bsnm on bt.type = bsnm.type and bt.sid = bsnm.sid 
-            where bp.type = :t
-              -- and bt.state != 1
-              -- and bp.state != 1
-              and bp.uid in (select bu.id
-                          from ba_user bu
-                          where bu.username in (<l>)))
-            where rank_reply_asc = 1 and dateline >= ((select unixepoch() - 86400*365*3))
+                   1 as rank_reply_asc
+            FROM top_recent_topics trt
+            INNER JOIN ba_post bp ON bp.id = trt.id AND bp.type = trt.type AND bp.mid = trt.mid
+            INNER JOIN ba_user bu ON bu.id = bp.uid
+            LEFT JOIN ba_space_naming_mapping bsnm ON bsnm.type = trt.type AND bsnm.sid = trt.sid
         """
     )
     @RegisterKotlinMapper(VUserLastReplyTopicRow::class)
@@ -984,4 +1000,3 @@ interface BgmDaoSqlite : Transactional<BgmDaoSqlite>, IBgmDao {
     @Transaction
     override fun _TRUNCATE_ALL_META():Int
 }
-
