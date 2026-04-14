@@ -7,6 +7,7 @@ import com.google.gson.reflect.TypeToken
 import io.javalin.http.Context
 import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
+import io.javalin.plugin.bundled.RateLimitPlugin
 import kotlinx.coroutines.runBlocking
 import moe.nyamori.bgm.db.*
 import moe.nyamori.bgm.model.Post
@@ -67,6 +68,7 @@ object ForumEnhanceHandler : Handler {
             })
 
     override fun handle(ctx: Context) = runBlocking {
+        ctx.with(RateLimitPlugin::class).requestPerTimeUnit(20, TimeUnit.MINUTES)
         try {
             if (!HttpHelper.DB_READ_SEMAPHORE.tryAcquire(
                     30,
