@@ -27,7 +27,7 @@
                 <groupId>org.jdbi</groupId>
                 <artifactId>jdbi3-bom</artifactId>
                 <type>pom</type>
-                <version>3.51.0</version>
+                <version>3.52.1</version>
                 <scope>import</scope>
             </dependency>
             <dependency>
@@ -90,13 +90,13 @@
         <dependency>
             <groupId>com.fasterxml.jackson.module</groupId>
             <artifactId>jackson-module-kotlin</artifactId>
-            <version>2.21.1</version>
+            <version>2.21.2</version>
         </dependency>
 
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>2.21.1</version>
+            <version>2.21.2</version>
         </dependency>
 
         <dependency>
@@ -114,19 +114,19 @@
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>brotli4j</artifactId>
-            <version>1.20.0</version>
+            <version>1.22.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>native-linux-x86_64</artifactId>
-            <version>1.20.0</version>
+            <version>1.22.0</version>
         </dependency>
 
         <dependency>
             <groupId>com.aayushatharva.brotli4j</groupId>
             <artifactId>native-windows-x86_64</artifactId>
-            <version>1.20.0</version>
+            <version>1.22.0</version>
         </dependency>
 
         <dependency>
@@ -182,13 +182,13 @@
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
-            <version>12.1.1</version>
+            <version>12.3.0</version>
             <scope>runtime</scope>
         </dependency>
         <dependency>
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-core</artifactId>
-            <version>12.1.1</version>
+            <version>12.3.0</version>
         </dependency>
 
         <dependency>
