@@ -4,7 +4,7 @@ import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Reserved
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
-import org.seimicrawler.xpath.JXNode
+import org.jsoup.nodes.Element
 import org.slf4j.LoggerFactory
 import java.text.SimpleDateFormat
 import java.util.*
@@ -59,10 +59,15 @@ object ParserHelper {
 
     fun precheck(
         topicId: Int,
-        bodyNode: JXNode,
+        body: Element,
         spaceType: SpaceType
     ): Pair<Topic?, Boolean>? {
-        if (bodyNode.selOne(XPathHelper.XP_404_MSG) != null) {
+        val is404 = body.selectXpath("div[@id='colunmNotice']/div/p[contains(@class,'text')]").first() != null ||
+                body.selectXpath("div[contains(@class,'mainWrapper')]/div[@id='column_container']/div/div/div/p").first() != null ||
+                body.selectXpath("div[@id='column_container']/div/div/div/div[contains(@class,'notice')]/p[contains(@class,'text')]").first() != null ||
+                body.selectXpath("div[1]/div[2]/div[1]/div/div/p[1]").first() != null
+
+        if (is404) {
             return Pair(
                 Topic(
                     id = topicId, space = Reserved(type = spaceType), display = false, state = Post.STATE_DELETED
@@ -70,7 +75,10 @@ object ParserHelper {
             )
         }
 
-        if (bodyNode.selOne("/div[1]/div[2]/div[1]/h1") != null) {
+        val isRedirect = body.selectXpath("div[@id='column_container']/div/div/h1").first() != null ||
+                body.selectXpath("div[1]/div[2]/div[1]/h1").first() != null
+
+        if (isRedirect) {
             LOGGER.info("Redirect post $spaceType-$topicId")
             return Pair(
                 Topic(
@@ -79,8 +87,8 @@ object ParserHelper {
             )
         }
 
-        if (bodyNode.selOne("/div[@id=\"wrapperClub\"]/div[contains(@class,\"clubMain\")]") != null
-        ) {
+        val isClub = body.selectXpath("div[@id='wrapperClub']/div[contains(@class,'clubMain')]").first() != null
+        if (isClub) {
             LOGGER.info("Club blog post $spaceType-$topicId")
             return Pair(
                 Topic(

@@ -11,289 +11,179 @@ import moe.nyamori.bgm.util.ParserHelper.getUidFromBgStyle
 import moe.nyamori.bgm.util.ParserHelper.getUserSign
 import moe.nyamori.bgm.util.ParserHelper.guessUidFromUsername
 import moe.nyamori.bgm.util.PostToStateHelper
-import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_CLOSED_SPAN
-import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_DISABLED_FLOOR_DATE_SPAN
-import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_DISABLED_FLOOR_AUTHOR_ANCHOR
-import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_SILENT_SPAN
-import moe.nyamori.bgm.util.XPathHelper.XP_404_MSG
-import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_CONTENT
-import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_USER_NAME_ANCHOR
-import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_USER_NICKNAME_ANCHOR_TEXT
-import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_USER_SIGN_SPAN_TEXT
-import moe.nyamori.bgm.util.XPathHelper.XP_FLOOR_USER_STYLE_BG_SPAN
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_NAME_ANCHOR
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TITLE_H1_TEXT
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_DIV
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_UID_SPAN
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT
-import moe.nyamori.bgm.util.XPathHelper.XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT
-import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_CONTENT
-import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_DIV_LIST
-import moe.nyamori.bgm.util.XPathHelper.XP_SUB_FLOOR_USER_NICKNAME_ANCHOR_TEXT
-import moe.nyamori.bgm.util.XPathHelper.XP_TOPIC_REOPEN_SPAN
-import org.seimicrawler.xpath.JXDocument
-import org.seimicrawler.xpath.JXNode
+import org.jsoup.Jsoup
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.text.SimpleDateFormat
 import java.util.*
 
 object GroupTopicParserR402 : Parser {
-
     private val LOGGER: Logger = LoggerFactory.getLogger(GroupTopicParserR402.javaClass)
     private val SDF_YYYY_M_D_HH_MM =
         SimpleDateFormat("yyyy-M-d HH:mm", Locale.CHINA).apply { timeZone = TimeZone.getTimeZone("GMT+08:00") }
     private val SUB_FLOOR_FLOOR_NUM_REGEX = Regex("#\\d+-(\\d+)")
 
-    const val SPACE_NAME_ANCHOR_XPATH = XP_GROUP_NAME_ANCHOR
-    const val SPACE_TOPIC_TITLE_H1_TEXT_XPATH = XP_GROUP_TOPIC_TITLE_H1_TEXT
-    const val SPACE_TOPIC_TOP_POST_DIV_XPATH = XP_GROUP_TOPIC_TOP_POST_DIV
-    const val SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH = "/div[3]/div[1]/div[1]/div[1]/small/text()"
-    const val SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH = XP_GROUP_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR
-    const val SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH = XP_GROUP_TOPIC_TOP_POST_UID_SPAN
-    const val SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH = XP_GROUP_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT
-    const val SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH = XP_GROUP_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT
-    const val SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH = XP_GROUP_TOPIC_TOP_POST_CONTENT_DIV
-    const val SPACE_TOPIC_FOLLOW_POST_DIV_LIST = XP_GROUP_TOPIC_FOLLOW_POST_DIV_LIST
-
-    const val XP_FLOOR_ANCHOR_R402 =
-        "div[contains(@class,\"re_info\")]/div[contains(@class,\"action\")]/small/a[contains(@class,\"floor-anchor\")]"
-    const val XP_FLOOR_DATE_SMALL_TEXT_R402 = "div[contains(@class,\"re_info\")]/div[contains(@class,\"action\")]/small/text()"
-
     override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         if (spaceType != SpaceType.GROUP) throw IllegalStateException("Should parse a group topic but got $spaceType")
         try {
-            val doc: JXDocument = JXDocument.create(htmlFileString)
-            val bodyNode = doc.selNOne("body")
+            val document = Jsoup.parse(htmlFileString)
+            val body = document.body()!!
 
-            if (bodyNode.selOne(XP_404_MSG) != null) {
+            if (body.selectFirst("div#colunmNotice > div > p.text") != null || 
+                body.selectFirst("div.mainWrapper > div#column_container > div > div > div > p") != null ||
+                body.selectFirst("> div:nth-child(1) > div:nth-child(2) > div:nth-child(1) > div > div > p:nth-child(1)") != null) {
                 return Pair(
-                    Topic(
-                        id = topicId, space = Reserved(type = spaceType), display = false, state = STATE_DELETED
-                    ), true
+                    Topic(id = topicId, space = Reserved(type = spaceType), display = false, state = STATE_DELETED),
+                    true
                 )
             }
 
-            val groupNameAnchor: JXNode = bodyNode.selOne(SPACE_NAME_ANCHOR_XPATH)!!
+            val groupNameAnchor = body.selectFirst("div#column_container > div.mainWrapper > div.columns > div > div#pageHeader > h1 > span > a.avatar")
+                ?: body.selectFirst("h1 > span > a") ?: body.selectFirst("div > h1 > span > a")!!
+            val topicTitleH1 = body.selectFirst("div#column_container > div.mainWrapper > div.columns > div > div#pageHeader > h1")
+                ?: body.selectFirst("h1#pageHeader") ?: body.selectFirst("div > h1")!!
+            val topPostDiv = body.selectFirst("div#column_container > div.mainWrapper > div.columns > div > div#post_list > div.postTopic")
+                ?: body.selectFirst("div#post_list > div.postTopic") ?: body.selectFirst("div#post_list > div") ?: body.selectFirst("div.postTopic")!!
+            val topPostDivSmall = topPostDiv.selectFirst("div.inner > div > small") 
+                ?: topPostDiv.selectFirst("small")!!
+            val topPostUsernameAnchor = topPostDiv.selectFirst("a.avatar")!!
+            val topPostUidSpan = topPostUsernameAnchor.selectFirst("span")!!
+            val topPostUserNicknameAnchor = topPostDiv.selectFirst("div.inner > strong > a")!!
+            val topPostUserSignSpan = topPostDiv.selectFirst("div.inner > span.tip_j")
+            val topPostContentDiv = topPostDiv.selectFirst("div.inner > div.topic_content")!!
+            val followPostDivList = body.select("div#comment_list > div.row_reply")
 
-            val topicTitle: JXNode = bodyNode.selOne(SPACE_TOPIC_TITLE_H1_TEXT_XPATH)!!
+            val groupName = groupNameAnchor.attr("href").split("/").last()
+            val groupDisplayName = groupNameAnchor.text()
+            val title = topicTitleH1.ownText()
 
-            val topPostDiv = bodyNode.selOne(SPACE_TOPIC_TOP_POST_DIV_XPATH)
-            val topPostDivSmallText = bodyNode.selOne(SPACE_TOPIC_TOP_POST_DATE_SMALL_TEXT_XPATH)
-            val topPostUsernameAnchor = bodyNode.selOne(SPACE_TOPIC_TOP_POST_AVATAR_USERNAME_ANCHOR_XPATH)
-            val topPostUidSpan = bodyNode.selOne(SPACE_TOPIC_TOP_POST_UID_SPAN_XPATH)
-            val topPostUserNicknameAnchorText =
-                bodyNode.selOne(SPACE_TOPIC_TOP_POST_USER_NICKNAME_ANCHOR_TEXT_XPATH)
-
-            val topPostUserSignSpanText = bodyNode.selOne(SPACE_TOPIC_TOP_POST_USER_SIGN_SPAN_TEXT_XPATH)
-            val topPostContentDiv = bodyNode.selOne(SPACE_TOPIC_TOP_POST_CONTENT_DIV_XPATH)
-
-            val followPostDivList = bodyNode.sel(SPACE_TOPIC_FOLLOW_POST_DIV_LIST)
-
-            // group name: /group/{groupName}
-            val groupName = groupNameAnchor.asElement().attr("href").split("/").last()
-            // group display name: {groupDisplayName}
-            val groupDisplayName = groupNameAnchor.asElement().text()
-            // title
-            val title = topicTitle.asString()
-
-            // top post div small : #1 - {yyyy-M-d HH:mm}
-            val topPostDateStr = topPostDivSmallText.asString()
+            val topPostDateStr = topPostDivSmall.ownText()
             val topPostDate = SDF_YYYY_M_D_HH_MM.parse(topPostDateStr.substring(5))
             val topPostDateline = topPostDate.toInstant().epochSecond
-            // username: /user/{username}
-            val topPostUserNameLine = topPostUsernameAnchor.asElement().attr("href")
-            val topPostUserUsername = topPostUserNameLine.substring(6)
-            // user nickname: {nickname}
-            val topPostUserNickname = topPostUserNicknameAnchorText.asString()
-            // uid: background-image:url\\('//lain.bgm.tv/pic/user/l/\\d+/\\d+/\\d+/(\\d+)\\.jpg\\?r=\\d+'\\)
-            // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
-            val topPostUserBgStyle = topPostUidSpan.asElement().attr("style")
+            val topPostUserUsername = topPostUsernameAnchor.attr("href").substring(6)
+            val topPostUserNickname = topPostUserNicknameAnchor.text()
+            val topPostUserBgStyle = topPostUidSpan.attr("style")
             val topPostUserUid = getUidFromBgStyle(topPostUserBgStyle) ?: guessUidFromUsername(topPostUserUsername)
-            // user sign: ({sign})
-            val topPostUserSignStr = topPostUserSignSpanText?.asString()
+            val topPostUserSignStr = topPostUserSignSpan?.ownText()
             val topPostUserSign = getUserSign(topPostUserSignStr)
-            // top post id: post_{id}
-            val topPostPid = topPostDiv.asElement().attr("id").substring(5).toInt()
-            // top post inner html: {}
-            val topPostContentHtml = topPostContentDiv.asElement().html()
-
+            val topPostPid = topPostDiv.attr("id").substring(5).toInt()
+            val topPostContentHtml = topPostContentDiv.html()
 
             val thisTopic = Topic(
                 id = topicId,
-                space = Group(
-                    type = spaceType,
-                    name = groupName,
-                    displayName = groupDisplayName
-                ),
-                uid = topPostUserUid,
-                title = title,
-                dateline = topPostDateline,
-                display = true,
-                topPostPid = topPostPid,
-                postList = null
+                space = Group(type = spaceType, name = groupName, displayName = groupDisplayName),
+                uid = topPostUserUid, title = title, dateline = topPostDateline,
+                display = true, topPostPid = topPostPid, postList = null
             )
 
             val postList = ArrayList<Post>()
-
-            val topPost = Post(
-                id = topPostPid,
-                floorNum = 1,
-                mid = topicId,
-                contentHtml = topPostContentHtml,
-                state = STATE_NORMAL,
-                dateline = topPostDateline,
-                user = User(
-                    id = topPostUserUid,
-                    username = topPostUserUsername,
-                    nickname = topPostUserNickname,
-                    sign = topPostUserSign
-                ),
-                subFloorNum = null,
-                related = null,
-                contentBbcode = null,
-                subFloorList = null
+            postList.add(
+                Post(
+                    id = topPostPid, floorNum = 1, mid = topicId,
+                    contentHtml = topPostContentHtml, state = STATE_NORMAL, dateline = topPostDateline,
+                    user = User(id = topPostUserUid, username = topPostUserUsername,
+                        nickname = topPostUserNickname, sign = topPostUserSign),
+                    subFloorNum = null, related = null, contentBbcode = null, subFloorList = null
+                )
             )
 
-            postList.add(topPost)
-
-            // follow post div list:
-            // followPostDivList[0]
             followPostDivList.forEachIndexed outer@{ outerIdx, floor ->
-                // Workaround for bug
-                if (outerIdx != floor.asElement().elementSiblingIndex()) return@outer
-                // follow post id: post_{id}
-                val floorPid = floor.asElement().attr("id").substring(5).toInt()
+                if (outerIdx != floor.elementSiblingIndex()) return@outer
+                val floorPid = floor.attr("id").substring(5).toInt()
 
-                // floor is slient or close
-                val isSilent = floor.selOne(XP_TOPIC_SILENT_SPAN) != null
-                val isClosed = floor.selOne(XP_TOPIC_CLOSED_SPAN) != null
-                val isReopen = floor.selOne(XP_TOPIC_REOPEN_SPAN) != null
+                val isSilent = floor.selectFirst("span.badgeStateSilent") != null
+                val isClosed = floor.selectFirst("span.badgeStateClosed") != null
+                val isReopen = floor.selectFirst("span.badgeStateReopen") != null
                 val isTopicDisabled = isSilent || isClosed
                 val isSpecialBadge = isSilent || isClosed || isReopen
 
-
                 val floorNum: Int
-                val floorDateStr: String
                 val floorDate: Long
 
                 if (isSpecialBadge) {
                     thisTopic.display = !isTopicDisabled
-                    val dateSpan = floor.selOne(XP_TOPIC_DISABLED_FLOOR_DATE_SPAN)
+                    val dateSpan = floor.selectFirst("span.tip_j")!!
                     floorNum = postList.size + 1
-                    floorDateStr = dateSpan.asElement().html()
-                    floorDate = SDF_YYYY_M_D_HH_MM.parse(floorDateStr).toInstant().epochSecond
+                    floorDate = SDF_YYYY_M_D_HH_MM.parse(dateSpan.html()).toInstant().epochSecond
                 } else {
-                    // follow post floor: #{floor}
-                    floorNum = floor.selOne(XP_FLOOR_ANCHOR_R402).asElement().text().substring(1).toInt()
-                    // follow post date: ' - {yyyy-M-d HH:mm}'
-                    floorDateStr = floor.selOne(XP_FLOOR_DATE_SMALL_TEXT_R402).asString().substring(2)
-                    floorDate = SDF_YYYY_M_D_HH_MM.parse(floorDateStr).toInstant().epochSecond
+                    val floorAnchor = floor.selectFirst("div.re_info > div.action > small > a.floor-anchor")
+                        ?: floor.selectFirst("div.post_actions > div.action > small > a.floor-anchor")
+                        ?: floor.selectFirst("div.re_info > small > a.floor-anchor")!!
+                    floorNum = floorAnchor.text().substring(1).toInt()
+                    val floorDateSmall = floor.selectFirst("div.re_info > div.action > small")
+                        ?: floor.selectFirst("div.post_actions > div.action > small")
+                        ?: floor.selectFirst("div.re_info > small")!!
+                    floorDate = SDF_YYYY_M_D_HH_MM.parse(floorDateSmall.ownText().substring(2)).toInstant().epochSecond
                 }
-                // follow post user anchor - username: /user/{username}
-                val floorUserUsername = floor.selOne(XP_FLOOR_USER_NAME_ANCHOR).asElement().attr("href").substring(6)
-                // follow post user anchor span - uid (plan B): background...
-                // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
-                val floorUserBgStyle = floor.selOne(XP_FLOOR_USER_STYLE_BG_SPAN).asElement().attr("style")
+
+                val floorUserUsername = floor.selectFirst("a")!!.attr("href").substring(6)
+                val floorUserBgStyle = floor.selectFirst("a > span")!!.attr("style")
                 val floorUserUid = getUidFromBgStyle(floorUserBgStyle) ?: guessUidFromUsername(floorUserUsername)
                 val floorUserNickname: String
-                val floorUserSignStr: String?
                 var floorUserSign: String? = null
+
                 if (!isSpecialBadge) {
-                    // follow post user nickname: {nickname}
-                    floorUserNickname = floor.selOne(XP_FLOOR_USER_NICKNAME_ANCHOR_TEXT).asString()
-                    // follow post user sign: ({sign})
-                    floorUserSignStr = floor.selOne(XP_FLOOR_USER_SIGN_SPAN_TEXT)?.asString()
+                    floorUserNickname = floor.selectFirst("span.userInfo > strong > a")?.text()
+                        ?: floor.selectFirst("div.inner > strong > a")!!.text()
+                    val floorUserSignStr = floor.selectFirst("span.userInfo > span.tip_j")?.ownText()
+                        ?: floor.selectFirst("span.userInfo > span")?.ownText()
+                        ?: floor.selectFirst("div.inner > span.tip_j")?.ownText()
                     floorUserSign = getUserSign(floorUserSignStr)
                 } else {
-                    floorUserNickname = floor.selOne(XP_TOPIC_DISABLED_FLOOR_AUTHOR_ANCHOR).asElement().html()
+                    floorUserNickname = floor.selectFirst("a[class*=post_author_]")!!.html()
                 }
 
-                // follow post content div
-                val floorContentHtml = if (!isSpecialBadge) floor.selOne(XP_FLOOR_CONTENT).asElement()
-                    .html() else floor.selOne("//div[contains(@class,\"inner\")]").asElement().html()
+                val floorContentHtml = if (!isSpecialBadge) {
+                    floor.selectFirst("div.message")!!.html()
+                } else {
+                    floor.selectFirst("div.inner")!!.html()
+                }
 
                 val thisFloor = Post(
-                    id = floorPid,
-                    floorNum = floorNum,
-                    subFloorNum = null,
-                    mid = topicId,
-                    related = null,
-                    contentHtml = floorContentHtml,
-                    contentBbcode = null,
-                    state = if (isSilent) {
-                        STATE_SILENT
-                    } else if (isClosed) {
-                        STATE_CLOSED
-                    } else if (isReopen) {
-                        STATE_REOPEN
-                    } else {
-                        PostToStateHelper.fromPostHtmlToState(floorContentHtml)
+                    id = floorPid, floorNum = floorNum, subFloorNum = null, mid = topicId,
+                    related = null, contentHtml = floorContentHtml, contentBbcode = null,
+                    state = when {
+                        isSilent -> STATE_SILENT; isClosed -> STATE_CLOSED; isReopen -> STATE_REOPEN
+                        else -> PostToStateHelper.fromPostHtmlToState(floorContentHtml)
                     },
                     dateline = floorDate,
-                    user = User(
-                        id = floorUserUid,
-                        username = floorUserUsername,
-                        nickname = floorUserNickname,
-                        sign = floorUserSign
-                    ),
+                    user = User(id = floorUserUid, username = floorUserUsername,
+                        nickname = floorUserNickname, sign = floorUserSign),
                     subFloorList = null
                 )
 
-
-                // sub floor
-                val subFloorDivList: MutableList<JXNode> = floor.sel(XP_SUB_FLOOR_DIV_LIST)
+                val subFloorDivList = floor.select("div.topic_sub_reply > div")
                 val subFloorList = ArrayList<Post>()
                 subFloorDivList.forEachIndexed inner@{ innerIdx, subFloor ->
-                    if (innerIdx != subFloor.asElement().elementSiblingIndex()) return@inner
-                    // sub floor pid: post_{pid}
-                    val subFloorPid = subFloor.asElement().attr("id").substring(5).toInt()
-                    // sub floor floor number: #{floor}-#{subFloor}
+                    if (innerIdx != subFloor.elementSiblingIndex()) return@inner
+                    val subFloorPid = subFloor.attr("id").substring(5).toInt()
+                    val subFloorAnchor = subFloor.selectFirst("div.re_info > div.action > small > a.floor-anchor")
+                        ?: subFloor.selectFirst("div.post_actions > div.action > small > a.floor-anchor")
+                        ?: subFloor.selectFirst("div.re_info > small > a.floor-anchor")!!
                     val subFloorFloorNum = SUB_FLOOR_FLOOR_NUM_REGEX
-                        .findAll(subFloor.selOne(XP_FLOOR_ANCHOR_R402).asElement().text()).iterator()
-                        .next().groupValues[1].toInt()
-                    // follow post date: ' - {yyyy-M-d HH:mm}'
-                    val subFloorDateStr = subFloor.selOne(XP_FLOOR_DATE_SMALL_TEXT_R402).asString().substring(2)
-                    val subFloorDate = SDF_YYYY_M_D_HH_MM.parse(subFloorDateStr).toInstant().epochSecond
-                    // follow post user anchor - username: /user/{username}
-                    val subFloorUserUsername =
-                        subFloor.selOne(XP_FLOOR_USER_NAME_ANCHOR).asElement().attr("href").substring(6)
-                    // follow post user anchor span - uid (plan B): background...
-                    // FIXME: Special handling for background-image:url('//lain.bgm.tv/pic/user/l/icon.jpg')
-                    val subFloorUserBgStyle = subFloor.selOne(XP_FLOOR_USER_STYLE_BG_SPAN).asElement().attr("style")
-                    val subFloorUserUid =
-                        getUidFromBgStyle(subFloorUserBgStyle) ?: guessUidFromUsername(subFloorUserUsername)
-                    // follow post user nickname: {nickname}
-                    val subFloorUserNickname = subFloor.selOne(XP_SUB_FLOOR_USER_NICKNAME_ANCHOR_TEXT).asString()
-
-                    // follow post content div
-                    val subFloorContentHtml = subFloor.selOne(XP_SUB_FLOOR_CONTENT).asElement().html()
-                    val thisSubFloor = Post(
-                        id = subFloorPid,
-                        floorNum = floorNum,
-                        subFloorNum = subFloorFloorNum,
-                        mid = topicId,
-                        related = floorPid,
-                        contentHtml = subFloorContentHtml,
-                        contentBbcode = null,
-                        state = PostToStateHelper.fromPostHtmlToState(subFloorContentHtml),
-                        dateline = subFloorDate,
-                        user = User(
-                            id = subFloorUserUid,
-                            username = subFloorUserUsername,
-                            nickname = subFloorUserNickname,
-                            sign = null
-                        ),
-                        subFloorList = null
+                        .findAll(subFloorAnchor.text()).iterator().next().groupValues[1].toInt()
+                    val subFloorDateSmall = subFloor.selectFirst("div.re_info > div.action > small")
+                        ?: subFloor.selectFirst("div.post_actions > div.action > small")
+                        ?: subFloor.selectFirst("div.re_info > small")!!
+                    val subFloorDate = SDF_YYYY_M_D_HH_MM.parse(subFloorDateSmall.ownText().substring(2)).toInstant().epochSecond
+                    val subFloorUserUsername = subFloor.selectFirst("a")!!.attr("href").substring(6)
+                    val subFloorUserBgStyle = subFloor.selectFirst("a > span")!!.attr("style")
+                    val subFloorUserUid = getUidFromBgStyle(subFloorUserBgStyle) ?: guessUidFromUsername(subFloorUserUsername)
+                    val subFloorUserNickname = subFloor.selectFirst("strong.userName > a")!!.text()
+                    val subFloorContentHtml = subFloor.selectFirst("div.cmt_sub_content")!!.html()
+                    subFloorList.add(
+                        Post(
+                            id = subFloorPid, floorNum = floorNum, subFloorNum = subFloorFloorNum,
+                            mid = topicId, related = floorPid, contentHtml = subFloorContentHtml,
+                            contentBbcode = null, state = PostToStateHelper.fromPostHtmlToState(subFloorContentHtml),
+                            dateline = subFloorDate,
+                            user = User(id = subFloorUserUid, username = subFloorUserUsername,
+                                nickname = subFloorUserNickname, sign = null),
+                            subFloorList = null
+                        )
                     )
-                    subFloorList.add(thisSubFloor)
                 }
-                if (subFloorList.isNotEmpty()) {
-                    thisFloor.subFloorList = subFloorList
-                }
+                if (subFloorList.isNotEmpty()) thisFloor.subFloorList = subFloorList
                 postList.add(thisFloor)
             }
             thisTopic.postList = postList
@@ -307,11 +197,7 @@ object GroupTopicParserR402 : Parser {
             return Pair(thisTopic, true)
         } catch (ex: Exception) {
             LOGGER.error("Ex: ", ex)
-//            LOGGER.error("Ex: ${htmlFile.nameWithoutExtension}")
             return Pair(null, false)
         }
-
     }
-
-
 }

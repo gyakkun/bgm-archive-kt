@@ -77,12 +77,6 @@
         </dependency>
 
         <dependency>
-            <groupId>cn.wanghaomiao</groupId>
-            <artifactId>JsoupXpath</artifactId>
-            <version>2.5.3</version>
-        </dependency>
-
-        <dependency>
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
             <version>7.6.0.202603022253-r</version>
@@ -371,26 +365,6 @@
                     </execution>
                 </executions>
             </plugin>
-            <!--<plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-toolchains-plugin</artifactId>
-                <version>3.2.0</version>
-                <executions>
-                    <execution>
-                        <phase>validate</phase>
-                        <goals>
-                            <goal>toolchain</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <toolchains>
-                        <jdk>
-                            <version>${lts.jdk.version}</version>
-                        </jdk>
-                    </toolchains>
-                </configuration>
-            </plugin>-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

@@ -5,12 +5,10 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.parser.Parser
 import moe.nyamori.bgm.util.ParserHelper
-import org.seimicrawler.xpath.JXDocument
-import org.seimicrawler.xpath.JXNode
+import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.io.File
-import java.nio.charset.StandardCharsets
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -22,52 +20,34 @@ object BlogTopicParserR649 : Parser {
     override fun parseTopic(htmlFileString: String, topicId: Int, spaceType: SpaceType): Pair<Topic?, Boolean> {
         if (spaceType != SpaceType.BLOG) throw IllegalStateException("Should parse a blog topic but got $spaceType")
         try {
-            val doc: JXDocument = JXDocument.create(htmlFileString)
-            val bodyNode = doc.selNOne("body")
-            var precheckResult: Pair<Topic?, Boolean>?
-            if (ParserHelper.precheck(topicId, bodyNode, spaceType).also { precheckResult = it } != null) {
-                return precheckResult!!
-            }
-            // user nickname, blog title
-            val blogTitleH1: JXNode = bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/h1[contains(@class,\"title\")]")!!
-            val authorUserCardDiv: JXNode = bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[1]/div[1][contains(@class,\"author\")][contains(@class,\"user-card\")]")
-            // blog post date
-            val blogPostDateSmallText: JXNode =
-                bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div/div[1][contains(@class,\"time\")]")
-            // main content
-            val blogEntryDiv: JXNode =
-                bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[1]/div[3][@id=\"entry_content\"]")
-            val blogTagDiv =
-                bodyNode.selOne("/div[1]/div[2]/div[1]/div[1]/div[1]/div[2]/div/div[2][contains(@class,\"tags\")]") // nullable
-            val blogRelatedSubjectDiv = bodyNode.selOne("/div[1]/div[2]/div[1]/div[2]/div[contains(@class,\"entry-related-subjects\")]") // nullable, many div.card div.subject-card inside
+            val document = Jsoup.parse(htmlFileString)
+            val body = document.body()!!
+            val precheckResult = ParserHelper.precheck(topicId, body, spaceType)
+            if (precheckResult != null) return precheckResult
 
-            // comment list R547
-            val blogCommentListDiv: JXNode = bodyNode.selOne("//*[@id=\"comment_list\"]") // nullable
+            val blogTitleH1 = body.selectFirst("h1.title")!!
+            val authorUserCardDiv = body.selectFirst("div.author.user-card")!!
+            val blogPostDateDiv = body.selectFirst("div.time")
+            val blogEntryDiv = body.selectFirst("div#entry_content")
+            val blogTagDiv = body.selectFirst("div.tags")
+            val blogRelatedSubjectDiv = body.selectFirst("div.entry-related-subjects")
+            val blogCommentListDiv = document.selectFirst("#comment_list")
 
             var meta: Map<String, Any>? = null
-            val dataLikesList = ParserHelper.extractDataLikeList(htmlFileString) // may be introduced in the future, keep it for now
-
+            val dataLikesList = ParserHelper.extractDataLikeList(htmlFileString)
             if (dataLikesList != null) {
                 val dataLikesListJson = GitHelper.GSON.fromJson(dataLikesList, JsonObject::class.java)
-                meta = mutableMapOf()
-                meta.put("data_likes_list", dataLikesListJson)
+                meta = mutableMapOf("data_likes_list" to dataLikesListJson)
             }
 
-            val (blogTopicWithoutCommentList, blogPostUser) =
-                extractBlogInfo(topicId, blogTitleH1, blogPostDateSmallText, blogTagDiv, blogRelatedSubjectDiv, authorUserCardDiv, meta)
-
-            val blogPostList: MutableList<Post> =
-                extractBlogEntryAndCommentList(
-                    topicId,
-                    blogPostUser,
-                    blogTopicWithoutCommentList.dateline!!,
-                    blogEntryDiv,
-                    blogCommentListDiv
-                )
-
-            blogTopicWithoutCommentList.postList = blogPostList
-
-            return Pair(blogTopicWithoutCommentList, true)
+            val (blogTopic, blogPostUser) = extractBlogInfo(
+                topicId, blogTitleH1, blogPostDateDiv, blogTagDiv, blogRelatedSubjectDiv, authorUserCardDiv, meta
+            )
+            val blogPostList = extractBlogEntryAndCommentList(
+                topicId, blogPostUser, blogTopic.dateline!!, blogEntryDiv, blogCommentListDiv
+            )
+            blogTopic.postList = blogPostList
+            return Pair(blogTopic, true)
         } catch (ex: Exception) {
             LOGGER.error("Ex: ", ex)
             return Pair(null, false)
@@ -75,266 +55,138 @@ object BlogTopicParserR649 : Parser {
     }
 
     private fun extractBlogInfo(
-        blogId: Int,
-        blogTitleH1: JXNode,
-        blogPostDateSmallText: JXNode,
-        blogTagDiv: JXNode?,
-        blogRelatedSubjectDiv: JXNode?,
-        authorUserCardDiv: JXNode,
-        meta: Map<String, Any>?
+        blogId: Int, blogTitleH1: Element, blogPostDateDiv: Element?,
+        blogTagDiv: Element?, blogRelatedSubjectDiv: Element?,
+        authorUserCardDiv: Element, meta: Map<String, Any>?
     ): Pair<Topic, User> {
-        val blogTitle = blogTitleH1.selOne("/text()").asString()
-        // val avatarAnchor: JXNode = blogTitleH1.selOne("/span/a[1]")
-
-        var dateSmallText = blogPostDateSmallText.asElement().text()
-        // 2025-9-6 14:45 · 24 分钟阅读
+        val blogTitle = blogTitleH1.ownText()
+        var dateSmallText = blogPostDateDiv!!.text()
         if ("·" in dateSmallText) dateSmallText = dateSmallText.substringBefore("·").trim()
         val dateline = ParserHelper.parsePostDate(dateSmallText).time / 1000
-
         val blogPostUser = extractBlogPostUser(authorUserCardDiv)
 
-        var tagList: List<String>? = null
-        var relatedSubjectIdList: List<Int>? = null
-
-        if (blogTagDiv != null) {
-            val tagAnchorList = blogTagDiv.sel("/a")
-            tagList = extractTags(tagAnchorList)
-        }
-
-        if (blogRelatedSubjectDiv != null) {
-            val relatedSubjectDivList = blogRelatedSubjectDiv.sel("/div[contains(@class,\"subject-card\")][contains(@class,\"card\")]")
-            relatedSubjectIdList = extractRelatedSubjectIdList(relatedSubjectDivList)
+        val tagList = blogTagDiv?.select("a")?.map { it.text() }
+        val relatedSubjectIdList = blogRelatedSubjectDiv?.select("div.subject-card.card")?.mapNotNull { cardDiv ->
+            val href = cardDiv.selectFirst("div.container > a")?.attr("href") ?: return@mapNotNull null
+            href.substring(href.lastIndexOf("/") + 1).toIntOrNull()
         }
 
         return Pair(
             Topic(
                 id = blogId,
-                space = Blog(
-                    tags = tagList,
-                    relatedSubjectIds = relatedSubjectIdList,
-                    meta = meta
-                ),
-
-                uid = blogPostUser.id,
-                title = blogTitle,
-                dateline = dateline,
-                display = true,
-                topPostPid = -blogId
+                space = Blog(tags = tagList, relatedSubjectIds = relatedSubjectIdList, meta = meta),
+                uid = blogPostUser.id, title = blogTitle, dateline = dateline,
+                display = true, topPostPid = -blogId
             ), blogPostUser
         )
     }
 
-    private fun extractBlogPostUser(authorUserCardDiv: JXNode): User {
-        val userNickname = authorUserCardDiv.selOne("/div[contains(@class,\"title\")]/p/a/text()").asString()
-        val userHref = authorUserCardDiv.selOne("/div[contains(@class,\"title\")]/p/a").asElement().attr("href")
-        val userAvatarImgSrc = authorUserCardDiv.selOne("/a/img").asElement().attr("src")
+    private fun extractBlogPostUser(authorUserCardDiv: Element): User {
+        val userNickname = authorUserCardDiv.selectFirst("div.title > p > a")!!.ownText()
+        val userHref = authorUserCardDiv.selectFirst("div.title > p > a")!!.attr("href")
+        val userAvatarImgSrc = authorUserCardDiv.selectFirst("a > img")!!.attr("src")
         val usernameFromHref = userHref.substring(userHref.lastIndexOf("/") + 1)
-        val uidFromAvatar =
-            getUidFromAvatarBgOrSrc(userAvatarImgSrc)
-        val uidGuessing = ParserHelper.guessUidFromUsername(usernameFromHref)
+        val uidFromAvatar = getUidFromAvatarSrc(userAvatarImgSrc)
         return User(
-            id = if (uidFromAvatar > 0) {
-                uidFromAvatar
-            } else uidGuessing,
-            nickname = userNickname,
-            username = usernameFromHref
+            id = if (uidFromAvatar > 0) uidFromAvatar else ParserHelper.guessUidFromUsername(usernameFromHref),
+            nickname = userNickname, username = usernameFromHref
         )
     }
 
-    private fun getUidFromAvatarBgOrSrc(userAvatarImgSrc: String): Int {
-        return userAvatarImgSrc.substring(userAvatarImgSrc.lastIndexOf("/") + 1, userAvatarImgSrc.lastIndexOf("jpg"))
-            .toCharArray()
-            .takeWhile { it.isDigit() }
-            .joinToString(separator = "").let {
-                if (it.isBlank()) {
-                    return@let -1
-                }
-                it.toInt()
+    private fun getUidFromAvatarSrc(src: String): Int {
+        return src.substring(src.lastIndexOf("/") + 1, src.lastIndexOf("jpg"))
+            .toCharArray().takeWhile { it.isDigit() }.joinToString("").let {
+                if (it.isBlank()) -1 else it.toInt()
             }
     }
-
-    private fun extractRelatedSubjectIdList(relatedSubjectDivList: List<JXNode>): List<Int> {
-        return relatedSubjectDivList.mapIndexed { idx, cardDiv ->
-            if (idx != cardDiv.asElement().elementSiblingIndex()) {
-                // expected because it has a sister <h2 class="subtitle">关联条目</h2>
-                // return@mapIndexed null
-            }
-            val containerDiv = cardDiv.selOne("/div[contains(@class,\"container\")]")
-            val innerAnchor = containerDiv.selOne("/a[1]")
-            val subjectHref = innerAnchor.asElement().attr("href")
-            val subjectId = subjectHref.substring(subjectHref.lastIndexOf("/") + 1).toIntOrNull()
-            // val debug = subjectId
-            // System.err.println("subject id $debug")
-            return@mapIndexed subjectId
-        }.filterNotNull()
-    }
-
-    private fun extractTags(tagAnchorList: List<JXNode>): List<String> {
-        return tagAnchorList.mapIndexed { idx, anchor ->
-            // Workaround for bug
-            if (idx != anchor.asElement().elementSiblingIndex()) return@mapIndexed null
-            val tag = anchor.asElement().text()
-            // val debug = tag
-            // System.err.println("tag $debug")
-            return@mapIndexed tag
-        }.filterNotNull()
-    }
-
 
     private fun extractBlogEntryAndCommentList(
-        blogId: Int,
-        blogPostUser: User,
-        blogDateline: Long,
-        blogEntryDiv: JXNode,
-        blogCommentListDiv: JXNode
+        blogId: Int, blogPostUser: User, blogDateline: Long,
+        blogEntryDiv: Element?, blogCommentListDiv: Element?
     ): MutableList<Post> {
         val result = mutableListOf<Post>()
-        val blogPost: Post = extractBlogEntry(blogId, blogPostUser, blogDateline, blogEntryDiv)
-        val commentList: List<Post> = extractCommentList(blogId, blogCommentListDiv)
-        result.add(blogPost)
-        result.addAll(commentList)
+        result.add(Post(
+            id = -blogId, user = blogPostUser, floorNum = 0, mid = blogId,
+            contentHtml = blogEntryDiv?.html() ?: "", state = Post.STATE_NORMAL, dateline = blogDateline
+        ))
+        if (blogCommentListDiv != null) {
+            blogCommentListDiv.children().forEachIndexed { idx, div ->
+                if (div.tagName() != "div") return@forEachIndexed
+                result.add(extractCommentFromDiv(blogId, null, div))
+            }
+        }
         return result
     }
 
-    private fun extractCommentList(blogId: Int, blogCommentListDiv: JXNode): List<Post> {
-        val divList = blogCommentListDiv.sel("/div")
-        return divList.mapIndexed { idx, div ->
-            if (idx != div.asElement().elementSiblingIndex()) return@mapIndexed null
-            return@mapIndexed extractCommentFromCommentPostDiv(blogId, null, div)
-        }.filterNotNull()
-    }
-
-    private fun extractCommentFromCommentPostDiv(
-        blogId: Int,
-        mainPostId: Int?,
-        postDiv: JXNode,
-        isSubReply: Boolean = false
+    private fun extractCommentFromDiv(
+        blogId: Int, mainPostId: Int?, postDiv: Element, isSubReply: Boolean = false
     ): Post {
         var possibleSubReplyPostList: List<Post>? = null
-
-        val possibleSubReplyListDiv =
-            postDiv.selOne("/div[2]/div[contains(@class,\"reply_content\")]/div[contains(@class,\"topic_sub_reply\")]")
-        val postId = postDiv.asElement().attr("id").substring("post_".length).toInt()
+        val possibleSubReplyListDiv = postDiv.selectFirst("div.reply_content > div.topic_sub_reply")
+        val postIdStr = postDiv.attr("id")
+        val postId = if (postIdStr.startsWith("post_")) postIdStr.substring("post_".length).toInt() else 0
 
         if (possibleSubReplyListDiv != null) {
             if (isSubReply) throw IllegalStateException("Sub reply should not have its sub replies!")
-            possibleSubReplyPostList = ArrayList()
-            val subReplyDivList = possibleSubReplyListDiv.sel("/div")
-            subReplyDivList.forEachIndexed { idx, innerDiv ->
-                if (idx != innerDiv.asElement().elementSiblingIndex()) return@forEachIndexed
-                possibleSubReplyPostList.add(
-                    extractCommentFromCommentPostDiv(
-                        blogId,
-                        postId,
-                        innerDiv,
-                        isSubReply = true
-                    )
-                )
+            val subList = ArrayList<Post>()
+            possibleSubReplyListDiv.children().forEachIndexed { idx, innerDiv ->
+                if (innerDiv.tagName() != "div") return@forEachIndexed
+                subList.add(extractCommentFromDiv(blogId, postId, innerDiv, isSubReply = true))
             }
+            possibleSubReplyPostList = subList
         }
 
-        val reInfoDiv = postDiv.selOne("/div[1][contains(@class,\"re_info\")]")
-            ?: postDiv.selOne("/div[1][contains(@class,\"post_actions\")]")
-        val reInfoSmall = reInfoDiv.selOne("/div[contains(@class,\"action\")]//small")
-        val reInfoAnchor = reInfoSmall.selOne("/a")
-        val avatarAnchor = postDiv.selOne("//a[contains(@class,\"avatar\")]")
-        val avatarAnchorBgSpan = avatarAnchor.selOne("/span")
-        val innerDiv = postDiv.selOne("/div[contains(@class,\"inner\")]")
-        val userStrong = innerDiv.selOne("/strong")
-        val userSignSpan = innerDiv.selOne("/span[contains(@class,\"tip_j\")]")
+        val reInfoDiv = postDiv.selectFirst("div.re_info")
+            ?: postDiv.selectFirst("div.post_actions")!!
+        val reInfoSmall = reInfoDiv.selectFirst("div.action > small")
+            ?: reInfoDiv.selectFirst("small")!!
+        val reInfoAnchor = reInfoSmall.selectFirst("a")!!
+        val avatarAnchor = postDiv.selectFirst("a.avatar")!!
+        val avatarBgSpan = avatarAnchor.selectFirst("span")!!
+        val innerDiv = postDiv.selectFirst("div.inner")!!
+        val userStrong = innerDiv.selectFirst("strong")!!
+        val userSignSpan = innerDiv.selectFirst("span.tip_j")
 
-        val floorText = reInfoAnchor.asElement().text()
-        var mainFloorNum: Int = -1
-        var subFloorNum: Int? = null
-
+        val floorText = reInfoAnchor.text()
+        val mainFloorNum: Int
+        val subFloorNum: Int?
         if (floorText.indexOf("-") >= 0) {
             subFloorNum = floorText.substring(floorText.indexOf("-") + 1).toInt()
             mainFloorNum = floorText.substring(floorText.indexOf("#") + 1, floorText.indexOf("-")).toInt()
         } else {
-            if (isSubReply) throw IllegalStateException("Should be a sub reply but got no sub floor number!")
+            subFloorNum = null
             mainFloorNum = floorText.substring(floorText.indexOf("#") + 1).toInt()
         }
 
-        val dateTextWithoutTrimming = reInfoSmall.asElement().text()
-        val dateText =
-            dateTextWithoutTrimming.split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(separator = " ")
+        val dateText = reInfoSmall.text().split(" ").filterIndexed { idx, _ -> idx > 1 }.joinToString(" ")
         val dateline = SDF_YYYY_M_D_HH_MM.parse(dateText).time / 1000
 
-        val avatarAnchorHref = avatarAnchor.asElement().attr("href")
-        val usernameFromAvatarAnchor = avatarAnchorHref.substring(avatarAnchorHref.lastIndexOf("/") + 1)
-        val avatarBgSpanStyle = avatarAnchorBgSpan.asElement().attr("style")
-        val uidFromAvatarBg = getUidFromAvatarBgOrSrc(avatarBgSpanStyle)
-        var userSign: String? = null
-        if (userSignSpan != null) {
-            val userSignSpanText = userSignSpan.asElement().text()
-            userSign = userSignSpanText.substring(
-                userSignSpanText.indexOf("(").let { if (it < 0) 0 else it } + 1,
-                userSignSpanText.lastIndexOf(")").let { if (it < 0) userSignSpanText.length - 1 else it }
-            )
+        val avatarHref = avatarAnchor.attr("href")
+        val username = avatarHref.substring(avatarHref.lastIndexOf("/") + 1)
+        val uidFromBg = getUidFromAvatarSrc(avatarBgSpan.attr("style"))
+        val userSign = userSignSpan?.text()?.let {
+            val s = it.indexOf("(").let { i -> if (i < 0) 0 else i } + 1
+            val e = it.lastIndexOf(")").let { i -> if (i < 0) it.length - 1 else i }
+            if (s < e) it.substring(s, e) else null
         }
-        val userNickname = userStrong.asElement().text()
-        val commentUser: User = makeCommentUser(usernameFromAvatarAnchor, uidFromAvatarBg, userNickname, userSign)
+        val userNickname = userStrong.text()
 
-
-        val possibleMainReplyDiv =
-            innerDiv.selOne("/div[contains(@class,\"reply_content\")]/div[contains(@class,\"message\")]")
-        val possibleSubReplyDiv = innerDiv.selOne("/div[contains(@class,\"cmt_sub_content\")]")
-
-        val replyContentHtml: String
-        if (possibleMainReplyDiv != null) {
-            replyContentHtml = possibleMainReplyDiv.asElement().html()
-        } else {
-            if (!isSubReply) throw IllegalStateException("Should be a main reply but can not found main reply div!")
-            replyContentHtml = possibleSubReplyDiv.asElement().html()
+        val possibleMainReplyDiv = innerDiv.selectFirst("div.reply_content > div.message")
+        val possibleSubReplyDiv = innerDiv.selectFirst("div.cmt_sub_content")
+        val replyContentHtml: String = when {
+            possibleMainReplyDiv != null -> possibleMainReplyDiv.html()
+            isSubReply && possibleSubReplyDiv != null -> possibleSubReplyDiv.html()
+            else -> throw IllegalStateException("Cannot find reply content in post $postId")
         }
 
         return Post(
-            id = postId,
-            user = commentUser,
-            floorNum = mainFloorNum,
-            subFloorNum = subFloorNum,
-            mid = blogId,
-            related = mainPostId,
-            contentHtml = replyContentHtml,
-            state = Post.STATE_NORMAL,
-            dateline = dateline,
-            subFloorList = possibleSubReplyPostList
+            id = postId, user = User(
+                id = if (uidFromBg > 0) uidFromBg else ParserHelper.guessUidFromUsername(username),
+                nickname = userNickname, username = username, sign = userSign
+            ),
+            floorNum = mainFloorNum, subFloorNum = subFloorNum,
+            mid = blogId, related = mainPostId, contentHtml = replyContentHtml,
+            state = Post.STATE_NORMAL, dateline = dateline, subFloorList = possibleSubReplyPostList
         )
-    }
-
-    private fun makeCommentUser(
-        usernameFromAvatarAnchor: String,
-        uidFromAvatarBg: Int,
-        userNickname: String,
-        userSign: String?
-    ): User {
-        val uidGuessing = ParserHelper.guessUidFromUsername(usernameFromAvatarAnchor)
-        return User(
-            id = if (uidFromAvatarBg > 0) {
-                uidFromAvatarBg
-            } else uidGuessing,
-            nickname = userNickname,
-            username = usernameFromAvatarAnchor,
-            sign = userSign
-        )
-    }
-
-    private fun extractBlogEntry(blogId: Int, blogPostUser: User, blogDateline: Long, blogEntryDiv: JXNode): Post {
-        return Post(
-            id = -blogId,
-            user = blogPostUser,
-            floorNum = 0,
-            mid = blogId,
-            contentHtml = blogEntryDiv.asElement().html(),
-            state = Post.STATE_NORMAL,
-            dateline = blogDateline
-        )
-    }
-
-    @JvmStatic
-    fun main(args: Array<String>) {
-        val htmlStr = File("E:\\[ToBak]\\Desktop_Win10\\291373.html").readText(StandardCharsets.UTF_8)
-        val some = BlogTopicParserR649.parseTopic(htmlStr,360398, SpaceType.BLOG)
-        System.err.println("debug")
     }
 }
