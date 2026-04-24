@@ -100,6 +100,14 @@ object SpotChecker {
 
     private val HOLE_CHECKED_SET_BY_TYPE = mutableMapOf<SpaceType, MutableSet<Int>>()
 
+    fun clearHoleCheckedSetByType(spaceType: SpaceType) {
+        HOLE_CHECKED_SET_BY_TYPE[spaceType]?.clear()
+    }
+    
+    fun setMaxIdMapForTest(spaceType: SpaceType, maxId: Int) {
+        TYPE_MAX_ID_MAP[spaceType] = maxId
+    }
+
     fun checkIfHolesInTopicListRange(spaceType: SpaceType, topicList: List<Int>): List<Int> {
         if (spaceType in HOLE_CHECK_SKIP_TYPE) return emptyList()
         val checkedIds = HOLE_CHECKED_SET_BY_TYPE.computeIfAbsent(spaceType) { mutableSetOf() }
@@ -112,11 +120,13 @@ object SpotChecker {
         //     HOLE_CHECKED_SET.clear()
         // }
         val holes = mutableListOf<Int>()
-        val maxId = topicList.max()
+        val maxId = topicList.maxOrNull() ?: return emptyList()
         val fakeTopicList = mutableListOf<Int>().apply {
             val checkSize = RANGE_HOLE_DETECT_DATE_BACK_LIMIT.coerceAtMost(topicList.size * 6 / 7)
             val lowerBound = maxId - checkSize + 1
-            (lowerBound..maxId).forEach { add(it) }
+            if (lowerBound <= maxId) {
+                (lowerBound..maxId).forEach { add(it) }
+            }
         }
         fakeTopicList.removeAll(topicList)
         val rangeSummary = RangeHelper.summaryRanges(fakeTopicList)
@@ -388,7 +398,7 @@ object SpotChecker {
     }
 
     fun getMaxTopicIdFromTopicList(spaceType: SpaceType): Int {
-        val result = getTopicList(spaceType).max()
+        val result = getTopicList(spaceType).maxOrNull() ?: -1
         LOGGER.info("Max id for $spaceType from recent topic list: $result")
         return result
     }
