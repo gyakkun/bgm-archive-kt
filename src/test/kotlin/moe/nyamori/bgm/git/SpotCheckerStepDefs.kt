@@ -5,17 +5,15 @@ import io.cucumber.java.en.Given
 import io.cucumber.java.en.When
 import io.cucumber.java.en.Then
 import kotlin.io.path.createTempDirectory
-import moe.nyamori.bgm.config.BlockRange
 import moe.nyamori.bgm.config.IConfig
-import moe.nyamori.bgm.config.RepoDto
-import moe.nyamori.bgm.config.SpaceBlock
 import moe.nyamori.bgm.config.setConfigDelegate
 import moe.nyamori.bgm.model.SpaceType
-import org.eclipse.jgit.internal.storage.file.FileRepository
 import org.eclipse.jgit.lib.Repository
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.mock
 import java.io.File
 import java.util.BitSet
 
@@ -59,9 +57,9 @@ class SpotCheckerStepDefs {
     }
 
     /**
-     * Creates a real (but empty) git repository in a temp directory.
-     * Using FileRepository avoids the Mockito + JDK-25 module access restrictions
-     * that prevent mocking the abstract org.eclipse.jgit.lib.Repository.
+     * Creates Mockito mocks for both the Repository and the IConfig.
+     * Mockito 5.23+ uses the 'subclass' mock maker for abstract classes (like Repository)
+     * instead of the inline byte-buddy agent, which avoids JDK 25 module-open restrictions.
      */
     @Given("a mock repository with configured max topic id {string}")
     fun a_mock_repository_with_configured_max_topic_id(maxId: String) {
@@ -69,47 +67,20 @@ class SpotCheckerStepDefs {
         tempDir = createTempDirectory("bgm-archive-test-").toFile()
         tempDir.deleteOnExit()
 
-        // FileRepository needs a .git directory
-        val gitDir = File(tempDir, ".git")
-        gitDir.mkdirs()
-        mockRepo = FileRepository(gitDir)
+        val tempGitDir = File(tempDir, ".git")
+        tempGitDir.mkdirs()
 
-        val configForTest = object : IConfig {
-            override val homeFolderAbsolutePath = ""
-            override val prevProcessedCommitRevIdFileName = ""
-            override val preferJgit = false
-            override val preferGitBatchAdd = false
-            override val disableCommitHook = false
-            override val httpHost = "localhost"
-            override val httpPort = 5926
-            override val dbIsEnableWal = false
-            override val jdbcUrl = ""
-            override val jdbcUsername: String? = null
-            override val jdbcPassword: String? = null
-            override val hikariMinIdle = 1
-            override val hikariMaxConn = 2
-            override val dbMetaKeyPrevCachedCommitRevId = ""
-            override val dbMetaKeyPrevPersistedJsonCommitRevId = ""
-            override val disableSpotCheck = false
-            override val disableDbPersist = true
-            override val disableDbPersistKey = true
-            override val dbPersistKey = ""
-            override val isRemoveJsonAfterProcess = false
-            override val spotCheckerTimeoutThresholdMs = 60_000L
-            override val bgmHealthStatus500TimeoutThresholdMs = 60_000L
-            override val enableCrankerConnector = false
-            override val crankerRegUrl = ""
-            override val crankerSlidingWin = 2
-            override val crankerComponent = ""
-            override val logCacheDetail = false
-            override val repoList: List<RepoDto> = emptyList()
-            override val spotCheckSampleSizeByType: Map<SpaceType, Int> = mapOf(spaceType to 20)
-            override val gitRelatedLockTimeoutMs = 30_000L
-            override val blockRangeList: List<BlockRange> = emptyList()
-            override val spaceBlockList: List<SpaceBlock> = emptyList()
-            override val unblockCode: String? = null
+        mockRepo = mock<Repository> {
+            on { isBare } doReturn false
+            on { directory } doReturn tempGitDir
+            on { workTree } doReturn tempDir
         }
-        setConfigDelegate(configForTest)
+
+        val mockConfig = mock<IConfig> {
+            on { disableSpotCheck } doReturn false
+            on { spotCheckSampleSizeByType } doReturn mapOf(spaceType to 20)
+        }
+        setConfigDelegate(mockConfig)
     }
 
     @Given("the topic list returned by recent topics API is {string}")
