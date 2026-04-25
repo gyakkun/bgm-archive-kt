@@ -39,8 +39,8 @@ class SpotCheckerStepDefs {
     @After
     fun tearDown() {
         SpotChecker.reset()
-        moe.nyamori.bgm.db.Dao.mockBgmDao = null
-        GitHelper.mockAllJsonRepoList = null
+        moe.nyamori.bgm.db.Dao.resetProvider()
+        GitHelper.resetProvider()
         mockRepo?.close()
         mockRepo = null
 
@@ -166,7 +166,9 @@ class SpotCheckerStepDefs {
     fun a_mock_repository_with_configured_max_topic_id(maxId: String) {
         maxTopicId = maxId.toInt()
         mockRepo = htmlRepoDto.repo
-        GitHelper.mockAllJsonRepoList = listOf(jsonRepoDto.repo)
+        GitHelper.setTestProvider(object : IJsonRepoListProvider {
+            override fun get(): List<Repository> = listOf(jsonRepoDto.repo)
+        })
     }
 
     @Given("the topic list returned by recent topics API is {string}")
@@ -385,13 +387,15 @@ class SpotCheckerStepDefs {
             on { getMaxTopicIdByType(spaceType.id) } doReturn maxId
         }
         
-        moe.nyamori.bgm.db.Dao.mockBgmDao = mockDao
+        moe.nyamori.bgm.db.Dao.setTestProvider(object : moe.nyamori.bgm.db.IBgmDaoProvider {
+            override fun get(): moe.nyamori.bgm.db.IBgmDao = mockDao
+        })
     }
 
     @Given("the json repo has file {string} with empty topic false")
     fun the_json_repo_has_file_with_empty_topic_false(relPath: String) {
-        val jsonRepo = GitHelper.mockAllJsonRepoList!!.first()
-        val repoDir = jsonRepo.directory.parentFile
+        val jsonRepo = GitHelper.allJsonRepoListSingleton.first()
+        val repoDir = jsonRepo.workTree
         
         val file = File(repoDir, relPath)
         file.parentFile.mkdirs()

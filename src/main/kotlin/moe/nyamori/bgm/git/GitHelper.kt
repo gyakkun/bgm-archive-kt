@@ -30,6 +30,11 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 import kotlin.time.Duration.Companion.nanoseconds
 
+
+interface IJsonRepoListProvider {
+    fun get(): List<Repository>
+}
+
 object GitHelper {
     private val log = LoggerFactory.getLogger(GitHelper.javaClass)
     val GSON: Gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
@@ -40,16 +45,31 @@ object GitHelper {
         }.map { it.repo }
     }
 
-    var mockAllJsonRepoList: List<Repository>? = null
+    private val defaultProvider = object : IJsonRepoListProvider {
+        private val lazyAllJsonRepoList: List<Repository> by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+            Config.repoList.filter {
+                it.type == RepoType.JSON
+            }.map { it.repo }
+        }
 
-    private val lazyAllJsonRepoList: List<Repository> by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        Config.repoList.filter {
-            it.type == RepoType.JSON
-        }.map { it.repo }
+        override fun get(): List<Repository> = lazyAllJsonRepoList
+    }
+
+    private var provider: IJsonRepoListProvider = defaultProvider
+
+    // For test only
+    fun setTestProvider(testProvider: IJsonRepoListProvider) {
+        provider = testProvider
+    }
+
+    // For test only
+    fun resetProvider() {
+        provider = defaultProvider
     }
 
     val allJsonRepoListSingleton: List<Repository>
-        get() = mockAllJsonRepoList ?: lazyAllJsonRepoList
+        get() = provider.get()
+
 
     val allRepoInDisplayOrder by lazy {
         allArchiveRepoListSingleton

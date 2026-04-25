@@ -10,6 +10,11 @@ import org.jdbi.v3.sqlobject.SqlObjectPlugin
 import org.jdbi.v3.sqlobject.kotlin.KotlinSqlObjectPlugin
 import java.util.concurrent.CountDownLatch
 
+
+interface IBgmDaoProvider {
+    fun get(): IBgmDao
+}
+
 object Dao {
     private val latch = CountDownLatch(1)
 
@@ -51,19 +56,32 @@ object Dao {
         // setSqlLogger(Slf4JSqlLogger())
     }
 
-    var mockBgmDao: IBgmDao? = null
-
-    private val lazyBgmDao: IBgmDao by lazy {
-        latch.await()
-        val res = if (DSProvider.isSqlite) {
-            jdbi.onDemand(BgmDaoSqlite::class.java)
-        } else {
-            jdbi.onDemand(BgmDaoPg::class.java)
+    private val defaultProvider = object : IBgmDaoProvider {
+        private val lazyBgmDao: IBgmDao by lazy {
+            latch.await()
+            val res = if (DSProvider.isSqlite) {
+                jdbi.onDemand(BgmDaoSqlite::class.java)
+            } else {
+                jdbi.onDemand(BgmDaoPg::class.java)
+            }
+            res ?: throw IllegalStateException("Should get jdbi dao class but got null")
         }
-        res ?: throw IllegalStateException("Should get jdbi dao class but got null")
+
+        override fun get(): IBgmDao = lazyBgmDao
+    }
+
+    private var provider: IBgmDaoProvider = defaultProvider
+
+    // For test only
+    fun setTestProvider(testProvider: IBgmDaoProvider) {
+        provider = testProvider
+    }
+
+    // For test only
+    fun resetProvider() {
+        provider = defaultProvider
     }
 
     val bgmDao: IBgmDao
-        get() = mockBgmDao ?: lazyBgmDao
-
+        get() = provider.get()
 }
