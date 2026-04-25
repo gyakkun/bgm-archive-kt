@@ -101,3 +101,25 @@ Feature: Spot Checker
     And the bitset of already spot checked mask has no bits set
     When spot check logic is executed
     Then the spot check list should contain at least "10" ids
+
+  Scenario: Spot checker alternates to small holes mask generation if topic 0 is unmasked
+    Given the space type is "GROUP"
+    And a mock repository with configured max topic id "100"
+    And the topic list returned by recent topics API is "100"
+    And the bitset of hidden topic mask has no bits set
+    And the bitset of already spot checked mask has bits from "1" to "100" set
+    And the database returns normal ids "1, 2, 5" and max id "5"
+    When spot check logic is executed
+    Then the generated hidden topic mask should have bit "0" set
+    And the generated hidden topic mask should not have bit "5" set
+
+  Scenario: Spot checker alternates to json walk through if topic 0 is masked
+    Given the space type is "GROUP"
+    And a mock repository with configured max topic id "100"
+    And the topic list returned by recent topics API is "100"
+    And the bitset of hidden topic mask has "0"
+    And the bitset of already spot checked mask has bits from "1" to "100" set
+    And the json repo has file "group/100.json" with empty topic false
+    When spot check logic is executed
+    Then the generated hidden topic mask should not have bit "0" set
+    And the generated hidden topic mask should not have bit "100" set

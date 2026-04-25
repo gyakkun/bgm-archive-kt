@@ -155,7 +155,11 @@ fun Repository.toRepoDtoOrThrow(): RepoDto {
 }
 
 private fun checkRepoExist(repo: Repository): RepoDto? {
-    return Config.repoList.firstOrNull { it.repo == repo }
+    val list = Config.repoList
+    println("checkRepoExist called! Config.repoList size: ${list.size}")
+    list.forEach { println("Repo in list: ${it.repo.directory.absolutePath}") }
+    println("Looking for: ${repo.directory.absolutePath}")
+    return list.firstOrNull { it.repo.directory.absolutePath == repo.directory.absolutePath }
 }
 
 fun Repository.hasCouplingJsonRepo(): Boolean {

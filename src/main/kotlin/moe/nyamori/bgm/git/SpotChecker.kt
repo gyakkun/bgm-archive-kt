@@ -103,6 +103,19 @@ object SpotChecker {
     fun clearHoleCheckedSetByType(spaceType: SpaceType) {
         HOLE_CHECKED_SET_BY_TYPE[spaceType]?.clear()
     }
+
+    fun reset() {
+        TYPE_MAX_ID_MAP.clear()
+        HOLE_CHECKED_SET_BY_TYPE.clear()
+        SpaceType.entries.forEach {
+            TYPE_MAX_ID_MAP[it] = -1
+            HOLE_CHECKED_SET_BY_TYPE[it] = mutableSetOf()
+        }
+    }
+
+    init {
+        reset()
+    }
     
     fun setMaxIdMapForTest(spaceType: SpaceType, maxId: Int) {
         TYPE_MAX_ID_MAP[spaceType] = maxId
@@ -154,7 +167,7 @@ object SpotChecker {
         return result
     }
 
-    private fun randomSelectTopicIds(archiveRepo: Repository, spaceType: SpaceType): List<Int> {
+    internal fun randomSelectTopicIds(archiveRepo: Repository, spaceType: SpaceType): List<Int> {
         require(!archiveRepo.isBare) { "bare archive repo can't be applied to spot check" }
         val maxId = getAndUpdateMaxIdAccordingToType(spaceType, archiveRepo)
         val result = mutableListOf<Int>()
@@ -187,15 +200,59 @@ object SpotChecker {
             LOGGER.info("Writing spot check file earlier due to the long time bitmask regen may take.")
             writeSpotCheckFile(archiveRepo, spaceType, result)
             LOGGER.info("Done writing spot check file before bitmask regen")
-            // Reset the bitset file
-            LOGGER.info("Writing empty spot check bitset file for $spaceType.")
-            writeBitsetToFile(
-                BitSet(maxId + 2).apply { set(maxId + 1) },
-                File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
-            )
-            // Reset the mask file
-            LOGGER.info("Going to re generate hidden topic mask file for $spaceType.")
-            genHiddenTopicMaskFile(archiveRepo, spaceType, maxId)
+            
+            val applySmallHolesMask = spaceType in listOf(SpaceType.BLOG, SpaceType.GROUP, SpaceType.SUBJECT) && !hiddenBs.get(0)
+
+            if (applySmallHolesMask) {
+                LOGGER.info("Generating small holes mask for $spaceType instead of normal json walk through.")
+                val maxIdDb = Dao.bgmDao.getMaxTopicIdByType(spaceType.id)
+                val finalMaxId = max(maxId, maxIdDb) + 1
+                val allNormalIds = Dao.bgmDao.getAllTopicIdByTypeAndState(spaceType.id, 0)
+                
+                val bitset = BitSet(finalMaxId)
+                allNormalIds.forEach { bitset.set(it) }
+                val reversed = (bitset.clone() as BitSet).apply { flip(0, finalMaxId) }
+                val abnormalIds = arrayListOf<Int>()
+                reversed.stream().forEach { abnormalIds.add(it) }
+                val holes = RangeHelper.summaryRanges(abnormalIds)
+                val bigholes = holes.filter {
+                    if (it.size == 1) return@filter false
+                    return@filter it[1] - it[0] >= 100
+                }
+                
+                val bigholeMaskedBs = BitSet(finalMaxId + 2).apply { set(finalMaxId + 1) }
+                bigholes.forEach { hole ->
+                    for (bit in hole[0]..hole[1]) {
+                        bigholeMaskedBs.set(bit)
+                    }
+                }
+                bigholeMaskedBs.set(0) // Mask topic 0 to control next round
+                
+                val normalMaskedBs = BitSet(finalMaxId + 2).apply { set(finalMaxId + 1) }
+                allNormalIds.forEach { normalId -> normalMaskedBs.set(normalId) }
+                
+                LOGGER.info("Writing newly generated spot check bitset file for $spaceType.")
+                writeBitsetToFile(
+                    normalMaskedBs,
+                    File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
+                )
+                
+                LOGGER.info("Writing newly generated hidden topic mask file for $spaceType.")
+                writeBitsetToFile(
+                    bigholeMaskedBs,
+                    File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")
+                )
+            } else {
+                // Reset the bitset file
+                LOGGER.info("Writing empty spot check bitset file for $spaceType.")
+                writeBitsetToFile(
+                    BitSet(maxId + 2).apply { set(maxId + 1) },
+                    File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$SPOT_CHECK_BITSET_FILE_NAME")
+                )
+                // Reset the mask file
+                LOGGER.info("Going to re generate hidden topic mask file for $spaceType.")
+                genHiddenTopicMaskFile(archiveRepo, spaceType, maxId)
+            }
             return result
         }
         // we abandon the calculating approach
@@ -310,6 +367,11 @@ object SpotChecker {
             newBs = result
             LOGGER.info("After merging op, new bitset size: ${newBs.size()}. Cardinality: ${newBs.cardinality()}. Zero count: ${newBs.size() - newBs.cardinality()}")
         }
+        
+        if (spaceType in listOf(SpaceType.BLOG, SpaceType.GROUP, SpaceType.SUBJECT)) {
+            newBs.clear(0)
+        }
+        
         writeBitsetToFile(
             newBs,
             File(archiveRepo.absolutePathWithoutDotGit()).resolve("${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME")

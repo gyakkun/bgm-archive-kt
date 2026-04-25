@@ -2,20 +2,15 @@ package moe.nyamori.bgm.git
 
 import io.cucumber.java.After
 import io.cucumber.java.en.Given
-import io.cucumber.java.en.When
 import io.cucumber.java.en.Then
-import kotlin.io.path.createTempDirectory
-import moe.nyamori.bgm.config.IConfig
-import moe.nyamori.bgm.config.setConfigDelegate
+import io.cucumber.java.en.When
 import moe.nyamori.bgm.model.SpaceType
 import org.eclipse.jgit.lib.Repository
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.*
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import java.io.File
-import java.util.BitSet
+import java.util.*
 
 class SpotCheckerStepDefs {
 
@@ -43,9 +38,28 @@ class SpotCheckerStepDefs {
 
     @After
     fun tearDown() {
-        SpaceType.entries.forEach { SpotChecker.clearHoleCheckedSetByType(it) }
+        SpotChecker.reset()
+        moe.nyamori.bgm.db.Dao.mockBgmDao = null
+        GitHelper.mockAllJsonRepoList = null
         mockRepo?.close()
         mockRepo = null
+
+        // Clear files and commits from the fixed repos to prevent cross-scenario pollution
+        val dirs = listOf(htmlRepoDir, jsonRepoDir)
+        for (dir in dirs) {
+            if (File(dir, ".git").exists()) {
+                ProcessBuilder("git", "rm", "-rf", ".").directory(dir).start().waitFor()
+                ProcessBuilder("git", "commit", "-m", "cleanup", "--allow-empty").directory(dir).start().waitFor()
+            }
+            
+            // Also delete any un-tracked files
+            for (space in SpaceType.entries) {
+                val spaceDir = File(dir, space.name.lowercase())
+                if (spaceDir.exists()) {
+                    spaceDir.deleteRecursively()
+                }
+            }
+        }
     }
 
     // ── Given steps ───────────────────────────────────────────────────────────
@@ -61,26 +75,98 @@ class SpotCheckerStepDefs {
      * Mockito 5.23+ uses the 'subclass' mock maker for abstract classes (like Repository)
      * instead of the inline byte-buddy agent, which avoids JDK 25 module-open restrictions.
      */
+    companion object {
+        private var initialized = false
+        lateinit var htmlRepoDir: File
+        lateinit var jsonRepoDir: File
+        lateinit var htmlRepoDto: moe.nyamori.bgm.config.RepoDto
+        lateinit var jsonRepoDto: moe.nyamori.bgm.config.RepoDto
+
+        fun setupGlobalReposAndConfig() {
+            if (initialized) return
+            
+            val tmp = File(System.getProperty("java.io.tmpdir"))
+            htmlRepoDir = File(tmp, "bgm-archive-test-fixed-html")
+            jsonRepoDir = File(tmp, "bgm-archive-test-fixed-json")
+            
+            // Always clean up dirs first to avoid stale commits/files from previous JVM runs
+            htmlRepoDir.deleteRecursively()
+            jsonRepoDir.deleteRecursively()
+            htmlRepoDir.mkdirs()
+            jsonRepoDir.mkdirs()
+            
+            listOf(htmlRepoDir, jsonRepoDir).forEach { dir ->
+                ProcessBuilder("git", "init").directory(dir).start().waitFor()
+                ProcessBuilder("git", "config", "user.email", "test@test.com").directory(dir).start().waitFor()
+                ProcessBuilder("git", "config", "user.name", "Test").directory(dir).start().waitFor()
+                ProcessBuilder("git", "config", "commit.gpgsign", "false").directory(dir).start().waitFor()
+            }
+
+            // Create initial empty commits so repos have a HEAD ref (required for git ls-tree HEAD)
+            listOf(htmlRepoDir, jsonRepoDir).forEach {
+                val placeholder = File(it, ".gitkeep")
+                placeholder.createNewFile()
+                ProcessBuilder("git", "add", ".").directory(it).start().waitFor()
+                ProcessBuilder("git", "commit", "-m", "init").directory(it).start().waitFor()
+                // Remove placeholder from working tree (keep git clean)
+                ProcessBuilder("git", "rm", ".gitkeep").directory(it).start().waitFor()
+                ProcessBuilder("git", "commit", "-m", "remove placeholder", "--allow-empty").directory(it).start().waitFor()
+            }
+            
+            jsonRepoDto = moe.nyamori.bgm.config.RepoDto(
+                id = 2,
+                path = jsonRepoDir.absolutePath,
+                type = moe.nyamori.bgm.config.RepoType.JSON,
+                optFriendlyName = "test-json",
+                optRepoIdCouplingWith = null,
+                optIsStatic = false,
+                optMutexTimeoutMs = 1000
+            )
+
+            htmlRepoDto = moe.nyamori.bgm.config.RepoDto(
+                id = 1,
+                path = htmlRepoDir.absolutePath,
+                type = moe.nyamori.bgm.config.RepoType.HTML,
+                optFriendlyName = "test",
+                optRepoIdCouplingWith = 2,
+                optIsStatic = false,
+                optMutexTimeoutMs = 1000
+            )
+
+            val baseConfig = moe.nyamori.bgm.config.checkAndGetConfigDto()
+            val myConfig = baseConfig.copy(
+                disableSpotCheck = false,
+                spotCheckSampleSizeByType = SpaceType.values().associate { it to 20 },
+                repoList = listOf(htmlRepoDto, jsonRepoDto),
+                jdbcUrl = "jdbc:sqlite:${htmlRepoDir.absolutePath.replace('\\', '/')}/test.db",
+                jdbcUsername = "",
+                jdbcPassword = "",
+                hikariMaxConn = 10,
+                preferJgit = true
+            )
+            moe.nyamori.bgm.config.setConfigDelegate(myConfig)
+            
+            // Touch Config to force initialization here
+            moe.nyamori.bgm.config.Config.disableSpotCheck
+            
+            initialized = true
+            
+            Runtime.getRuntime().addShutdownHook(Thread {
+                if (htmlRepoDir.exists()) htmlRepoDir.deleteRecursively()
+                if (jsonRepoDir.exists()) jsonRepoDir.deleteRecursively()
+            })
+        }
+    }
+    @io.cucumber.java.Before
+    fun globalSetup() {
+        setupGlobalReposAndConfig()
+    }
+
     @Given("a mock repository with configured max topic id {string}")
     fun a_mock_repository_with_configured_max_topic_id(maxId: String) {
         maxTopicId = maxId.toInt()
-        tempDir = createTempDirectory("bgm-archive-test-").toFile()
-        tempDir.deleteOnExit()
-
-        val tempGitDir = File(tempDir, ".git")
-        tempGitDir.mkdirs()
-
-        mockRepo = mock<Repository> {
-            on { isBare } doReturn false
-            on { directory } doReturn tempGitDir
-            on { workTree } doReturn tempDir
-        }
-
-        val mockConfig = mock<IConfig> {
-            on { disableSpotCheck } doReturn false
-            on { spotCheckSampleSizeByType } doReturn mapOf(spaceType to 20)
-        }
-        setConfigDelegate(mockConfig)
+        mockRepo = htmlRepoDto.repo
+        GitHelper.mockAllJsonRepoList = listOf(jsonRepoDto.repo)
     }
 
     @Given("the topic list returned by recent topics API is {string}")
@@ -165,11 +251,7 @@ class SpotCheckerStepDefs {
 
         holeCheckResult = SpotChecker.checkIfHolesInTopicListRange(spaceType, mockTopicList)
 
-        val randomSelectMethod = SpotChecker::class.java
-            .getDeclaredMethod("randomSelectTopicIds", Repository::class.java, SpaceType::class.java)
-        randomSelectMethod.isAccessible = true
-        @Suppress("UNCHECKED_CAST")
-        val randomIds = randomSelectMethod.invoke(SpotChecker, repo, spaceType) as List<Int>
+        val randomIds = SpotChecker.randomSelectTopicIds(repo, spaceType)
 
         val allList = randomIds + holeCheckResult
         SpotChecker.writeSpotCheckFile(repo, spaceType, allList)
@@ -281,12 +363,77 @@ class SpotCheckerStepDefs {
         )
     }
 
+    @Given("the bitset of already spot checked mask has bits from {string} to {string} set")
+    fun the_bitset_of_already_spot_checked_mask_has_bits_from_to_set(startStr: String, endStr: String) {
+        val start = startStr.toInt()
+        val end = endStr.toInt()
+        val bs = BitSet(maxTopicId + 2).apply { set(maxTopicId + 1) }
+        for (i in start..end) {
+            bs.set(i)
+        }
+        writeBitsetFile(bs, "spot_check_bitset.txt")
+    }
+
+    @Given("the database returns normal ids {string} and max id {string}")
+    fun the_database_returns_normal_ids_and_max_id(idsStr: String, maxIdStr: String) {
+        val ids = idsStr.split(",").map { it.trim().toInt() }
+        val maxId = maxIdStr.toInt()
+        
+        // Mocking Dao.bgmDao
+        val mockDao = mock<moe.nyamori.bgm.db.IBgmDao> {
+            on { getAllTopicIdByTypeAndState(spaceType.id, 0) } doReturn ArrayList(ids)
+            on { getMaxTopicIdByType(spaceType.id) } doReturn maxId
+        }
+        
+        moe.nyamori.bgm.db.Dao.mockBgmDao = mockDao
+    }
+
+    @Given("the json repo has file {string} with empty topic false")
+    fun the_json_repo_has_file_with_empty_topic_false(relPath: String) {
+        val jsonRepo = GitHelper.mockAllJsonRepoList!!.first()
+        val repoDir = jsonRepo.directory.parentFile
+        
+        val file = File(repoDir, relPath)
+        file.parentFile.mkdirs()
+        val id = relPath.substringAfterLast("/").substringBefore(".").toInt()
+        // Provide a minimal but complete JSON that satisfies isEmptyTopic() == false
+        val jsonContent = "{\"id\": $id, \"state\": 0, \"topPostPid\": 1, \"postList\": [{\"id\": 1, \"floorNum\": 1, \"mid\": $id, \"dateline\": 123456789, \"contentHtml\": \"test\"}]}"
+        file.writeText(jsonContent)
+        
+        ProcessBuilder("git", "add", ".").directory(repoDir).start().waitFor()
+        ProcessBuilder("git", "commit", "-m", "add $relPath", "--allow-empty").directory(repoDir).start().waitFor()
+    }
+
+    @Then("the generated hidden topic mask should have bit {string} set")
+    fun the_generated_hidden_topic_mask_should_have_bit_set(bitStr: String) {
+        val bit = bitStr.toInt()
+        val repo = requireNotNull(mockRepo)
+        val maskFile = File(repo.workTree, "${spaceType.name.lowercase()}/hidden_topic_mask.txt")
+        val bs = SpotChecker.getBitsetFromLongPlaintextFile(maskFile)
+        assertTrue(bs.get(bit), "Expected bit $bit to be set in hidden_topic_mask.txt")
+    }
+
+    @Then("the generated hidden topic mask should not have bit {string} set")
+    fun the_generated_hidden_topic_mask_should_not_have_bit_set(bitStr: String) {
+        val bit = bitStr.toInt()
+        val repo = requireNotNull(mockRepo)
+        val maskFile = File(repo.workTree, "${spaceType.name.lowercase()}/hidden_topic_mask.txt")
+        val bs = SpotChecker.getBitsetFromLongPlaintextFile(maskFile)
+        assertFalse(bs.get(bit), "Expected bit $bit to not be set in hidden_topic_mask.txt")
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private fun writeBitsetFile(bs: BitSet, filename: String) {
         val repo = requireNotNull(mockRepo) { "mockRepo must be initialised before writing mask files" }
-        val maskFile = File(repo.workTree, "${spaceType.name.lowercase()}/$filename")
+        val repoDir = repo.workTree
+        val maskFile = File(repoDir, "${spaceType.name.lowercase()}/$filename")
         maskFile.parentFile.mkdirs()
+        val relPath = "${spaceType.name.lowercase()}/$filename"
         maskFile.writeText(bs.toLongArray().joinToString("\n"))
+
+        // Must commit so that archiveRepo.getFileContentAsStringInACommit can see it
+        ProcessBuilder("git", "add", relPath).directory(repoDir).start().waitFor()
+        ProcessBuilder("git", "commit", "-m", "add $relPath", "--allow-empty").directory(repoDir).start().waitFor()
     }
 }

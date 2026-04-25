@@ -40,11 +40,16 @@ object GitHelper {
         }.map { it.repo }
     }
 
-    val allJsonRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
+    var mockAllJsonRepoList: List<Repository>? = null
+
+    private val lazyAllJsonRepoList: List<Repository> by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
         Config.repoList.filter {
             it.type == RepoType.JSON
         }.map { it.repo }
     }
+
+    val allJsonRepoListSingleton: List<Repository>
+        get() = mockAllJsonRepoList ?: lazyAllJsonRepoList
 
     val allRepoInDisplayOrder by lazy {
         allArchiveRepoListSingleton
