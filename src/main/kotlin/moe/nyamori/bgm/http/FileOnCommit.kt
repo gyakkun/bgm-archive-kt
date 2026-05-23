@@ -110,10 +110,10 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
     private fun fillMetaHeader(ctx: Context, cp: FileHistoryLookup.ChatamPair) = with(ctx) {
         header("x-bak-hrn", cp.html.repo.simpleName())
         header("x-bak-jrn", cp.json.repo.simpleName())
-        header("x-bak-hch", cp.html.hash)
-        header("x-bak-jch", cp.json.hash)
-        header("x-bak-hcm", cp.html.msg)
-        header("x-bak-jcm", cp.json.msg)
+        header("x-bak-hch", cp.html.sha1)
+        header("x-bak-jch", cp.json.sha1)
+        header("x-bak-hcm", cp.html.fullMessage)
+        header("x-bak-jcm", cp.json.fullMessage)
     }
 
     private fun htmlModifier(html: String): String {

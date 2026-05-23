@@ -30,7 +30,7 @@ class ParserHelperTest {
         val archiveRepo = Config.repoList.first { it.type == RepoType.HTML && !it.repo.isBare }.repo
         val commitList = archiveRepo.getRevCommitList(filePath)
         for (i in commitList) {
-            val htmlString = archiveRepo.getFileContentAsStringInACommit(i.hash, filePath)
+            val htmlString = archiveRepo.getFileContentAsStringInACommit(i.sha1, filePath)
             val revId = ParserHelper.getStyleRevNumberFromHtmlString(htmlString)
             val htmlFile =
                 File("E:\\SOURCE_ROOT\\bgm-archive-kt\\src\\test\\resources\\html_samples\\blog\\$revId.html")

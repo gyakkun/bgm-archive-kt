@@ -8,13 +8,12 @@ import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
-import moe.nyamori.bgm.git.GitHelper.getPrevPersistedJsonCommitRef
-import moe.nyamori.bgm.git.GitHelper.getWalkBetweenCommitInReverseOrder
+import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
+import moe.nyamori.bgm.git.GitHelper.getPrevPersistedJsonCommitSha1Str
 import moe.nyamori.bgm.git.GitHelper.hasCouplingArchiveRepo
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.*
-import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
+
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper
 import moe.nyamori.bgm.util.TopicJsonHelper
@@ -24,9 +23,8 @@ import moe.nyamori.bgm.util.TopicJsonHelper.getPostListFromTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
 import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
+import moe.nyamori.bgm.git.GitHelper.processHistory
 import org.eclipse.jgit.lib.Repository
-import org.eclipse.jgit.revwalk.RevCommit
-import org.eclipse.jgit.revwalk.RevWalk
 import org.slf4j.LoggerFactory
 
 object JsonToDbProcessor {
@@ -65,29 +63,14 @@ object JsonToDbProcessor {
 
         reposToProcess.forEach { jsonRepo ->
 
-            val latestCommit = jsonRepo.getLatestCommitRef()
-            val prevPersistedCommit =
-                getPrevPersistedJsonCommitRef(jsonRepo)
-            val walk = jsonRepo.getWalkBetweenCommitInReverseOrder(
-                latestCommit,
-                prevPersistedCommit,
-                stepInAdvance = false,
-            )
-            val realPrevPersistedCommitForCheck = getPrevPersistedJsonCommitRef(jsonRepo)
-            var prev = walk.next()
+            val latestSha1 = jsonRepo.getLatestCommitSha1StrExt()
+            val prevPersistedSha1 = getPrevPersistedJsonCommitSha1Str(jsonRepo)
+            
             val sidNameMappingSet = mutableSetOf<SpaceNameMappingData>()
             var everFailed = false
 
-            // FIXME
-            while (prev != null) {
-                if (realPrevPersistedCommitForCheck == prev) {
-                    break
-                }
-                prev = walk.next()
-            }
-
             everFailed = jsonRepo.toRepoDtoOrThrow().withLock {
-                walkAndPersistToDb(jsonRepo, prev, walk, sidNameMappingSet, everFailed)
+                walkAndPersistToDb(jsonRepo, prevPersistedSha1, latestSha1, sidNameMappingSet, everFailed)
             }
             if (everFailed) {
                 LOGGER.error("Failed at persistence for repo ${jsonRepo.simpleName()}. Please check log!")
@@ -97,37 +80,31 @@ object JsonToDbProcessor {
 
     private fun walkAndPersistToDb(
         jsonRepo: Repository,
-        inPrev: RevCommit,
-        walk: RevWalk,
+        prevPersistedSha1: String,
+        latestSha1: String,
         sidNameMappingSet: MutableSet<SpaceNameMappingData>,
         inEverFailed: Boolean
     ): Boolean {
-        var prev = inPrev
         var everFailed = inEverFailed
-        LOGGER.info("The previously persisted json repo commit for ${jsonRepo.absolutePathWithoutDotGit()}: $prev")
-        run breakable@{
-            walk.use {
-                it.forEach outer@{ cur ->
-                    if (cur == prev) {
-                        LOGGER.warn("Commit $cur has been iterated twice! Repo: ${jsonRepo.simpleName()}")
-                        return@breakable
-                    }
-                    val curCommitId = cur.sha1Str()
-                    val curCommitFullMsg = cur.fullMessage
-                    if (curCommitFullMsg.startsWith("META", ignoreCase = true)) {
-                        Dao.bgmDao.updatePrevPersistedCommitId(jsonRepo, curCommitId)
-                        prev = cur
-                        return@outer
-                    }
-                    LOGGER.info("Persisting $curCommitFullMsg - $curCommitId , repo - ${jsonRepo.simpleName()}")
-                    val changedFilePathList = jsonRepo.findChangedFilePaths(prev, cur)
-                    changedFilePathList.forEach inner@{ path ->
-                        if (!path.endsWith("json")) return@inner
-                        LOGGER.info("Path ${jsonRepo.simpleName()}/$path")
-                        var jsonStr = "NOT READY YET"
-                        runCatching {
-                            jsonStr = jsonRepo.getFileContentAsStringInACommit(cur.sha1Str(), path)
-                            val topicUnmod = GSON.fromJson(jsonStr, Topic::class.java)
+        LOGGER.info("The previously persisted json repo commit for ${jsonRepo.absolutePathWithoutDotGit()}: $prevPersistedSha1")
+        
+        jsonRepo.processHistory(prevPersistedSha1, latestSha1) { curCommit, changedFilePathList ->
+            val curCommitId = curCommit.sha1
+            val curCommitFullMsg = curCommit.fullMessage
+            
+            if (curCommitFullMsg.startsWith("META", ignoreCase = true)) {
+                Dao.bgmDao.updatePrevPersistedCommitId(jsonRepo, curCommitId)
+                return@processHistory
+            }
+            LOGGER.info("Persisting $curCommitFullMsg - $curCommitId , repo - ${jsonRepo.simpleName()}")
+            
+            changedFilePathList.forEach inner@{ path ->
+                if (!path.endsWith("json")) return@inner
+                LOGGER.info("Path ${jsonRepo.simpleName()}/$path")
+                var jsonStr = "NOT READY YET"
+                runCatching {
+                    jsonStr = jsonRepo.getFileContentAsStringInACommit(curCommitId, path)
+                    val topicUnmod = GSON.fromJson(jsonStr, Topic::class.java)
 
                             if (!isValidTopic(topicUnmod)) return@inner
                             val topic = preProcessTopic(topicUnmod)
@@ -173,22 +150,19 @@ object JsonToDbProcessor {
                             )
                             Dao.bgmDao.upsertSidAlias(sidNameMappingSet)
                             sidNameMappingSet.clear()
-                        }.onFailure {
-                            LOGGER.error(
-                                "Ex when checking content of $path at commit ${cur.sha1Str()}, repo - ${jsonRepo.simpleName()}",
-                                it
-                            )
-                            LOGGER.error("Json Str: $jsonStr")
-                            everFailed = true
-                        }
-                    }
-
-                    Dao.bgmDao.updatePrevPersistedCommitId(jsonRepo, curCommitId)
-                    prev = cur
+                }.onFailure {
+                    LOGGER.error(
+                        "Ex when checking content of $path at commit ${curCommit.sha1}, repo - ${jsonRepo.simpleName()}",
+                        it
+                    )
+                    LOGGER.error("Json Str: $jsonStr")
+                    everFailed = true
                 }
-                Dao.bgmDao.handleNegativeUid()
             }
+
+            Dao.bgmDao.updatePrevPersistedCommitId(jsonRepo, curCommitId)
         }
+        Dao.bgmDao.handleNegativeUid()
         LOGGER.info(
             "Persisted last commit for repo ${jsonRepo.simpleName()}: ${
                 Dao.bgmDao.getPrevPersistedCommitId(jsonRepo)

@@ -13,9 +13,10 @@ import moe.nyamori.bgm.git.GitHelper.getRevCommitById
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.lowercaseName
 import moe.nyamori.bgm.util.FilePathHelper
-import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.StringHashingHelper.repoIdFromDto
+import moe.nyamori.bgm.git.IGitCommit
+import moe.nyamori.bgm.git.JGitCommitAdapter
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants.DOT_GIT
@@ -38,11 +39,11 @@ object FileHistoryLookup {
 
     data class CommitHashAndTimestampAndMsg(
         val repo: Repository,
-        val hash: String,
-        val commitTimeEpochMs: Long,
-        val authorTimeEpochMs: Long,
-        val msg: String
-    )
+        override val sha1: String,
+        override val commitTimeEpochMs: Long,
+        override val authorTimeEpochMs: Long,
+        override val fullMessage: String
+    ) : IGitCommit
 
     private val spaceTypeTopicIdPairToChatamPairCache: LoadingCache<
             Pair<SpaceType, Int/*topicId*/>,
@@ -93,7 +94,7 @@ object FileHistoryLookup {
             .filter {
                 jsonChatamByTs.contains(it.timestampHint())
                         // Special handling
-                        || (jsonChatamByTs.isNotEmpty() && it.msg.startsWith("META"))
+                        || (jsonChatamByTs.isNotEmpty() && it.fullMessage.startsWith("META"))
             }
             .associate { htmlChatam ->
                 val thePairedJsonChatam = jsonChatamByTs[htmlChatam.timestampHint()] ?: run {
@@ -108,15 +109,15 @@ object FileHistoryLookup {
                     // See the commit "META: ADD HISTORICAL DATA." in bgm-archive-old repo.
                     log.warn(
                         "Seems we need to do special handling for commit: {} , timestampHint = {}",
-                        htmlChatam.msg.trim(),
+                        htmlChatam.fullMessage.trim(),
                         Instant.ofEpochMilli(htmlChatam.timestampHint())
                     )
                     val tm = TreeMap(jsonChatamByTs)
                     val res = tm.ceilingEntry(htmlChatam.timestampHint())?.value ?: tm.firstEntry().value
                     log.warn(
                         "Html commit {} mapped to json commit {}. Time diff (html-json) = {}",
-                        htmlChatam.msg.trim(),
-                        res.msg.trim(),
+                        htmlChatam.fullMessage.trim(),
+                        res.fullMessage.trim(),
                         Duration.ofMillis(htmlChatam.timestampHint() - res.timestampHint())
                     )
                     res
@@ -124,7 +125,7 @@ object FileHistoryLookup {
 
                 // This is to extract the accurate timestamp from meta_ts.txt file
                 val metaTs = htmlChatam.repo.getFileContentAsStringInACommit(
-                    htmlChatam.hash, "${spaceType.lowercaseName()}/meta_ts.txt", forceJgit = true
+                    htmlChatam.sha1, "${spaceType.lowercaseName()}/meta_ts.txt", forceJgit = true
                 )
                 if (metaTs.trim().isBlank()) return@associate htmlChatam.timestampHint() to ChatamPair(
                     spaceType,
@@ -137,7 +138,7 @@ object FileHistoryLookup {
                     if (it.size != 2) {
                         log.warn(
                             "Invalid meta_ts line: ${htmlChatam.repo.folderName()} - commit - ${
-                                htmlChatam.hash
+                                htmlChatam.sha1
                             } - line - $it"
                         )
                         return@filter false
@@ -151,7 +152,7 @@ object FileHistoryLookup {
                     ?: run {
                         log.error(
                             "Topic id not found in this meta_ts file: ${htmlChatam.repo.folderName()} - commit - ${
-                                htmlChatam.hash
+                                htmlChatam.sha1
                             } - type - ${spaceType.lowercaseName()} - topicId - $topicId"
                         )
                         htmlChatam.timestampHint()
@@ -234,13 +235,15 @@ object FileHistoryLookup {
         log.error("Ex when getting all chatam by relPath=$relPath using git: ", it)
     }.getOrDefault(emptyList())
 
-    fun RevCommit.toChatam(repo: Repository) = CommitHashAndTimestampAndMsg(
+    fun IGitCommit.toChatam(repo: Repository) = CommitHashAndTimestampAndMsg(
         repo,
-        this.sha1Str(),
-        this.committerIdent.whenAsInstant.toEpochMilli(),
-        this.authorIdent.whenAsInstant.toEpochMilli(),
+        this.sha1,
+        this.commitTimeEpochMs,
+        this.authorTimeEpochMs,
         this.fullMessage
     )
+
+    fun RevCommit.toChatam(repo: Repository) = JGitCommitAdapter(this).toChatam(repo)
 
     fun Repository.getRevCommitList(relPath: String): List<CommitHashAndTimestampAndMsg> =
         runCatching {
@@ -356,9 +359,9 @@ object FileHistoryLookup {
                 val diffSec = diff / 1000
                 val logSec = diffSec % 60
                 val logMin = diffSec / 60
-                log.info("Diff=${logMin}m${logSec}s for html ${topicId.toHtmlRelPath(spaceType)} in ${it.html.repo.folderName()} : ${it.html.hash}")
+                log.info("Diff=${logMin}m${logSec}s for html ${topicId.toHtmlRelPath(spaceType)} in ${it.html.repo.folderName()} : ${it.html.sha1}")
                 it to it.html.repo.getFileContentAsStringInACommit(
-                    it.html.hash,
+                    it.html.sha1,
                     it.topicId.toHtmlRelPath(it.spaceType),
                 )
             }
@@ -388,9 +391,9 @@ object FileHistoryLookup {
                 val diffSec = diff / 1000
                 val logSec = diffSec % 60
                 val logMin = diffSec / 60
-                log.debug("Diff=${logMin}m${logSec}s for json ${topicId.toJsonRelPath(spaceType)} in ${it.json.repo.folderName()} : ${it.json.hash}")
+                log.debug("Diff=${logMin}m${logSec}s for json ${topicId.toJsonRelPath(spaceType)} in ${it.json.repo.folderName()} : ${it.json.sha1}")
                 it to it.json.repo.getFileContentAsStringInACommit(
-                    it.json.hash,
+                    it.json.sha1,
                     it.topicId.toJsonRelPath(it.spaceType),
                 )
             }

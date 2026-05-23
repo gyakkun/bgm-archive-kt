@@ -9,18 +9,16 @@ import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
-import moe.nyamori.bgm.git.GitHelper.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder
+import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
+import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitSha1Str
+import moe.nyamori.bgm.git.GitHelper.processHistory
 import moe.nyamori.bgm.git.GitHelper.hasCouplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.TopicParserEntrance
-import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Repository
-import org.eclipse.jgit.revwalk.RevCommit
-import org.eclipse.jgit.revwalk.RevWalk
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.nio.charset.StandardCharsets.UTF_8
@@ -67,25 +65,15 @@ object CommitToJsonProcessor {
         var repoCounter = 0
         reposToProcess.forEach { archiveRepo ->
             repoCounter++
-            val walk =
-                archiveRepo.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder()
             val jsonRepo = archiveRepo.couplingJsonRepo()!!
-            var prev = walk.next() // used in the iteration (now = next() ... prev = now)
-            val prevProcessedArchiveCommitRef = archiveRepo.getPrevProcessedArchiveCommitRef()
-
-            // FIXME: Workaround the inclusive walk boundary
-            while (prev != null) {
-                if (prevProcessedArchiveCommitRef == prev) {
-                    break
-                }
-                prev = walk.next()
-            }
+            val prevProcessedSha1 = archiveRepo.getPrevProcessedArchiveCommitSha1Str()
+            val latestSha1 = archiveRepo.getLatestCommitSha1StrExt()
 
             jsonRepo.toRepoDtoOrThrow().withLock {
                 walkAndWriteJsonAndCommitToJsonRepo(
                     archiveRepo,
-                    prev,
-                    walk,
+                    prevProcessedSha1,
+                    latestSha1,
                     firstCommitSpaceType,
                     jsonRepo,
                     shouldSpotCheck,
@@ -97,54 +85,48 @@ object CommitToJsonProcessor {
 
     private fun walkAndWriteJsonAndCommitToJsonRepo(
         archiveRepo: Repository,
-        inPrev: RevCommit,
-        walk: RevWalk,
+        prevProcessedSha1: String,
+        latestSha1: String,
         inFirstCommitSpaceType: SpaceType?,
         jsonRepo: Repository,
         inShouldSpotCheck: Boolean,
         repoCounter: Int
     ) {
-        var prev = inPrev
         var firstCommitSpaceType = inFirstCommitSpaceType
         var shouldSpotCheck = inShouldSpotCheck
-        log.info("The previously processed commit for repo - ${archiveRepo.simpleName()}: $prev")
-        run breakable@{
-            walk.use {
-                it.forEachIndexed { commitIdx, curCommit ->
-                    var outerTimingForCommit = System.currentTimeMillis()
-                    try {
-                        val noGoodIdTreeSet = TreeSet<Int>()
-                        if (curCommit == prev) {
-                            log.error("The first commit being iterated twice! Repo - ${archiveRepo.simpleName()}")
-                            return@breakable
-                        }
+        log.info("The previously processed commit for repo - ${archiveRepo.simpleName()}: $prevProcessedSha1")
+        
+        var commitIdx = 0
+        archiveRepo.processHistory(prevProcessedSha1, latestSha1) { curCommit, changedHtmlFilePathList ->
+            var outerTimingForCommit = System.currentTimeMillis()
+            try {
+                val noGoodIdTreeSet = TreeSet<Int>()
 
-                        if (curCommit.fullMessage.startsWith("META", ignoreCase = true)
-                            || curCommit.fullMessage.startsWith("init", ignoreCase = true)
-                        ) {
-                            log.warn("Iterating meta or init commit for repo ${archiveRepo.simpleName()}: $curCommit")
-                            return@forEachIndexed // continue
-                        }
+                if (curCommit.fullMessage.startsWith("META", ignoreCase = true)
+                    || curCommit.fullMessage.startsWith("init", ignoreCase = true)
+                ) {
+                    log.warn("Iterating meta or init commit for repo ${archiveRepo.simpleName()}: ${curCommit.sha1}")
+                    return@processHistory // continue
+                }
 
-                        val commitSpaceType = extractSpaceTypeFromCommitOrThrow(curCommit)
-                        if (firstCommitSpaceType == null) firstCommitSpaceType = commitSpaceType
-                        val changedHtmlFilePathList = archiveRepo.findChangedFilePaths(prev, curCommit)
+                val commitSpaceType = extractSpaceTypeFromCommitOrThrow(curCommit)
+                if (firstCommitSpaceType == null) firstCommitSpaceType = commitSpaceType
 
-                        log.info(
-                            "Processing repo = ${archiveRepo.simpleName()}, commit msg = ${
-                                curCommit.shortMessage
-                            } , commit id = ${
-                                curCommit.sha1Str().substring(0, 8)
-                            }"
-                        )
+                log.info(
+                    "Processing repo = ${archiveRepo.simpleName()}, commit msg = ${
+                        curCommit.shortMessage
+                    } , commit id = ${
+                        curCommit.sha1.substring(0, 8)
+                    }"
+                )
 
-                        for (pathIdx in changedHtmlFilePathList.indices) {
+                for (pathIdx in changedHtmlFilePathList.indices) {
                             val path = changedHtmlFilePathList[pathIdx]
                             try {
                                 if (path.endsWith(NO_GOOD_FILE_NAME)) {
                                     handleNoGoodFile(
                                         Path.of(archiveRepo.absolutePathWithoutDotGit()).resolve(path),
-                                        archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path),
+                                        archiveRepo.getFileContentAsStringInACommit(curCommit.sha1, path),
                                         noGoodIdTreeSet
                                     )
                                     continue
@@ -155,11 +137,11 @@ object CommitToJsonProcessor {
 
                                 if (htmlSpaceType != commitSpaceType) {
                                     log.error("Html space type not consistent with commit space type! htmlSpaceType=$htmlSpaceType, commitSpaceType=$commitSpaceType")
-                                    log.error("At commit -  ${curCommit.name}, repo - ${archiveRepo.simpleName()}, path = $path")
+                                    log.error("At commit -  ${curCommit.sha1}, repo - ${archiveRepo.simpleName()}, path = $path")
                                 }
 
                                 val fileContentInStr =
-                                    archiveRepo.getFileContentAsStringInACommit(curCommit.sha1Str(), path)
+                                    archiveRepo.getFileContentAsStringInACommit(curCommit.sha1, path)
                                 val topicId = path.split("/").last().replace(".html", "").toInt()
 
                                 var innerTimingForFile = System.currentTimeMillis()
@@ -188,19 +170,18 @@ object CommitToJsonProcessor {
                             } catch (ex: Exception) {
                                 log.error(
                                     "Exception occurs when handling ${archiveRepo.simpleName()}/$path, commit - ${
-                                        curCommit.sha1Str().substring(0, 8)
+                                        curCommit.sha1.substring(0, 8)
                                     } - ${curCommit.shortMessage}", ex
                                 )
                             }
                         }
                         writeJsonRepoLastCommitId(curCommit, jsonRepo)
                         commitJsonRepo(jsonRepo, commitSpaceType, curCommit, changedHtmlFilePathList)
-                        prev = curCommit
                         writeNoGoodFile(archiveRepo, noGoodIdTreeSet, commitSpaceType)
                         if (noGoodIdTreeSet.isNotEmpty()) {
                             log.error(
                                 "NG LIST during repo - ${archiveRepo.simpleName()}, commit - ${
-                                    curCommit.sha1Str().substring(0, 8)
+                                    curCommit.sha1.substring(0, 8)
                                 } -  ${curCommit.shortMessage}:\n $noGoodIdTreeSet"
                             )
                         }
@@ -213,7 +194,7 @@ object CommitToJsonProcessor {
                                 "Process commit taking longer than expected (threshold:${
                                     spotCheckerTimeoutThresholdMs
                                 }ms). Skipping generating spot check file. Cur commit: ${
-                                    curCommit.sha1Str().substring(0, 8)
+                                    curCommit.sha1.substring(0, 8)
                                 } - ${curCommit.shortMessage}"
                             )
                             shouldSpotCheck = false
@@ -221,7 +202,7 @@ object CommitToJsonProcessor {
                         if (commitIdx != 0) {
                             log.warn(
                                 "Not processing the first commit. Not generating spot check file for safety. Cur commit: ${
-                                    curCommit.sha1Str().substring(0, 8)
+                                    curCommit.sha1.substring(0, 8)
                                 } - ${curCommit.shortMessage}"
                             )
                             shouldSpotCheck = false
@@ -233,13 +214,14 @@ object CommitToJsonProcessor {
                     } catch (ex: Exception) {
                         log.error(
                             "Ex occurs when processing repo - ${archiveRepo.simpleName()},  commit - ${
-                                curCommit.name.substring(
+                                curCommit.sha1.substring(
                                     0,
                                     8
                                 )
                             } - ${curCommit.shortMessage}", ex
                         )
                     }
+                    commitIdx++
                 }
                 runCatching {
                     if (shouldSpotCheck && firstCommitSpaceType != null) {
@@ -250,8 +232,6 @@ object CommitToJsonProcessor {
                         log.error("Failed at spot check. SpaceType=${firstCommitSpaceType!!}")
                     }
                 }
-            }
-        }
     }
 
     private fun extractSpaceTypeFromRelPathOrThrow(path: String): SpaceType {
@@ -273,7 +253,7 @@ object CommitToJsonProcessor {
         return htmlSpaceType
     }
 
-    private fun extractSpaceTypeFromCommitOrThrow(curCommit: RevCommit): SpaceType {
+    private fun extractSpaceTypeFromCommitOrThrow(curCommit: GitCommitDto): SpaceType {
         val commitMsgSplitArr = curCommit.fullMessage.split(" ")
         val commitSpaceType = if (commitMsgSplitArr.isNotEmpty()) {
             when (commitMsgSplitArr[0]) {
@@ -299,11 +279,11 @@ object CommitToJsonProcessor {
         noGoodIdTreeSet.addAll(toAdd)
     }.onFailure { log.error("Failed to handle no good file: ", it) }
 
-    private fun writeJsonRepoLastCommitId(prevProcessedCommit: RevCommit, jsonRepo: Repository) {
-        log.info("Writing last commit id: ${jsonRepo.simpleName()}/$prevProcessedCommit")
+    private fun writeJsonRepoLastCommitId(prevProcessedCommit: GitCommitDto, jsonRepo: Repository) {
+        log.info("Writing last commit id: ${jsonRepo.simpleName()}/${prevProcessedCommit.sha1}")
         val lastCommitIdFile =
             File(jsonRepo.absolutePathWithoutDotGit()).resolve(prevProcessedCommitRevIdFileName)
-        val lastCommitIdStr = prevProcessedCommit.sha1Str()
+        val lastCommitIdStr = prevProcessedCommit.sha1
         FileWriter(lastCommitIdFile).use {
             it.write(lastCommitIdStr)
             it.flush()
@@ -328,7 +308,7 @@ object CommitToJsonProcessor {
     private fun commitJsonRepo(
         jsonRepo: Repository,
         commitSpaceType: SpaceType,
-        archiveCommit: RevCommit,
+        archiveCommit: GitCommitDto,
         changedHtmlFilePathList: List<String>
     ) {
         var timing = System.currentTimeMillis()
@@ -376,7 +356,7 @@ object CommitToJsonProcessor {
 
     private fun commandLineCommitJsonRepoAddFileSeparately(
         jsonRepo: Repository,
-        archiveCommit: RevCommit,
+        archiveCommit: GitCommitDto,
         changedHtmlFilePathList: List<String>
     ) {
         val commitMsg = archiveCommit.fullMessage
@@ -420,7 +400,7 @@ object CommitToJsonProcessor {
         commitMsgFile.delete()
     }
 
-    private fun commandLineCommitJsonRepoAddFileInBatch(jsonRepo: Repository, archiveCommit: RevCommit) {
+    private fun commandLineCommitJsonRepoAddFileInBatch(jsonRepo: Repository, archiveCommit: GitCommitDto) {
         val commitMsg = archiveCommit.fullMessage
         val jsonRepoDir = File(jsonRepo.absolutePathWithoutDotGit())
         val commitMsgFile =
@@ -447,7 +427,7 @@ object CommitToJsonProcessor {
     private fun jgitCommitJsonRepo(
         jsonRepo: Repository,
         changedFilePathList: List<String>,
-        archiveCommit: RevCommit
+        archiveCommit: GitCommitDto
     ) {
         Git(jsonRepo).use { git ->
             log.info("About to git add")

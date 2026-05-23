@@ -7,7 +7,7 @@ import moe.nyamori.bgm.db.SpaceNameMappingData
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.model.*
-import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
+import moe.nyamori.bgm.git.JGitCommitAdapter
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper.stringHash
 import moe.nyamori.bgm.util.TopicJsonHelper.getLikeListFromTopic
@@ -138,7 +138,7 @@ class DbTest {
             Dao.bgmDao.handleNegativeUid()
             Dao.bgmDao.updatePrevPersistedCommitId(
                 jsonRepo,
-                jsonRepo.getLatestCommitRef().sha1Str()
+                JGitCommitAdapter(jsonRepo.getLatestCommitRef()).sha1
             )
         }
     }

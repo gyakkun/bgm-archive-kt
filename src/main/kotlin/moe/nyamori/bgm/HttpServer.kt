@@ -23,6 +23,7 @@ import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.git.JGitCommitAdapter
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.RangeHelper
 import moe.nyamori.bgm.util.getSelfVersion
@@ -406,7 +407,7 @@ object HttpServer {
                     val commitMsg = commit.shortMessage.trim()
 
                     @Transient
-                    private val _msTsHint = commit.timestampHint()
+                    private val _msTsHint = JGitCommitAdapter(commit).timestampHint()
                     val commitTime = prettyMsTs(_msTsHint)
                     val elapsed = Duration.between(
                         Instant.ofEpochMilli(_msTsHint),

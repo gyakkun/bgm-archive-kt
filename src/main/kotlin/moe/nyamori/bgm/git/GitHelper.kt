@@ -9,7 +9,6 @@ import moe.nyamori.bgm.config.RepoType
 import moe.nyamori.bgm.config.getCouplingArchiveRepo
 import moe.nyamori.bgm.config.getCouplingJsonRepo
 import moe.nyamori.bgm.db.Dao
-import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
@@ -28,7 +27,12 @@ import org.eclipse.jgit.treewalk.TreeWalk
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.nanoseconds
+
+data class GitCommitDto(val sha1: String, val fullMessage: String) {
+    val shortMessage: String get() = fullMessage.lines().firstOrNull() ?: ""
+}
 
 
 interface IJsonRepoListProvider {
@@ -39,20 +43,14 @@ object GitHelper {
     private val log = LoggerFactory.getLogger(GitHelper.javaClass)
     val GSON: Gson = GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create()
 
-    val allArchiveRepoListSingleton by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-        Config.repoList.filter {
-            it.type == RepoType.HTML
-        }.map { it.repo }
-    }
+    val allArchiveRepoListSingleton: List<Repository> get() = Config.repoList.filter {
+        it.type == RepoType.HTML
+    }.map { it.repo }
 
     private val defaultProvider = object : IJsonRepoListProvider {
-        private val lazyAllJsonRepoList: List<Repository> by lazy(mode = LazyThreadSafetyMode.SYNCHRONIZED) {
-            Config.repoList.filter {
-                it.type == RepoType.JSON
-            }.map { it.repo }
-        }
-
-        override fun get(): List<Repository> = lazyAllJsonRepoList
+        override fun get(): List<Repository> = Config.repoList.filter {
+            it.type == RepoType.JSON
+        }.map { it.repo }
     }
 
     private var provider: IJsonRepoListProvider = defaultProvider
@@ -73,7 +71,7 @@ object GitHelper {
 
     val allRepoInDisplayOrder by lazy {
         allArchiveRepoListSingleton
-            .sortedBy { -1L * it.getRevCommitById(it.getLastCommitSha1StrExtGit()).timestampHint() }
+            .sortedBy { -1L * JGitCommitAdapter(it.getRevCommitById(it.getLastCommitSha1StrExtGit())).timestampHint() }
             .filter { it.hasCouplingJsonRepo() }
             .map { listOf(it, it.couplingJsonRepo()!!) }
             .flatten()
@@ -103,7 +101,7 @@ object GitHelper {
         bottomCommit: RevCommit,
         stepInAdvance: Boolean = true
     ): RevWalk {
-        this.use {
+        this.let {
             val walk = RevWalk(it)
             walk.markStart(topCommit)
             walk.markUninteresting(bottomCommit)
@@ -116,7 +114,7 @@ object GitHelper {
     }
 
     fun Repository.getRevCommitById(id: String): RevCommit {
-        this.use { repo ->
+        this.let { repo ->
             // val revWalk = RevWalk(repo)
             // val revId = repo.resolve(id)
             // val revCommit = revWalk.parseCommit(revId)
@@ -125,13 +123,21 @@ object GitHelper {
     }
 
     fun Repository.getFirstCommitIdStr(): String {
-        this.use { repo ->
+        if (!Config.preferJgit) return getFirstCommitIdStrExt()
+        this.let { repo ->
             val headObj = this.resolve(HEAD)
             val headCommit = repo.parseCommit(headObj)
             val tmpWalk = RevWalk(repo)
             tmpWalk.markStart(headCommit)
-            return tmpWalk.last().sha1Str()
+            return JGitCommitAdapter(tmpWalk.last()).sha1
         }
+    }
+
+    fun Repository.getFirstCommitIdStrExt(): String {
+        val cmd = "git rev-list --max-parents=0 HEAD"
+        val gitProcess = Runtime.getRuntime().exec(cmd, null, File(this.absolutePathWithoutDotGit()))
+        val msgList = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = true, printAtStdErr = false, logCmd = false)
+        return msgList.lastOrNull { it.isNotBlank() }?.trim() ?: throw IllegalStateException("Cannot find first commit id")
     }
 
     fun Repository.getGivenCommitByIdStrOrFirstCommit(commitIdStr: String): RevCommit {
@@ -143,8 +149,19 @@ object GitHelper {
         }.getOrDefault(this.getRevCommitById(this.getFirstCommitIdStr()))
     }
 
+    fun Repository.getGivenCommitIdStrOrFirstCommit(commitIdStr: String): String {
+        if (commitIdStr.isBlank()) return this.getFirstCommitIdStr()
+        // If native git, we just return the str (assuming it's valid). We could validate it with `git cat-file -t` but we trust the DB mostly.
+        if (!Config.preferJgit) return commitIdStr
+        return JGitCommitAdapter(this.getGivenCommitByIdStrOrFirstCommit(commitIdStr)).sha1
+    }
+
     fun getPrevPersistedJsonCommitRef(jsonRepo: Repository): RevCommit {
         return jsonRepo.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo))
+    }
+
+    fun getPrevPersistedJsonCommitSha1Str(jsonRepo: Repository): String {
+        return jsonRepo.getGivenCommitIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo))
     }
 
     fun Repository.getPrevProcessedArchiveCommitRef(): RevCommit {
@@ -154,9 +171,15 @@ object GitHelper {
         )
     }
 
+    fun Repository.getPrevProcessedArchiveCommitSha1Str(): String {
+        require(this.hasCouplingJsonRepo())
+        return getGivenCommitIdStrOrFirstCommit(
+            getPrevProcessedArchiveCommitRevIdStr(couplingJsonRepo()!!)
+        )
+    }
 
     fun Repository.getLatestCommitRef(): RevCommit {
-        this.use { repo ->
+        this.let { repo ->
             val revWalk = RevWalk(repo)
             val latestHeadCommitRevId = repo.resolve(HEAD)
             val latestHeadCommit = revWalk.parseCommit(latestHeadCommitRevId)
@@ -164,10 +187,14 @@ object GitHelper {
         }
     }
 
+    fun Repository.getLatestCommitSha1StrExt(): String {
+        return this.getLastCommitSha1StrExtGit()
+    }
+
     fun getPrevProcessedArchiveCommitRevIdStr(jsonRepo: Repository): String {
         if (jsonRepo.isBare) {
             return jsonRepo.getFileContentAsStringInACommit(
-                jsonRepo.getLatestCommitRef().sha1Str(),
+                JGitCommitAdapter(jsonRepo.getLatestCommitRef()).sha1,
                 prevProcessedCommitRevIdFileName
             ).trim()
         } else {
@@ -190,6 +217,13 @@ object GitHelper {
         }
     }
 
+    private val pathRepoMap = ConcurrentHashMap<String, Repository>()
+
+    // For test only
+    fun clearRepoCache() {
+        pathRepoMap.values.forEach { runCatching { it.close() } }
+        pathRepoMap.clear()
+    }
 
     fun getRepoByPath(path: String): Repository {
         var repo = File(path)
@@ -236,7 +270,7 @@ object GitHelper {
     private fun Repository.getFileContentAsStringInACommitJgit(
         commitId: String,
         relPath: String
-    ): String = this.use outerUse@{ repo ->
+    ): String = this.let outerUse@{ repo ->
         val revCommit = runCatching { repo.parseCommit(ObjectId.fromString(commitId)) }
             .onFailure {
                 log.error(
@@ -308,6 +342,13 @@ object GitHelper {
         val gitProcess = Runtime.getRuntime()
             .exec(cmd, null, File(this.absolutePathWithoutDotGit()))
         val msgList = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = false, printAtStdErr = false, logCmd = false)
+        if (gitProcess.exitValue() != 0) {
+            // JGit returns empty string if not found, we should do the same to maintain parity
+            if (msgList.joinToString("\n").contains("does not exist in")) {
+                return ""
+            }
+            throw RuntimeException("git show failed: ${msgList.joinToString("\n")}")
+        }
         if (msgList.size > 2) log.info("msgListLen = ${msgList.size}")
         if (msgList.last().isBlank()) return msgList.take(msgList.size - 1).joinToString("\n")
         return msgList.joinToString("\n")
@@ -336,6 +377,94 @@ object GitHelper {
             }
         }
         return result
+    }
+
+    fun Repository.processHistory(
+        prevProcessedSha1: String,
+        latestSha1: String,
+        action: (commit: GitCommitDto, changedFiles: List<String>) -> Unit
+    ) {
+        if (Config.preferJgit) {
+            val topCommit = this.getRevCommitById(latestSha1)
+            val bottomCommit = this.getRevCommitById(prevProcessedSha1)
+            val walk = this.getWalkBetweenCommitInReverseOrder(topCommit, bottomCommit, false)
+            var prev = walk.next()
+            while (prev != null) {
+                if (bottomCommit == prev) {
+                    break
+                }
+                prev = walk.next()
+            }
+            walk.forEach { cur ->
+                if (cur == prev) {
+                    log.warn("Commit ${JGitCommitAdapter(cur).sha1} has been iterated twice! Repo: ${this.simpleName()}")
+                    return@forEach
+                }
+                val files = this.findChangedFilePaths(prev, cur)
+                action(GitCommitDto(JGitCommitAdapter(cur).sha1, cur.fullMessage), files)
+                prev = cur
+            }
+        } else {
+            val cmd = "git log --reverse --name-status --format=format:COMMIT_START%n%H%n%B%nFILES_START $prevProcessedSha1..$latestSha1"
+            val process = Runtime.getRuntime().exec(cmd, null, File(this.absolutePathWithoutDotGit()))
+            process.inputStream.bufferedReader().use { reader ->
+                var line: String? = reader.readLine()
+                var curSha1: String? = null
+                val curMessage = StringBuilder()
+                val curFiles = mutableListOf<String>()
+                var state = 0 // 0: wait COMMIT_START, 1: read sha1, 2: read message, 3: read files
+                while (line != null) {
+                    when (state) {
+                        0 -> {
+                            if (line == "COMMIT_START") {
+                                state = 1
+                            }
+                        }
+                        1 -> {
+                            curSha1 = line
+                            state = 2
+                        }
+                        2 -> {
+                            if (line == "FILES_START") {
+                                state = 3
+                            } else {
+                                curMessage.append(line).append("\n")
+                            }
+                        }
+                        3 -> {
+                            if (line == "COMMIT_START") {
+                                // Flush previous commit
+                                action(GitCommitDto(curSha1!!, curMessage.toString().trimEnd()), curFiles.toList())
+                                // Start new commit
+                                curSha1 = null
+                                curMessage.clear()
+                                curFiles.clear()
+                                state = 1
+                            } else if (line.isNotBlank()) {
+                                val parts = line.split("\t")
+                                if (parts.size >= 2) {
+                                    val status = parts[0]
+                                    val path = parts[parts.size - 1]
+                                    if (!status.startsWith("D")) {
+                                        curFiles.add(path)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    line = reader.readLine()
+                }
+                if (state == 3 && curSha1 != null) {
+                    action(GitCommitDto(curSha1, curMessage.toString().trimEnd()), curFiles.toList())
+                }
+            }
+            val exitCode = process.waitFor()
+            if (exitCode != 0) {
+                val err = process.errorStream.bufferedReader().readText()
+                log.error("git log failed with exit code $exitCode: $err")
+                throw RuntimeException("git log failed: $err")
+            }
+        }
     }
 
     fun Repository.absolutePathWithoutDotGit() =

@@ -5,7 +5,7 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.util.GitCommitIdHelper.sha1Str
+import moe.nyamori.bgm.git.JGitCommitAdapter
 
 object TopicListHelper {
     fun getTopicList(spaceType: SpaceType): List<Int> {
@@ -14,7 +14,7 @@ object TopicListHelper {
             if (repo.toRepoDtoOrThrow().optIsStatic) return@forEach
             runCatching {
                 val topicListFile = repo.getFileContentAsStringInACommit(
-                    repo.getPrevProcessedArchiveCommitRef().sha1Str(),
+                    JGitCommitAdapter(repo.getPrevProcessedArchiveCommitRef()).sha1,
                     spaceType.name.lowercase() + "/topiclist.txt"
                 )
                 val tmpResult = topicListFile.lines().mapNotNull { it.toIntOrNull() }.sorted()
