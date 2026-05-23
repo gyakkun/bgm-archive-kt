@@ -63,6 +63,8 @@ interface IConfig {
     val blockRangeList: List<BlockRange>
     val spaceBlockList: List<SpaceBlock>
     val unblockCode: String?
+
+    val disableSmallHolesRevisit: Boolean
 }
 
 data class ConfigDto(
@@ -119,6 +121,8 @@ data class ConfigDto(
     override val blockRangeList: List<BlockRange>,
     override val spaceBlockList: List<SpaceBlock>,
     override val unblockCode: String?,
+
+    override val disableSmallHolesRevisit: Boolean,
 ) : IConfig
 
 data class RepoDto(

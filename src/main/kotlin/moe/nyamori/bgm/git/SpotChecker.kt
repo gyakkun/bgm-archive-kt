@@ -51,6 +51,7 @@ object SpotChecker {
     const val RANGE_HOLE_DETECT_DATE_BACK_LIMIT = 100
     const val RANGE_HOLE_DETECT_TAKE_LIMIT = 10
     val HOLE_CHECK_SKIP_TYPE = listOf(SpaceType.EP, SpaceType.CHARACTER, SpaceType.PERSON)
+    val SMALL_HOLES_REVISIT_TYPE = listOf(SpaceType.BLOG, SpaceType.GROUP, SpaceType.SUBJECT)
 
     // TODO: Make it configurable
     const val HOLE_CHECK_SIZE_PER_TYPE: Int = 25
@@ -200,8 +201,9 @@ object SpotChecker {
             LOGGER.info("Writing spot check file earlier due to the long time bitmask regen may take.")
             writeSpotCheckFile(archiveRepo, spaceType, result)
             LOGGER.info("Done writing spot check file before bitmask regen")
-            
-            val applySmallHolesMask = spaceType in listOf(SpaceType.BLOG, SpaceType.GROUP, SpaceType.SUBJECT) && !hiddenBs.get(0)
+
+            val applySmallHolesMask =
+                spaceType in SMALL_HOLES_REVISIT_TYPE && !hiddenBs.get(0) && !Config.disableSmallHolesRevisit
 
             if (applySmallHolesMask) {
                 LOGGER.info("Generating small holes mask for $spaceType instead of normal json walk through.")
@@ -368,7 +370,7 @@ object SpotChecker {
             LOGGER.info("After merging op, new bitset size: ${newBs.size()}. Cardinality: ${newBs.cardinality()}. Zero count: ${newBs.size() - newBs.cardinality()}")
         }
         
-        if (spaceType in listOf(SpaceType.BLOG, SpaceType.GROUP, SpaceType.SUBJECT)) {
+        if (spaceType in SMALL_HOLES_REVISIT_TYPE) {
             newBs.clear(0)
         }
         

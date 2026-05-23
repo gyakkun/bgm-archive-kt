@@ -99,6 +99,8 @@ data class ConfigReadout(
     val blockRangeList: List<BlockRange>? = null,
     val spaceBlockList: List<SpaceBlock>? = null,
     val unblockCode: String? = null,
+
+    val disableSmallHolesRevisit: Boolean? = null,
 )
 
 data class RepoReadout(
@@ -256,6 +258,8 @@ fun ConfigReadout.toDto(): ConfigDto {
 
         blockRangeList = this.blockRangeList ?: emptyList(),
         spaceBlockList = this.spaceBlockList ?: emptyList(),
-        unblockCode = this.unblockCode
+        unblockCode = this.unblockCode,
+
+        disableSmallHolesRevisit = this.disableSmallHolesRevisit ?: false
     )
 }
