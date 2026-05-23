@@ -4,7 +4,7 @@ import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFirstCommitIdStr
-import moe.nyamori.bgm.git.GitHelper.getGivenCommitIdStrOrFirstCommit
+import moe.nyamori.bgm.git.GitHelper.getGivenCommitByIdStrOrFirstCommit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
 import moe.nyamori.bgm.git.GitHelper.processHistory
 import moe.nyamori.bgm.git.GitHelper.simpleName
@@ -28,8 +28,8 @@ object CommitHistoryCacheHelper {
         var prevCachedMsg = ""
         var latestMsg = ""
         runCatching {
-            prevCachedMsg = this.getGivenCommitIdStrOrFirstCommit(prevCachedSha1)
-            latestMsg = this.getGivenCommitIdStrOrFirstCommit(latestSha1)
+            prevCachedMsg = this.getGivenCommitByIdStrOrFirstCommit(prevCachedSha1).fullMessage.trim().substringBefore("\n")
+            latestMsg = this.getGivenCommitByIdStrOrFirstCommit(latestSha1).fullMessage.trim().substringBefore("\n")
         }
 
         var counter = 0
