@@ -386,8 +386,8 @@ object HttpServer {
         val holes = SpaceType.entries.associateWith {
             val res = RangeHelper.checkHolesForType(it)
             runCatching {
-                val holesMaskFile = File(System.getProperty("user.home"))
-                    .resolve("source/bgm-archive-holes/${it.name.lowercase()}.txt")
+                val holesMaskFile = File(Config.homeFolderAbsolutePath)
+                    .resolve("bgm-archive-holes/${it.name.lowercase()}.txt")
                 val masked = SpotChecker.getBitsetFromLongPlaintextFile(holesMaskFile)
                 res.filter { !masked.get(it) }
             }.getOrDefault(res)

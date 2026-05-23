@@ -12,7 +12,7 @@ interface IConfig {
     /**
      * Path start with / (Linux) or X: (Windows) will be treated as absolute path, otherwise will be relative from home folder
      */
-    val homeFolderAbsolutePath: String
+    val homeFolderAbsolutePath: String /* ~/source by default */
     val prevProcessedCommitRevIdFileName: String
     val preferJgit: Boolean
     val preferGitBatchAdd: Boolean
