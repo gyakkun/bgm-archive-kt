@@ -37,6 +37,7 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getLatestCommit
+import moe.nyamori.bgm.git.GitSanityCheck
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.CacheHook
 import moe.nyamori.bgm.http.CommitHook
@@ -96,7 +97,7 @@ object HttpServer {
         setConfigDelegate(cfg)
         writeDbPersistKeyIfNecessary(cfg)
         writeConfigToConfigFolder(cfg)
-        moe.nyamori.bgm.git.GitSanityCheck.performSanityCheck(cfg)
+        if (!cfg.isBypassGitSanityCheckInHttpServer) GitSanityCheck.performSanityCheck(cfg)
         customizeHttpMsg()
         val app = Javalin.create { config ->
             config.registerPlugin(RateLimitPlugin { cfg ->

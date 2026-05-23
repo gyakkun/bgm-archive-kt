@@ -212,13 +212,17 @@ object GitSanityCheck {
     }
 
     private fun runGitCommand(dir: File, vararg command: String) {
+        // System.err.println("command to run ${command.contentToString()}")
         val pb = ProcessBuilder(*command)
             .directory(dir)
             .start()
+        // System.err.println("command started ${command.contentToString()}")
         val exitCode = pb.waitFor()
+        // System.err.println("wait for done ${command.contentToString()}")
         if (exitCode != 0) {
             val errorStream = pb.errorStream.bufferedReader().readText()
             throw IllegalStateException("Command ${command.joinToString(" ")} failed with exit code $exitCode: $errorStream")
         }
+        // System.err.println("end of command")
     }
 }

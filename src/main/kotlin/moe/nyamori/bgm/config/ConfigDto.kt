@@ -66,6 +66,8 @@ interface IConfig {
 
     val disableSmallHolesRevisit: Boolean
     val isUseJgitInCacheBuild: Boolean
+    // FIXME: On Steve-PC the sanity check will hang at git add . command
+    val isBypassGitSanityCheckInHttpServer: Boolean
 }
 
 data class ConfigDto(
@@ -125,6 +127,7 @@ data class ConfigDto(
 
     override val disableSmallHolesRevisit: Boolean,
     override val isUseJgitInCacheBuild: Boolean,
+    override val isBypassGitSanityCheckInHttpServer: Boolean,
 ) : IConfig
 
 data class RepoDto(
