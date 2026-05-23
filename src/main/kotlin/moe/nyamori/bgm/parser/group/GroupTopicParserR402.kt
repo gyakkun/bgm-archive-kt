@@ -1,11 +1,16 @@
 package moe.nyamori.bgm.parser.group
 
-import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.model.Group
+import moe.nyamori.bgm.model.Post
 import moe.nyamori.bgm.model.Post.Companion.STATE_CLOSED
 import moe.nyamori.bgm.model.Post.Companion.STATE_DELETED
 import moe.nyamori.bgm.model.Post.Companion.STATE_NORMAL
 import moe.nyamori.bgm.model.Post.Companion.STATE_REOPEN
 import moe.nyamori.bgm.model.Post.Companion.STATE_SILENT
+import moe.nyamori.bgm.model.Reserved
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.model.User
 import moe.nyamori.bgm.parser.Parser
 import moe.nyamori.bgm.util.ParserHelper.getUidFromBgStyle
 import moe.nyamori.bgm.util.ParserHelper.getUserSign

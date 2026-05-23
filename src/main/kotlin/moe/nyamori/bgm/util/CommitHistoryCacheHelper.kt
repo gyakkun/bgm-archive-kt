@@ -2,13 +2,10 @@ package moe.nyamori.bgm.util
 
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.Dao
-import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFirstCommitIdStr
 import moe.nyamori.bgm.git.GitHelper.getGivenCommitByIdStrOrFirstCommit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommit
-import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
 import moe.nyamori.bgm.git.GitHelper.processHistory
-import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.util.StringHashingHelper.repoIdFromDto
 import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory

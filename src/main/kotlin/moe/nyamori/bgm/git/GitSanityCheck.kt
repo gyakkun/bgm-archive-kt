@@ -1,12 +1,12 @@
 package moe.nyamori.bgm.git
 
 import moe.nyamori.bgm.config.IConfig
-import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.util.FilePathHelper
 import moe.nyamori.bgm.git.GitHelper.getCommitById
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getFirstCommitIdStr
 import moe.nyamori.bgm.git.GitHelper.getLatestCommit
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.util.FilePathHelper
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 import org.slf4j.LoggerFactory
 import java.io.File

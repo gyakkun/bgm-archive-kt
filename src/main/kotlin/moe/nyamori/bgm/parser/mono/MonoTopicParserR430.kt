@@ -2,7 +2,13 @@ package moe.nyamori.bgm.parser.mono
 
 import com.google.gson.JsonObject
 import moe.nyamori.bgm.git.GitHelper
-import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.model.Character
+import moe.nyamori.bgm.model.Person
+import moe.nyamori.bgm.model.Post
+import moe.nyamori.bgm.model.Reserved
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.model.User
 import moe.nyamori.bgm.parser.Parser
 import moe.nyamori.bgm.util.ParserHelper
 import moe.nyamori.bgm.util.ParserHelper.getUidFromBgStyle
@@ -11,7 +17,6 @@ import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.lang.IllegalArgumentException
 import java.text.SimpleDateFormat
 import java.util.*
 

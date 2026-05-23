@@ -7,12 +7,11 @@ import moe.nyamori.bgm.config.Config.spotCheckerTimeoutThresholdMs
 import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
-import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
 import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitSha1Str
-import moe.nyamori.bgm.git.GitHelper.processHistory
 import moe.nyamori.bgm.git.GitHelper.hasCouplingJsonRepo
+import moe.nyamori.bgm.git.GitHelper.processHistory
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.parser.TopicParserEntrance
@@ -20,7 +19,11 @@ import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
-import java.io.*
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileOutputStream
+import java.io.FileWriter
+import java.io.OutputStreamWriter
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.file.Path
 import java.time.Duration

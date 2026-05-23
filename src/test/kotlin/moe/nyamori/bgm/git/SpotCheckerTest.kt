@@ -1,12 +1,12 @@
 package moe.nyamori.bgm.git
 
 import moe.nyamori.bgm.model.SpaceType
-import org.junit.jupiter.api.Test
-import java.util.BitSet
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import java.util.*
 
 class SpotCheckerTest {
 

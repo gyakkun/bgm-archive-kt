@@ -2,8 +2,6 @@ package moe.nyamori.bgm.parser
 
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.Topic
-import moe.nyamori.bgm.parser.blog.BlogTopicParserR398
-import moe.nyamori.bgm.parser.blog.BlogTopicParserR400
 import moe.nyamori.bgm.parser.ep.EpTopicParserR416
 import moe.nyamori.bgm.util.ParserHelper
 import org.slf4j.LoggerFactory

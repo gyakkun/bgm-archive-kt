@@ -1,6 +1,7 @@
 package moe.nyamori.bgm.parser.mono
 
-import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.parser.Parser
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory

@@ -10,9 +10,9 @@ import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
+import moe.nyamori.bgm.git.GitHelper.getCommitById
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLastCommitSha1StrExtGit
-import moe.nyamori.bgm.git.GitHelper.getCommitById
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
@@ -22,7 +22,11 @@ import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.TopicListHelper.getTopicList
 import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
-import java.io.*
+import java.io.BufferedReader
+import java.io.BufferedWriter
+import java.io.File
+import java.io.FileWriter
+import java.io.InputStreamReader
 import java.nio.file.Path
 import java.time.Duration
 import java.time.OffsetDateTime

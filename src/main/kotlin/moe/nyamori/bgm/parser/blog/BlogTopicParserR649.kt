@@ -2,7 +2,11 @@ package moe.nyamori.bgm.parser.blog
 
 import com.google.gson.JsonObject
 import moe.nyamori.bgm.git.GitHelper
-import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.model.Blog
+import moe.nyamori.bgm.model.Post
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.model.User
 import moe.nyamori.bgm.parser.Parser
 import moe.nyamori.bgm.util.ParserHelper
 import org.jsoup.Jsoup

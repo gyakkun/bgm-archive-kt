@@ -6,7 +6,9 @@ import io.cucumber.java.en.Then
 import io.cucumber.java.en.When
 import moe.nyamori.bgm.model.SpaceType
 import org.eclipse.jgit.lib.Repository
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import java.io.File

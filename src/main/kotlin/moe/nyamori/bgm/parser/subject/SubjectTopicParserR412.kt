@@ -2,11 +2,13 @@ package moe.nyamori.bgm.parser.subject
 
 import com.google.gson.JsonObject
 import moe.nyamori.bgm.git.GitHelper
-import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.model.Reserved
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Subject
+import moe.nyamori.bgm.model.Topic
 import moe.nyamori.bgm.parser.Parser
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import kotlin.collections.HashMap
 
 object SubjectTopicParserR412 : Parser {
 

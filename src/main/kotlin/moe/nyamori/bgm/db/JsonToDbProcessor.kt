@@ -2,18 +2,24 @@ package moe.nyamori.bgm.db
 
 import com.google.gson.GsonBuilder
 import com.google.gson.ToNumberPolicy
-import moe.nyamori.bgm.config.getCouplingJsonRepo
 import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
-import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
 import moe.nyamori.bgm.git.GitHelper.getPrevPersistedJsonCommitSha1Str
 import moe.nyamori.bgm.git.GitHelper.hasCouplingArchiveRepo
+import moe.nyamori.bgm.git.GitHelper.processHistory
 import moe.nyamori.bgm.git.GitHelper.simpleName
-import moe.nyamori.bgm.model.*
-
+import moe.nyamori.bgm.model.Blog
+import moe.nyamori.bgm.model.Like
+import moe.nyamori.bgm.model.LikeRev
+import moe.nyamori.bgm.model.LikeRevUsername
+import moe.nyamori.bgm.model.Post
+import moe.nyamori.bgm.model.Space
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.model.User
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper
 import moe.nyamori.bgm.util.TopicJsonHelper
@@ -23,7 +29,6 @@ import moe.nyamori.bgm.util.TopicJsonHelper.getPostListFromTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.getUserListFromPostList
 import moe.nyamori.bgm.util.TopicJsonHelper.isValidTopic
 import moe.nyamori.bgm.util.TopicJsonHelper.preProcessTopic
-import moe.nyamori.bgm.git.GitHelper.processHistory
 import org.eclipse.jgit.lib.Repository
 import org.slf4j.LoggerFactory
 

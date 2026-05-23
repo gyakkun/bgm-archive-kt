@@ -3,7 +3,6 @@ package moe.nyamori.bgm.util
 import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.config.RepoType
 import moe.nyamori.bgm.git.FileHistoryLookup.getRevCommitList
-import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test

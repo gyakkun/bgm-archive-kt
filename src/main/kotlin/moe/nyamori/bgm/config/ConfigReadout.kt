@@ -6,7 +6,13 @@ import moe.nyamori.bgm.model.SpaceType
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.*
-import kotlin.io.path.*
+import kotlin.io.path.Path
+import kotlin.io.path.exists
+import kotlin.io.path.isDirectory
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.name
+import kotlin.io.path.notExists
+import kotlin.io.path.readText
 import kotlin.text.Charsets.UTF_8
 
 private val ConfigLogger = LoggerFactory.getLogger("ConfigInit")

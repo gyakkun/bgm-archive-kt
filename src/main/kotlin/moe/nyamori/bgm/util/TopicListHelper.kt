@@ -5,7 +5,6 @@ import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommit
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.git.JGitCommitAdapter
 
 object TopicListHelper {
     fun getTopicList(spaceType: SpaceType): List<Int> {

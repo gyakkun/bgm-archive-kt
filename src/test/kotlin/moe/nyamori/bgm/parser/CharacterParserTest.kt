@@ -1,7 +1,6 @@
 package moe.nyamori.bgm.parser
 
 import moe.nyamori.bgm.model.SpaceType
-import moe.nyamori.bgm.parser.mono.CharacterTopicParserR430
 import moe.nyamori.bgm.util.ParserHelper
 import org.junit.jupiter.api.Test
 

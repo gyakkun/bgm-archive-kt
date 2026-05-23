@@ -1,7 +1,13 @@
 package moe.nyamori.bgm.util
 
 import moe.nyamori.bgm.db.Dao
-import moe.nyamori.bgm.model.*
+import moe.nyamori.bgm.model.Blog
+import moe.nyamori.bgm.model.Like
+import moe.nyamori.bgm.model.LikeRevUsername
+import moe.nyamori.bgm.model.Post
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.model.User
 import moe.nyamori.bgm.parser.ep.EpTopicParserR416
 import org.slf4j.LoggerFactory
 

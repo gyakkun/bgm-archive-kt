@@ -1,13 +1,24 @@
 package moe.nyamori.bgm
 
-import com.google.gson.*
-import moe.nyamori.bgm.config.*
+import com.google.gson.GsonBuilder
+import com.google.gson.ToNumberPolicy
+import moe.nyamori.bgm.config.Config
+import moe.nyamori.bgm.config.ConfigReadout
+import moe.nyamori.bgm.config.RepoType
+import moe.nyamori.bgm.config.setConfigDelegate
+import moe.nyamori.bgm.config.toDto
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.db.SpaceNameMappingData
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommit
-import moe.nyamori.bgm.model.*
-import moe.nyamori.bgm.git.JGitCommitAdapter
+import moe.nyamori.bgm.model.Blog
+import moe.nyamori.bgm.model.Group
+import moe.nyamori.bgm.model.Like
+import moe.nyamori.bgm.model.Space
+import moe.nyamori.bgm.model.SpaceType
+import moe.nyamori.bgm.model.Subject
+import moe.nyamori.bgm.model.Topic
+import moe.nyamori.bgm.model.User
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import moe.nyamori.bgm.util.StringHashingHelper.stringHash
 import moe.nyamori.bgm.util.TopicJsonHelper.getLikeListFromTopic
@@ -21,7 +32,6 @@ import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
-import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.streams.asStream
 

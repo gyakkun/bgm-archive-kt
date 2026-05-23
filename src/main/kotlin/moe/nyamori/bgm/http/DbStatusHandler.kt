@@ -2,7 +2,6 @@ package moe.nyamori.bgm.http
 
 import io.javalin.http.Context
 import io.javalin.http.Handler
-import moe.nyamori.bgm.config.Config
 import moe.nyamori.bgm.db.DSProvider
 import moe.nyamori.bgm.http.HumanReadable.toHumanReadableBytes
 import java.io.File
