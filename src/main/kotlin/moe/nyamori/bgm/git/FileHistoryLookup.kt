@@ -15,8 +15,6 @@ import moe.nyamori.bgm.model.lowercaseName
 import moe.nyamori.bgm.util.FilePathHelper
 import moe.nyamori.bgm.util.GitCommitIdHelper.timestampHint
 import moe.nyamori.bgm.util.StringHashingHelper.repoIdFromDto
-import moe.nyamori.bgm.git.IGitCommit
-import moe.nyamori.bgm.git.JGitCommitAdapter
 import moe.nyamori.bgm.util.blockAndPrintProcessResults
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.lib.Constants.DOT_GIT
@@ -171,7 +169,7 @@ object FileHistoryLookup {
     fun getAllChatamByRelativePath(
         relPath: String,
         forceNotDbCache: Boolean = false,
-        forceJgit: Boolean = false
+        useJgit: Boolean = Config.preferJgit
     ): List<CommitHashAndTimestampAndMsg> = runCatching {
         if (forceNotDbCache) throw RuntimeException("Force opt out db cache!")
         val isHtml = relPath.endsWith("html", ignoreCase = true)
@@ -198,7 +196,7 @@ object FileHistoryLookup {
         else if (isJson) allJsonRepoListSingleton
         else listOf(allArchiveRepoListSingleton, allJsonRepoListSingleton).flatten()
 
-        val res = if (Config.preferJgit || forceJgit) {
+        val res = if (useJgit) {
             repoList.parallelStream().map {
                 runCatching {
                     it.getRevCommitListJgit(relPath)
@@ -225,7 +223,7 @@ object FileHistoryLookup {
             if (elapsed >= 100) {
                 log.warn(
                     "$this ${
-                        if (Config.preferJgit) "jgit" else "external git"
+                        if (useJgit) "jgit" else "external git"
                     } get log timing: ${elapsed}ms. RelPath: $relPath"
                 )
             }

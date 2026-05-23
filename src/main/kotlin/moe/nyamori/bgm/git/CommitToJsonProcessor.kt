@@ -253,7 +253,7 @@ object CommitToJsonProcessor {
         return htmlSpaceType
     }
 
-    private fun extractSpaceTypeFromCommitOrThrow(curCommit: GitCommitDto): SpaceType {
+    private fun extractSpaceTypeFromCommitOrThrow(curCommit: ISlimGitCommit): SpaceType {
         val commitMsgSplitArr = curCommit.fullMessage.split(" ")
         val commitSpaceType = if (commitMsgSplitArr.isNotEmpty()) {
             when (commitMsgSplitArr[0]) {
@@ -279,7 +279,7 @@ object CommitToJsonProcessor {
         noGoodIdTreeSet.addAll(toAdd)
     }.onFailure { log.error("Failed to handle no good file: ", it) }
 
-    private fun writeJsonRepoLastCommitId(prevProcessedCommit: GitCommitDto, jsonRepo: Repository) {
+    private fun writeJsonRepoLastCommitId(prevProcessedCommit: ISlimGitCommit, jsonRepo: Repository) {
         log.info("Writing last commit id: ${jsonRepo.simpleName()}/${prevProcessedCommit.sha1}")
         val lastCommitIdFile =
             File(jsonRepo.absolutePathWithoutDotGit()).resolve(prevProcessedCommitRevIdFileName)
@@ -308,11 +308,12 @@ object CommitToJsonProcessor {
     private fun commitJsonRepo(
         jsonRepo: Repository,
         commitSpaceType: SpaceType,
-        archiveCommit: GitCommitDto,
-        changedHtmlFilePathList: List<String>
+        archiveCommit: ISlimGitCommit,
+        changedHtmlFilePathList: List<String>,
+        useJgit: Boolean = Config.preferJgit
     ) {
         var timing = System.currentTimeMillis()
-        if (Config.preferJgit) {
+        if (useJgit) {
             jgitCommitJsonRepo(jsonRepo, changedHtmlFilePathList, archiveCommit)
         } else {
             if (Config.preferGitBatchAdd) {
@@ -356,7 +357,7 @@ object CommitToJsonProcessor {
 
     private fun commandLineCommitJsonRepoAddFileSeparately(
         jsonRepo: Repository,
-        archiveCommit: GitCommitDto,
+        archiveCommit: ISlimGitCommit,
         changedHtmlFilePathList: List<String>
     ) {
         val commitMsg = archiveCommit.fullMessage
@@ -400,7 +401,7 @@ object CommitToJsonProcessor {
         commitMsgFile.delete()
     }
 
-    private fun commandLineCommitJsonRepoAddFileInBatch(jsonRepo: Repository, archiveCommit: GitCommitDto) {
+    private fun commandLineCommitJsonRepoAddFileInBatch(jsonRepo: Repository, archiveCommit: ISlimGitCommit) {
         val commitMsg = archiveCommit.fullMessage
         val jsonRepoDir = File(jsonRepo.absolutePathWithoutDotGit())
         val commitMsgFile =
@@ -427,7 +428,7 @@ object CommitToJsonProcessor {
     private fun jgitCommitJsonRepo(
         jsonRepo: Repository,
         changedFilePathList: List<String>,
-        archiveCommit: GitCommitDto
+        archiveCommit: ISlimGitCommit
     ) {
         Git(jsonRepo).use { git ->
             log.info("About to git add")

@@ -5,6 +5,7 @@ import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper.findChangedFilePaths
 import moe.nyamori.bgm.git.GitHelper.getFirstCommitIdStr
 import moe.nyamori.bgm.git.GitHelper.getGivenCommitByIdStrOrFirstCommit
+import moe.nyamori.bgm.git.GitHelper.getLatestCommit
 import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
 import moe.nyamori.bgm.git.GitHelper.processHistory
 import moe.nyamori.bgm.git.GitHelper.simpleName
@@ -22,7 +23,7 @@ object CommitHistoryCacheHelper {
         var isFreshCacheBuild = false
         val prevCachedSha1 =
             Dao.bgmDao.getPrevCachedCommitId(this) ?: run { isFreshCacheBuild = true; this.getFirstCommitIdStr() }
-        val latestSha1 = this.getLatestCommitSha1StrExt()
+        val latestSha1 = this.getLatestCommit(false).sha1
         val firstCommitSha1 = this.getFirstCommitIdStr()
         
         var prevCachedMsg = ""

@@ -30,9 +30,6 @@ import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.time.Duration.Companion.nanoseconds
 
-data class GitCommitDto(val sha1: String, val fullMessage: String) {
-    val shortMessage: String get() = fullMessage.lines().firstOrNull() ?: ""
-}
 
 
 interface IJsonRepoListProvider {
@@ -268,7 +265,7 @@ object GitHelper {
             if (elapsed >= 100) {
                 log.warn(
                     "$this ${
-                        if (Config.preferJgit) "jgit" else "external git"
+                        if (useJgit) "jgit" else "external git"
                     } get file content: ${elapsed}ms. RelPath: $relPath"
                 )
             }
@@ -396,11 +393,11 @@ object GitHelper {
         prevProcessedSha1: String,
         latestSha1: String,
         useJgit: Boolean = Config.preferJgit,
-        action: (commit: GitCommitDto, changedFiles: List<String>) -> Unit
+        action: (commit: ISlimGitCommit, changedFiles: List<String>) -> Unit
     ) {
         if (useJgit) {
-            val topCommit = this.getCommitById(latestSha1)
-            val bottomCommit = this.getCommitById(prevProcessedSha1)
+            val topCommit = this.getCommitById(latestSha1, true)
+            val bottomCommit = this.getCommitById(prevProcessedSha1, true)
             val walk = this.getWalkBetweenCommitInReverseOrder(topCommit, bottomCommit, false)
             var prev = walk.next()
             while (prev != null) {
@@ -415,7 +412,7 @@ object GitHelper {
                     return@forEach
                 }
                 val files = this.findChangedFilePaths(prev, cur)
-                action(GitCommitDto(JGitCommitAdapter(cur).sha1, cur.fullMessage), files)
+                action(JGitCommitAdapter(cur), files)
                 prev = cur
             }
         } else {
@@ -448,7 +445,12 @@ object GitHelper {
                         3 -> {
                             if (line == "COMMIT_START") {
                                 // Flush previous commit
-                                action(GitCommitDto(curSha1!!, curMessage.toString().trimEnd()), curFiles.toList())
+                                action(
+                                    object : ISlimGitCommit {
+                                        override val sha1 = curSha1!!
+                                        override val fullMessage = curMessage.toString().trimEnd()
+                                    }, curFiles.toList()
+                                )
                                 // Start new commit
                                 curSha1 = null
                                 curMessage.clear()
@@ -469,7 +471,10 @@ object GitHelper {
                     line = reader.readLine()
                 }
                 if (state == 3 && curSha1 != null) {
-                    action(GitCommitDto(curSha1, curMessage.toString().trimEnd()), curFiles.toList())
+                    action(object : ISlimGitCommit {
+                        override val sha1 = curSha1!!
+                        override val fullMessage = curMessage.toString().trimEnd()
+                    }, curFiles.toList())
                 }
             }
             val exitCode = process.waitFor()

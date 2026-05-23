@@ -3,10 +3,13 @@ package moe.nyamori.bgm.git
 import org.eclipse.jgit.lib.ObjectId
 import org.eclipse.jgit.revwalk.RevCommit
 
-interface IGitCommit {
+interface ISlimGitCommit {
     val sha1: String
     val fullMessage: String
     val shortMessage: String get() = fullMessage.lines().firstOrNull() ?: ""
+}
+
+interface IGitCommit : ISlimGitCommit {
     val commitTimeEpochMs: Long
     val authorTimeEpochMs: Long
 }
