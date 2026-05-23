@@ -113,8 +113,8 @@ object GitHelper {
         }
     }
 
-    fun Repository.getCommitById(id: String): IGitCommit {
-        if (Config.preferJgit) {
+    fun Repository.getCommitById(id: String, useJgit: Boolean = Config.preferJgit): IGitCommit {
+        if (useJgit) {
             return JGitCommitAdapter(this.parseCommit(ObjectId.fromString(id)))
         }
         val cmd = arrayOf("git", "--no-pager", "log", "-1", "--format=%H%x00%ct%x00%at%x00%B", id)
@@ -135,8 +135,8 @@ object GitHelper {
         return GitExtCommit(sha1, fullMessage, commitTimeEpochMs, authorTimeEpochMs)
     }
 
-    fun Repository.getFirstCommitIdStr(): String {
-        if (!Config.preferJgit) return getFirstCommitIdStrExt()
+    fun Repository.getFirstCommitIdStr(useJgit: Boolean = Config.preferJgit): String {
+        if (!useJgit) return getFirstCommitIdStrExt()
         this.let { repo ->
             val headObj = this.resolve(HEAD)
             val headCommit = repo.parseCommit(headObj)
@@ -153,48 +153,50 @@ object GitHelper {
         return msgList.lastOrNull { it.isNotBlank() }?.trim() ?: throw IllegalStateException("Cannot find first commit id")
     }
 
-    fun Repository.getGivenCommitByIdStrOrFirstCommit(commitIdStr: String): IGitCommit {
+    fun Repository.getGivenCommitByIdStrOrFirstCommit(commitIdStr: String, useJgit: Boolean = Config.preferJgit): IGitCommit {
         return runCatching {
             if (commitIdStr.isBlank()) throw IllegalArgumentException("Commit id should not be blank! Repo: $this")
-            this.getCommitById(commitIdStr)
+            this.getCommitById(commitIdStr, useJgit)
         }.onFailure {
             log.error("Error when getting commit by id in repo-$this, id-$commitIdStr", it)
-        }.getOrDefault(this.getCommitById(this.getFirstCommitIdStr()))
+        }.getOrDefault(this.getCommitById(this.getFirstCommitIdStr(useJgit), useJgit))
     }
 
-    fun Repository.getGivenCommitIdStrOrFirstCommit(commitIdStr: String): String {
-        if (commitIdStr.isBlank()) return this.getFirstCommitIdStr()
+    fun Repository.getGivenCommitIdStrOrFirstCommit(commitIdStr: String, useJgit: Boolean = Config.preferJgit): String {
+        if (commitIdStr.isBlank()) return this.getFirstCommitIdStr(useJgit)
         // If native git, we just return the str (assuming it's valid). We could validate it with `git cat-file -t` but we trust the DB mostly.
-        if (!Config.preferJgit) return commitIdStr
-        return this.getGivenCommitByIdStrOrFirstCommit(commitIdStr).sha1
+        if (!useJgit) return commitIdStr
+        return this.getGivenCommitByIdStrOrFirstCommit(commitIdStr, useJgit).sha1
     }
 
-    fun getPrevPersistedJsonCommit(jsonRepo: Repository): IGitCommit {
-        return jsonRepo.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo))
+    fun getPrevPersistedJsonCommit(jsonRepo: Repository, useJgit: Boolean = Config.preferJgit): IGitCommit {
+        return jsonRepo.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo), useJgit)
     }
 
-    fun getPrevPersistedJsonCommitSha1Str(jsonRepo: Repository): String {
-        return jsonRepo.getGivenCommitIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo))
+    fun getPrevPersistedJsonCommitSha1Str(jsonRepo: Repository, useJgit: Boolean = Config.preferJgit): String {
+        return jsonRepo.getGivenCommitIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo), useJgit)
     }
 
-    fun Repository.getPrevProcessedArchiveCommit(): IGitCommit {
+    fun Repository.getPrevProcessedArchiveCommit(useJgit: Boolean = Config.preferJgit): IGitCommit {
         require(this.hasCouplingJsonRepo())
         return getGivenCommitByIdStrOrFirstCommit(
-            getPrevProcessedArchiveCommitRevIdStr(couplingJsonRepo()!!)
+            getPrevProcessedArchiveCommitRevIdStr(couplingJsonRepo()!!),
+            useJgit
         )
     }
 
-    fun Repository.getPrevProcessedArchiveCommitSha1Str(): String {
+    fun Repository.getPrevProcessedArchiveCommitSha1Str(useJgit: Boolean = Config.preferJgit): String {
         require(this.hasCouplingJsonRepo())
         return getGivenCommitIdStrOrFirstCommit(
-            getPrevProcessedArchiveCommitRevIdStr(couplingJsonRepo()!!)
+            getPrevProcessedArchiveCommitRevIdStr(couplingJsonRepo()!!),
+            useJgit
         )
     }
 
-    fun Repository.getLatestCommit(): IGitCommit {
+    fun Repository.getLatestCommit(useJgit: Boolean = Config.preferJgit): IGitCommit {
         this.let { repo ->
             val latestHeadCommitRevId = repo.resolve(HEAD).name
-            return repo.getCommitById(latestHeadCommitRevId)
+            return repo.getCommitById(latestHeadCommitRevId, useJgit)
         }
     }
 
@@ -253,10 +255,10 @@ object GitHelper {
     fun Repository.getFileContentAsStringInACommit(
         commitId: String,
         relPath: String,
-        forceJgit: Boolean = false
+        useJgit: Boolean = Config.preferJgit
     ): String = runCatching {
         val timing = System.currentTimeMillis()
-        val res = if (Config.preferJgit || forceJgit) {
+        val res = if (useJgit) {
             this.getFileContentAsStringInACommitJgit(commitId, relPath)
         } else {
             this.getFileContentAsStringInACommitExtGit(commitId, relPath)
@@ -393,9 +395,10 @@ object GitHelper {
     fun Repository.processHistory(
         prevProcessedSha1: String,
         latestSha1: String,
+        useJgit: Boolean = Config.preferJgit,
         action: (commit: GitCommitDto, changedFiles: List<String>) -> Unit
     ) {
-        if (Config.preferJgit) {
+        if (useJgit) {
             val topCommit = this.getCommitById(latestSha1)
             val bottomCommit = this.getCommitById(prevProcessedSha1)
             val walk = this.getWalkBetweenCommitInReverseOrder(topCommit, bottomCommit, false)

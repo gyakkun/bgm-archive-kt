@@ -125,7 +125,7 @@ object FileHistoryLookup {
 
                 // This is to extract the accurate timestamp from meta_ts.txt file
                 val metaTs = htmlChatam.repo.getFileContentAsStringInACommit(
-                    htmlChatam.sha1, "${spaceType.lowercaseName()}/meta_ts.txt", forceJgit = true
+                    htmlChatam.sha1, "${spaceType.lowercaseName()}/meta_ts.txt", useJgit = true
                 )
                 if (metaTs.trim().isBlank()) return@associate htmlChatam.timestampHint() to ChatamPair(
                     spaceType,
@@ -245,7 +245,7 @@ object FileHistoryLookup {
 
     fun RevCommit.toChatam(repo: Repository) = JGitCommitAdapter(this).toChatam(repo)
 
-    fun Repository.getRevCommitList(relPath: String): List<CommitHashAndTimestampAndMsg> =
+    fun Repository.getRevCommitList(relPath: String, useJgit: Boolean = Config.preferJgit): List<CommitHashAndTimestampAndMsg> =
         runCatching {
             val repoIdCommitIdList = Dao.bgmDao.queryRepoCommitForCacheByFileRelativePath(relPath)
             repoIdCommitIdList.filter { it.repoId == this.repoIdFromDto().toLong() }
@@ -256,7 +256,7 @@ object FileHistoryLookup {
         }.getOrNull() ?:
         runCatching {
             val timing = System.currentTimeMillis()
-            val res = if (Config.preferJgit) {
+            val res = if (useJgit) {
                 this.getRevCommitListJgit(relPath)
             } else {
                 this.getRevCommitListExtGit(relPath)
@@ -266,7 +266,7 @@ object FileHistoryLookup {
                 if (elapsed >= 100) {
                     log.warn(
                         "$this ${
-                            if (Config.preferJgit) "jgit" else "external git"
+                            if (useJgit) "jgit" else "external git"
                         } get log timing: ${elapsed}ms. RelPath: $relPath"
                     )
                 }
