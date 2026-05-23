@@ -6,6 +6,7 @@ import moe.nyamori.bgm.model.SpaceType
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.*
+import kotlin.Boolean
 import kotlin.io.path.Path
 import kotlin.io.path.exists
 import kotlin.io.path.isDirectory
@@ -107,6 +108,7 @@ data class ConfigReadout(
     val unblockCode: String? = null,
 
     val disableSmallHolesRevisit: Boolean? = null,
+    val isUseJgitInCacheBuild: Boolean? = null
 )
 
 data class RepoReadout(
@@ -266,6 +268,7 @@ fun ConfigReadout.toDto(): ConfigDto {
         spaceBlockList = this.spaceBlockList ?: emptyList(),
         unblockCode = this.unblockCode,
 
-        disableSmallHolesRevisit = this.disableSmallHolesRevisit ?: false
+        disableSmallHolesRevisit = this.disableSmallHolesRevisit ?: false,
+        isUseJgitInCacheBuild = this.isUseJgitInCacheBuild ?: true
     )
 }

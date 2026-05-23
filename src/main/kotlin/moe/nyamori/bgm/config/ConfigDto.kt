@@ -65,6 +65,7 @@ interface IConfig {
     val unblockCode: String?
 
     val disableSmallHolesRevisit: Boolean
+    val isUseJgitInCacheBuild: Boolean
 }
 
 data class ConfigDto(
@@ -123,6 +124,7 @@ data class ConfigDto(
     override val unblockCode: String?,
 
     override val disableSmallHolesRevisit: Boolean,
+    override val isUseJgitInCacheBuild: Boolean,
 ) : IConfig
 
 data class RepoDto(

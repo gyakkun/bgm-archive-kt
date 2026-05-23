@@ -15,25 +15,26 @@ object CommitHistoryCacheHelper {
     private val LOGGER = LoggerFactory.getLogger(CommitHistoryCacheHelper::class.java)
     fun Repository.buildCache() {
         check(HttpHelper.DB_WRITE_LOCK.isHeldByCurrentThread)
+        val jgitToggle = Config.isUseJgitInCacheBuild
         val repo = this
         // require(this.hasCouplingJsonRepo() || this.hasCouplingArchiveRepo())
         var isFreshCacheBuild = false
         val prevCachedSha1 =
-            Dao.bgmDao.getPrevCachedCommitId(this) ?: run { isFreshCacheBuild = true; this.getFirstCommitIdStr() }
-        val latestSha1 = this.getLatestCommit(false).sha1
-        val firstCommitSha1 = this.getFirstCommitIdStr()
+            Dao.bgmDao.getPrevCachedCommitId(this) ?: run { isFreshCacheBuild = true; this.getFirstCommitIdStr(useJgit = jgitToggle) }
+        val latestSha1 = this.getLatestCommit(useJgit = jgitToggle).sha1
+        val firstCommitSha1 = this.getFirstCommitIdStr(useJgit = jgitToggle)
         
         var prevCachedMsg = ""
         var latestMsg = ""
         runCatching {
-            prevCachedMsg = this.getGivenCommitByIdStrOrFirstCommit(prevCachedSha1).fullMessage.trim().substringBefore("\n")
-            latestMsg = this.getGivenCommitByIdStrOrFirstCommit(latestSha1).fullMessage.trim().substringBefore("\n")
+            prevCachedMsg = this.getGivenCommitByIdStrOrFirstCommit(prevCachedSha1, useJgit = jgitToggle).fullMessage.trim().substringBefore("\n")
+            latestMsg = this.getGivenCommitByIdStrOrFirstCommit(latestSha1, useJgit = jgitToggle).fullMessage.trim().substringBefore("\n")
         }
 
         var counter = 0
         var failedCount = 0
 
-        this.processHistory(prevCachedSha1, latestSha1) { cur, files ->
+        this.processHistory(prevCachedSha1, latestSha1, useJgit = jgitToggle) { cur, files ->
             runCatching {
                 counter++
                 val curCommitId = cur.sha1
