@@ -119,7 +119,22 @@ Feature: Spot Checker
     And the topic list returned by recent topics API is "100"
     And the bitset of hidden topic mask has "0"
     And the bitset of already spot checked mask has bits from "1" to "100" set
-    And the json repo has file "group/100.json" with empty topic false
+    And the json repo has file "group/100.json" with empty topic "false"
     When spot check logic is executed
     Then the generated hidden topic mask should not have bit "0" set
     And the generated hidden topic mask should not have bit "100" set
+
+  Scenario: Spot checker proceeds mask generation normally if topic 0 is unmasked and small holes revisit is disabled
+    Given the space type is "GROUP"
+    And a mock repository with configured max topic id "100"
+    And the topic list returned by recent topics API is "100"
+    And the bitset of hidden topic mask has no bits set
+    And the bitset of already spot checked mask has bits from "1" to "100" set
+    And the database returns normal ids "1, 2, 5" and max id "5"
+    And the json repo has file "group/99.json" with empty topic "true"
+    And the disableSmallHolesRevisit toggle is "true"
+    When spot check logic is executed
+    Then the generated hidden topic mask should not have bit "0" set
+    And the generated hidden topic mask should not have bit "3" set
+    And the generated hidden topic mask should not have bit "4" set
+    And the generated hidden topic mask should have bit "99" set

@@ -81,6 +81,7 @@ class SpotCheckerStepDefs {
         lateinit var jsonRepoDir: File
         lateinit var htmlRepoDto: moe.nyamori.bgm.config.RepoDto
         lateinit var jsonRepoDto: moe.nyamori.bgm.config.RepoDto
+        lateinit var testConfigDto: moe.nyamori.bgm.config.ConfigDto
 
         fun setupGlobalReposAndConfig() {
             if (initialized) return
@@ -144,6 +145,7 @@ class SpotCheckerStepDefs {
                 hikariMaxConn = 10,
                 preferJgit = true
             )
+            testConfigDto = myConfig
             moe.nyamori.bgm.config.setConfigDelegate(myConfig)
             
             // Touch Config to force initialization here
@@ -193,6 +195,13 @@ class SpotCheckerStepDefs {
     fun the_bitset_of_hidden_topic_mask_has_no_bits_set() {
         val bs = BitSet(maxTopicId + 2).apply { set(maxTopicId + 1) }
         writeBitsetFile(bs, "hidden_topic_mask.txt")
+    }
+
+    @Given("the disableSmallHolesRevisit toggle is {string}")
+    fun the_disableSmallHolesRevisit_toggle_is_true(toggleStr:String) {
+        val newConfig = testConfigDto.copy(disableSmallHolesRevisit = toggleStr.toBooleanStrict())
+        testConfigDto = newConfig
+        moe.nyamori.bgm.config.setConfigDelegate(newConfig)
     }
 
     @Given("the bitset of already spot checked mask has {string}")
@@ -392,16 +401,20 @@ class SpotCheckerStepDefs {
         })
     }
 
-    @Given("the json repo has file {string} with empty topic false")
-    fun the_json_repo_has_file_with_empty_topic_false(relPath: String) {
+    @Given("the json repo has file {string} with empty topic {string}")
+    fun the_json_repo_has_file_with_empty_topic(relPath: String, emptyStr: String) {
         val jsonRepo = GitHelper.allJsonRepoListSingleton.first()
         val repoDir = jsonRepo.workTree
         
         val file = File(repoDir, relPath)
         file.parentFile.mkdirs()
         val id = relPath.substringAfterLast("/").substringBefore(".").toInt()
-        // Provide a minimal but complete JSON that satisfies isEmptyTopic() == false
-        val jsonContent = "{\"id\": $id, \"state\": 0, \"topPostPid\": 1, \"postList\": [{\"id\": 1, \"floorNum\": 1, \"mid\": $id, \"dateline\": 123456789, \"contentHtml\": \"test\"}]}"
+        val isEmpty = emptyStr.toBooleanStrict()
+        val jsonContent = if (isEmpty) {
+            "{\"id\": $id, \"state\": 0, \"topPostPid\": 0, \"postList\": []}"
+        } else {
+            "{\"id\": $id, \"state\": 0, \"topPostPid\": 1, \"postList\": [{\"id\": 1, \"floorNum\": 1, \"mid\": $id, \"dateline\": 123456789, \"contentHtml\": \"test\"}]}"
+        }
         file.writeText(jsonContent)
         
         ProcessBuilder("git", "add", ".").directory(repoDir).start().waitFor()
