@@ -46,8 +46,8 @@ class FullLifecycleGitTest {
 
         moe.nyamori.bgm.git.GitSanityCheck.initEmptyRepo(jsonRepoDir)
         
-        val templateHtml = File("src/test/resources/html_samples/templates/group.html").readText()
-        moe.nyamori.bgm.git.GitSanityCheck.generateRealisticRepo(htmlRepoDir, templateHtml)
+        val templates = moe.nyamori.bgm.git.GitSanityCheck.loadTemplatesFromClasspath()
+        moe.nyamori.bgm.git.GitSanityCheck.generateRealisticRepo(htmlRepoDir, templates)
 
         val htmlRepoDto = RepoDto(
             id = htmlRepoId,

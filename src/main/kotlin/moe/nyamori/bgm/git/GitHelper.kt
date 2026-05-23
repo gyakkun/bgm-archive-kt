@@ -131,7 +131,7 @@ object GitHelper {
         val sha1 = parts[0]
         val commitTimeEpochMs = parts[1].trim().toLong() * 1000L
         val authorTimeEpochMs = parts[2].trim().toLong() * 1000L
-        val fullMessage = parts[3].trim()
+        val fullMessage = parts[3].trimEnd('\n')
         return GitExtCommit(sha1, fullMessage, commitTimeEpochMs, authorTimeEpochMs)
     }
 

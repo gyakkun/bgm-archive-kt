@@ -15,7 +15,7 @@ class JGitCommitAdapter(val revCommit: RevCommit) : IGitCommit {
     override val sha1: String
         get() = ObjectId.toString(revCommit.id)
     override val fullMessage: String
-        get() = revCommit.fullMessage
+        get() = revCommit.fullMessage.trimEnd('\n')
     override val commitTimeEpochMs: Long
         get() = revCommit.committerIdent.whenAsInstant.toEpochMilli()
     override val authorTimeEpochMs: Long
