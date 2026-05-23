@@ -3,6 +3,11 @@ package moe.nyamori.bgm.git
 import moe.nyamori.bgm.config.IConfig
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.FilePathHelper
+import moe.nyamori.bgm.git.GitHelper.getCommitById
+import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
+import moe.nyamori.bgm.git.GitHelper.getFirstCommitIdStr
+import moe.nyamori.bgm.git.GitHelper.getLatestCommit
+import org.eclipse.jgit.storage.file.FileRepositoryBuilder
 import org.slf4j.LoggerFactory
 import java.io.File
 import kotlin.random.Random
@@ -76,6 +81,15 @@ object GitSanityCheck {
             runGitCommand(dir, "git", "add", ".")
             val commitMsg = "${spaceType.name} TOPIC: 2026-05-23T00:00:00.000Z | $nowTs"
             runGitCommand(dir, "git", "commit", "-m", commitMsg)
+
+            // Fuzzy commit with weird characters
+            val fuzzyHtmlRelPath = "fuzzy/\${Random.nextInt(100000)}.html"
+            val fuzzyHtmlFile = File(spaceDir, fuzzyHtmlRelPath)
+            fuzzyHtmlFile.parentFile.mkdirs()
+            fuzzyHtmlFile.writeText("<html><body>Fuzzy! \\n\\r\\t \uD83D\uDE00 '\\\" \\\\</body></html>")
+            runGitCommand(dir, "git", "add", ".")
+            val fuzzyMsg = "FUZZY TOPIC: \n Line 2 \n Line 3 with 'single' and \"double\" quotes \n Emoji: \uD83D\uDE00 \n Backslash: \\ "
+            runGitCommand(dir, "git", "commit", "-m", fuzzyMsg)
         }
     }
 
@@ -111,7 +125,66 @@ object GitSanityCheck {
                 throw IllegalStateException("GitSanityCheck failed: git log --raw output format changed or missing files! Output: \n$logOutput")
             }
 
-            log.info("GitSanityCheck passed successfully.")
+            // Test 3: Strict Parity Check between JGit and GitExt
+            val jgitRepo = FileRepositoryBuilder()
+                .setGitDir(File(tempDir, ".git"))
+                .build()
+
+            val firstExt = jgitRepo.getFirstCommitIdStr(useJgit = false)
+            val firstJgit = jgitRepo.getFirstCommitIdStr(useJgit = true)
+            check(firstExt == firstJgit) { "Parity failure: getFirstCommitIdStr Ext=\$firstExt, Jgit=\$firstJgit" }
+
+            val latestExt = jgitRepo.getLatestCommit(useJgit = false)
+            val latestJgit = jgitRepo.getLatestCommit(useJgit = true)
+            check(latestExt.sha1 == latestJgit.sha1) { "Parity failure: getLatestCommit sha1 Ext=\${latestExt.sha1}, Jgit=\${latestJgit.sha1}" }
+            check(latestExt.fullMessage == latestJgit.fullMessage) { "Parity failure: getLatestCommit fullMessage Ext=\${latestExt.fullMessage}, Jgit=\${latestJgit.fullMessage}" }
+            check(latestExt.commitTimeEpochMs == latestJgit.commitTimeEpochMs) { "Parity failure: getLatestCommit commitTimeEpochMs Ext=\${latestExt.commitTimeEpochMs}, Jgit=\${latestJgit.commitTimeEpochMs}" }
+            check(latestExt.authorTimeEpochMs == latestJgit.authorTimeEpochMs) { "Parity failure: getLatestCommit authorTimeEpochMs Ext=\${latestExt.authorTimeEpochMs}, Jgit=\${latestJgit.authorTimeEpochMs}" }
+
+            val firstCommitExt = jgitRepo.getCommitById(firstExt, useJgit = false)
+            val firstCommitJgit = jgitRepo.getCommitById(firstJgit, useJgit = true)
+            check(firstCommitExt.sha1 == firstCommitJgit.sha1) { "Parity failure: getCommitById sha1 Ext=\${firstCommitExt.sha1}, Jgit=\${firstCommitJgit.sha1}" }
+            check(firstCommitExt.fullMessage == firstCommitJgit.fullMessage) { "Parity failure: getCommitById fullMessage Ext=\${firstCommitExt.fullMessage}, Jgit=\${firstCommitJgit.fullMessage}" }
+
+            val fileRelPath = "group/topiclist.txt"
+            val contentExt = jgitRepo.getFileContentAsStringInACommit(latestExt.sha1, fileRelPath, useJgit = false)
+            val contentJgit = jgitRepo.getFileContentAsStringInACommit(latestExt.sha1, fileRelPath, useJgit = true)
+            check(contentExt == contentJgit) { "Parity failure: getFileContentAsStringInACommit Ext=\$contentExt, Jgit=\$contentJgit" }
+            
+            // --- FUZZY RANDOMIZED PARITY CHECKS ---
+            log.info("Starting fuzzy randomized parity checks...")
+            val allCommitsProcess = ProcessBuilder("git", "log", "--format=%H")
+                .directory(tempDir)
+                .start()
+            val allCommits = allCommitsProcess.inputStream.bufferedReader().readText().trim().lines().filter { it.isNotBlank() }
+
+            val randomCommits = allCommits.shuffled(Random(System.currentTimeMillis())).take(15) // Check up to 15 random commits
+            for (commitSha1 in randomCommits) {
+                // Test getCommitById parity
+                val extCommit = jgitRepo.getCommitById(commitSha1, useJgit = false)
+                val jgitCommit = jgitRepo.getCommitById(commitSha1, useJgit = true)
+                check(extCommit.sha1 == jgitCommit.sha1) { "Fuzzy Parity failure: getCommitById sha1 Ext=\${extCommit.sha1}, Jgit=\${jgitCommit.sha1}" }
+                check(extCommit.fullMessage == jgitCommit.fullMessage) { "Fuzzy Parity failure: getCommitById fullMessage Ext=\${extCommit.fullMessage}, Jgit=\${jgitCommit.fullMessage}" }
+                check(extCommit.commitTimeEpochMs == jgitCommit.commitTimeEpochMs) { "Fuzzy Parity failure: getCommitById commitTimeEpochMs Ext=\${extCommit.commitTimeEpochMs}, Jgit=\${jgitCommit.commitTimeEpochMs}" }
+                check(extCommit.authorTimeEpochMs == jgitCommit.authorTimeEpochMs) { "Fuzzy Parity failure: getCommitById authorTimeEpochMs Ext=\${extCommit.authorTimeEpochMs}, Jgit=\${jgitCommit.authorTimeEpochMs}" }
+
+                // Test getFileContentAsStringInACommit parity for a random file in this commit
+                val lsTreeProcess = ProcessBuilder("git", "ls-tree", "-r", "--name-only", commitSha1)
+                    .directory(tempDir)
+                    .start()
+                val files = lsTreeProcess.inputStream.bufferedReader().readText().trim().lines().filter { it.isNotBlank() }
+                if (files.isNotEmpty()) {
+                    val randomFile = files.random(Random(System.currentTimeMillis()))
+                    val fuzzyContentExt = jgitRepo.getFileContentAsStringInACommit(commitSha1, randomFile, useJgit = false)
+                    val fuzzyContentJgit = jgitRepo.getFileContentAsStringInACommit(commitSha1, randomFile, useJgit = true)
+                    check(fuzzyContentExt == fuzzyContentJgit) { "Fuzzy Parity failure: getFileContentAsStringInACommit for \$randomFile in \$commitSha1" }
+                }
+            }
+            log.info("Fuzzy randomized parity checks passed for \${randomCommits.size} commits!")
+            
+            jgitRepo.close()
+
+            log.info("GitSanityCheck passed successfully. Strict Parity is 100%.")
         } catch (e: Exception) {
             log.error("GitSanityCheck encountered an error: ", e)
             throw e
