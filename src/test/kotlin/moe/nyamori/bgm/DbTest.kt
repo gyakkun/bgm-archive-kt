@@ -5,7 +5,7 @@ import moe.nyamori.bgm.config.*
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.db.SpaceNameMappingData
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
-import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
+import moe.nyamori.bgm.git.GitHelper.getLatestCommit
 import moe.nyamori.bgm.model.*
 import moe.nyamori.bgm.git.JGitCommitAdapter
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
@@ -138,7 +138,7 @@ class DbTest {
             Dao.bgmDao.handleNegativeUid()
             Dao.bgmDao.updatePrevPersistedCommitId(
                 jsonRepo,
-                JGitCommitAdapter(jsonRepo.getLatestCommitRef()).sha1
+                jsonRepo.getLatestCommit().sha1
             )
         }
     }

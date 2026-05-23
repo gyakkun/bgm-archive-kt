@@ -7,7 +7,7 @@ import io.javalin.http.Handler
 import io.javalin.http.HttpStatus
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
+import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommit
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.HttpHelper.checkAndExtractSpaceTypeInContext
 import moe.nyamori.bgm.util.TopicListHelper.getTopicList

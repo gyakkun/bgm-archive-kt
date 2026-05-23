@@ -3,7 +3,7 @@ package moe.nyamori.bgm.util
 import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitRef
+import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommit
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.git.JGitCommitAdapter
 
@@ -14,7 +14,7 @@ object TopicListHelper {
             if (repo.toRepoDtoOrThrow().optIsStatic) return@forEach
             runCatching {
                 val topicListFile = repo.getFileContentAsStringInACommit(
-                    JGitCommitAdapter(repo.getPrevProcessedArchiveCommitRef()).sha1,
+                    repo.getPrevProcessedArchiveCommit().sha1,
                     spaceType.name.lowercase() + "/topiclist.txt"
                 )
                 val tmpResult = topicListFile.lines().mapNotNull { it.toIntOrNull() }.sorted()

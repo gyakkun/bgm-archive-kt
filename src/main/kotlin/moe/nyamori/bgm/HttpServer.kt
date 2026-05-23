@@ -19,7 +19,7 @@ import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.git.GitHelper
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.folderName
-import moe.nyamori.bgm.git.GitHelper.getLatestCommitRef
+import moe.nyamori.bgm.git.GitHelper.getLatestCommit
 import moe.nyamori.bgm.git.SpotChecker
 import moe.nyamori.bgm.http.*
 import moe.nyamori.bgm.model.SpaceType
@@ -63,6 +63,7 @@ object HttpServer {
         setConfigDelegate(cfg)
         writeDbPersistKeyIfNecessary(cfg)
         writeConfigToConfigFolder(cfg)
+        moe.nyamori.bgm.git.GitSanityCheck.performSanityCheck(cfg)
         customizeHttpMsg()
         val app = Javalin.create { config ->
             config.registerPlugin(RateLimitPlugin { cfg ->
@@ -398,7 +399,7 @@ object HttpServer {
         val syncHealth = java.util.concurrent.atomic.AtomicBoolean(true)
         val now = Instant.now()
         val lastCommits = GitHelper.allRepoInDisplayOrder
-            .map { it to it.getLatestCommitRef() }
+            .map { it to it.getLatestCommit() }
             .associate { (repo, commit) ->
                 val folderName = repo.folderName()
                 val dto = repo.toRepoDtoOrThrow()
@@ -407,7 +408,7 @@ object HttpServer {
                     val commitMsg = commit.shortMessage.trim()
 
                     @Transient
-                    private val _msTsHint = JGitCommitAdapter(commit).timestampHint()
+                    private val _msTsHint = commit.timestampHint()
                     val commitTime = prettyMsTs(_msTsHint)
                     val elapsed = Duration.between(
                         Instant.ofEpochMilli(_msTsHint),

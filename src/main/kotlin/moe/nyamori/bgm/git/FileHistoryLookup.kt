@@ -9,7 +9,7 @@ import moe.nyamori.bgm.git.GitHelper.allArchiveRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.folderName
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.git.GitHelper.getRevCommitById
+import moe.nyamori.bgm.git.GitHelper.getCommitById
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.model.lowercaseName
 import moe.nyamori.bgm.util.FilePathHelper
@@ -184,7 +184,7 @@ object FileHistoryLookup {
         val repoIdToRepo = repoList.associateBy { it.repoIdFromDto().toLong() }
         val res = repoIdToRepo.mapNotNull { (k, repo) ->
             repoIdToCommitIdList[k]
-                ?.mapNotNull { runCatching { repo.getRevCommitById(it.commitId) }.getOrNull() }
+                ?.mapNotNull { runCatching { repo.getCommitById(it.commitId) }.getOrNull() }
                 ?.map { it.toChatam(repo) }
         }.flatten()
         res
@@ -249,7 +249,7 @@ object FileHistoryLookup {
         runCatching {
             val repoIdCommitIdList = Dao.bgmDao.queryRepoCommitForCacheByFileRelativePath(relPath)
             repoIdCommitIdList.filter { it.repoId == this.repoIdFromDto().toLong() }
-                .map { this.getRevCommitById(it.commitId) }
+                .map { this.getCommitById(it.commitId) }
                 .map { it.toChatam(this) }
         }.onFailure {
             log.error("Failed to get commit list for $relPath by db query: ", it)

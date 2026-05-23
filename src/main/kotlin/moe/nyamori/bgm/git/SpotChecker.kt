@@ -12,7 +12,7 @@ import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
 import moe.nyamori.bgm.git.GitHelper.getLastCommitSha1StrExtGit
-import moe.nyamori.bgm.git.GitHelper.getRevCommitById
+import moe.nyamori.bgm.git.GitHelper.getCommitById
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
@@ -481,8 +481,8 @@ object SpotChecker {
         } else jsonRepoList).toMutableList().apply {
             sortBy {
                 val lastCommitSha1 = it.getLastCommitSha1StrExtGit()
-                val revCommit = it.getRevCommitById(lastCommitSha1)
-                revCommit.authorIdent.whenAsInstant
+                val revCommit = it.getCommitById(lastCommitSha1)
+                revCommit.authorTimeEpochMs
             }
         }
         LOGGER.info("Walking through json repo folders: ${workingRepoList.map { it.absolutePathWithoutDotGit() }}")
@@ -497,7 +497,7 @@ object SpotChecker {
                 return@outer
             }
             val headSha1 = jsonRepo.getLastCommitSha1StrExtGit()
-            LOGGER.info("Last commit sha1 of repo: $headSha1, msg: ${jsonRepo.getRevCommitById(headSha1).shortMessage}")
+            LOGGER.info("Last commit sha1 of repo: $headSha1, msg: ${jsonRepo.getCommitById(headSha1).shortMessage}")
             val gitLsTree = ProcessBuilder()
                 .command("git", "ls-tree", "-r", "--name-only", "HEAD")
                 .directory(File(jsonRepo.absolutePathWithoutDotGit()))

@@ -44,19 +44,10 @@ class FullLifecycleGitTest {
         val htmlRepoId = globalRepoIdCounter++
         val jsonRepoId = globalRepoIdCounter++
 
-        val dirs = listOf(htmlRepoDir, jsonRepoDir)
-        for (dir in dirs) {
-            ProcessBuilder("git", "init").directory(dir).start().waitFor()
-            ProcessBuilder("git", "config", "user.name", "test").directory(dir).start().waitFor()
-            ProcessBuilder("git", "config", "user.email", "test@test.com").directory(dir).start().waitFor()
-            ProcessBuilder("git", "config", "commit.gpgsign", "false").directory(dir).start().waitFor()
-            ProcessBuilder("git", "commit", "-m", "init", "--allow-empty").directory(dir).start().waitFor()
-            
-            // Create a fake placeholder and commit to make sure HEAD exists
-            File(dir, "placeholder").createNewFile()
-            ProcessBuilder("git", "add", ".").directory(dir).start().waitFor()
-            ProcessBuilder("git", "commit", "-m", "GROUP remove placeholder").directory(dir).start().waitFor()
-        }
+        moe.nyamori.bgm.git.GitSanityCheck.initEmptyRepo(jsonRepoDir)
+        
+        val templateHtml = File("src/test/resources/html_samples/templates/group.html").readText()
+        moe.nyamori.bgm.git.GitSanityCheck.generateRealisticRepo(htmlRepoDir, templateHtml)
 
         val htmlRepoDto = RepoDto(
             id = htmlRepoId,
@@ -147,43 +138,7 @@ class FullLifecycleGitTest {
         val htmlRepo = GitHelper.allArchiveRepoListSingleton.first()
         val jsonRepo = GitHelper.allJsonRepoListSingleton.first()
 
-        // 1. Add sample HTML file to repo
-        val topicId = 123456
-        val postId1 = 111111
-        val postId2 = 222222
-
-        val spaceDir = File(htmlRepoDir, "group")
-        spaceDir.mkdirs()
-        val htmlRelPath = FilePathHelper.numberToPath(topicId) + ".html"
-        val htmlFile = File(spaceDir, htmlRelPath)
-        htmlFile.parentFile.mkdirs()
-
-        val templateHtml = File("src/test/resources/html_samples/templates/group.html").readText()
-        val sampleHtml = templateHtml
-            .replace("{topicId}", topicId.toString())
-            .replace("{postId1}", postId1.toString())
-            .replace("{postId2}", postId2.toString())
-        htmlFile.writeText(sampleHtml)
-
-        // Add meta_ts.txt
-        val metaTsFile = File(spaceDir, "meta_ts.txt")
-        val nowTs = System.currentTimeMillis()
-        metaTsFile.appendText("$topicId:$nowTs\n")
-
-        // Add topiclist.txt
-        val topicListFile = File(spaceDir, "topiclist.txt")
-        topicListFile.appendText("$topicId\n")
-
-        // 2. Add and commit html file
-        if (useJgit) {
-            org.eclipse.jgit.api.Git(htmlRepo).use { git ->
-                git.add().addFilepattern(".").call()
-                git.commit().setMessage("GROUP TOPIC: 2026-05-23T04:56:56.660Z | $nowTs").call()
-            }
-        } else {
-            ProcessBuilder("git", "add", ".").directory(htmlRepoDir).start().waitFor()
-            ProcessBuilder("git", "commit", "-m", "GROUP TOPIC: 2026-05-23T04:56:56.660Z | $nowTs").directory(htmlRepoDir).start().waitFor()
-        }
+        val topicId = 123456 // The ID created by GitSanityCheck.generateRealisticRepo
 
         // 2. Html to Json processing
         CommitToJsonProcessor.job(true)

@@ -71,7 +71,7 @@ object GitHelper {
 
     val allRepoInDisplayOrder by lazy {
         allArchiveRepoListSingleton
-            .sortedBy { -1L * JGitCommitAdapter(it.getRevCommitById(it.getLastCommitSha1StrExtGit())).timestampHint() }
+            .sortedBy { -1L * it.getCommitById(it.getLastCommitSha1StrExtGit()).timestampHint() }
             .filter { it.hasCouplingJsonRepo() }
             .map { listOf(it, it.couplingJsonRepo()!!) }
             .flatten()
@@ -84,11 +84,11 @@ object GitHelper {
         require(hasCouplingJsonRepo()) {
             "It should be an archive repo with coupling json repo!"
         }
-        val prevProcessedArchiveCommit = getPrevProcessedArchiveCommitRef()
-        val latestArchiveCommit = getLatestCommitRef()
+        val prevProcessedCommit = getPrevProcessedArchiveCommit()
+        val latestArchiveCommit = getLatestCommit()
         return this.getWalkBetweenCommitInReverseOrder(
             latestArchiveCommit,
-            prevProcessedArchiveCommit,
+            prevProcessedCommit,
             stepInAdvance = false
         )
     }
@@ -97,14 +97,14 @@ object GitHelper {
      * @param stepInAdvance Walk from top to bottom are inclusive
      */
     fun Repository.getWalkBetweenCommitInReverseOrder(
-        topCommit: RevCommit,
-        bottomCommit: RevCommit,
+        topCommit: IGitCommit,
+        bottomCommit: IGitCommit,
         stepInAdvance: Boolean = true
     ): RevWalk {
         this.let {
             val walk = RevWalk(it)
-            walk.markStart(topCommit)
-            walk.markUninteresting(bottomCommit)
+            walk.markStart(it.parseCommit(org.eclipse.jgit.lib.ObjectId.fromString(topCommit.sha1)))
+            walk.markUninteresting(it.parseCommit(org.eclipse.jgit.lib.ObjectId.fromString(bottomCommit.sha1)))
             walk.sort(RevSort.REVERSE, true) // // from bottom to top
             // the walk will include (bottom-1) commit
             // step next in advance
@@ -113,13 +113,26 @@ object GitHelper {
         }
     }
 
-    fun Repository.getRevCommitById(id: String): RevCommit {
-        this.let { repo ->
-            // val revWalk = RevWalk(repo)
-            // val revId = repo.resolve(id)
-            // val revCommit = revWalk.parseCommit(revId)
-            return repo.parseCommit(ObjectId.fromString(id))
+    fun Repository.getCommitById(id: String): IGitCommit {
+        if (Config.preferJgit) {
+            return JGitCommitAdapter(this.parseCommit(ObjectId.fromString(id)))
         }
+        val cmd = arrayOf("git", "--no-pager", "log", "-1", "--format=%H%x00%ct%x00%at%x00%B", id)
+        val gitProcess = ProcessBuilder(*cmd)
+            .directory(File(this.absolutePathWithoutDotGit()))
+            .start()
+        val output = gitProcess.inputStream.bufferedReader().readText()
+        if (gitProcess.waitFor() != 0) {
+            val err = gitProcess.errorStream.bufferedReader().readText()
+            throw IllegalStateException("Failed to get commit by id $id: $err")
+        }
+        val parts = output.split('\u0000', limit = 4)
+        if (parts.size != 4) throw IllegalStateException("Unexpected git log output for commit $id: $output")
+        val sha1 = parts[0]
+        val commitTimeEpochMs = parts[1].trim().toLong() * 1000L
+        val authorTimeEpochMs = parts[2].trim().toLong() * 1000L
+        val fullMessage = parts[3].trim()
+        return GitExtCommit(sha1, fullMessage, commitTimeEpochMs, authorTimeEpochMs)
     }
 
     fun Repository.getFirstCommitIdStr(): String {
@@ -140,23 +153,23 @@ object GitHelper {
         return msgList.lastOrNull { it.isNotBlank() }?.trim() ?: throw IllegalStateException("Cannot find first commit id")
     }
 
-    fun Repository.getGivenCommitByIdStrOrFirstCommit(commitIdStr: String): RevCommit {
+    fun Repository.getGivenCommitByIdStrOrFirstCommit(commitIdStr: String): IGitCommit {
         return runCatching {
             if (commitIdStr.isBlank()) throw IllegalArgumentException("Commit id should not be blank! Repo: $this")
-            this.getRevCommitById(commitIdStr)
+            this.getCommitById(commitIdStr)
         }.onFailure {
             log.error("Error when getting commit by id in repo-$this, id-$commitIdStr", it)
-        }.getOrDefault(this.getRevCommitById(this.getFirstCommitIdStr()))
+        }.getOrDefault(this.getCommitById(this.getFirstCommitIdStr()))
     }
 
     fun Repository.getGivenCommitIdStrOrFirstCommit(commitIdStr: String): String {
         if (commitIdStr.isBlank()) return this.getFirstCommitIdStr()
         // If native git, we just return the str (assuming it's valid). We could validate it with `git cat-file -t` but we trust the DB mostly.
         if (!Config.preferJgit) return commitIdStr
-        return JGitCommitAdapter(this.getGivenCommitByIdStrOrFirstCommit(commitIdStr)).sha1
+        return this.getGivenCommitByIdStrOrFirstCommit(commitIdStr).sha1
     }
 
-    fun getPrevPersistedJsonCommitRef(jsonRepo: Repository): RevCommit {
+    fun getPrevPersistedJsonCommit(jsonRepo: Repository): IGitCommit {
         return jsonRepo.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo))
     }
 
@@ -164,7 +177,7 @@ object GitHelper {
         return jsonRepo.getGivenCommitIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo))
     }
 
-    fun Repository.getPrevProcessedArchiveCommitRef(): RevCommit {
+    fun Repository.getPrevProcessedArchiveCommit(): IGitCommit {
         require(this.hasCouplingJsonRepo())
         return getGivenCommitByIdStrOrFirstCommit(
             getPrevProcessedArchiveCommitRevIdStr(couplingJsonRepo()!!)
@@ -178,12 +191,10 @@ object GitHelper {
         )
     }
 
-    fun Repository.getLatestCommitRef(): RevCommit {
+    fun Repository.getLatestCommit(): IGitCommit {
         this.let { repo ->
-            val revWalk = RevWalk(repo)
-            val latestHeadCommitRevId = repo.resolve(HEAD)
-            val latestHeadCommit = revWalk.parseCommit(latestHeadCommitRevId)
-            return latestHeadCommit
+            val latestHeadCommitRevId = repo.resolve(HEAD).name
+            return repo.getCommitById(latestHeadCommitRevId)
         }
     }
 
@@ -194,7 +205,7 @@ object GitHelper {
     fun getPrevProcessedArchiveCommitRevIdStr(jsonRepo: Repository): String {
         if (jsonRepo.isBare) {
             return jsonRepo.getFileContentAsStringInACommit(
-                JGitCommitAdapter(jsonRepo.getLatestCommitRef()).sha1,
+                jsonRepo.getLatestCommit().sha1,
                 prevProcessedCommitRevIdFileName
             ).trim()
         } else {
@@ -385,12 +396,12 @@ object GitHelper {
         action: (commit: GitCommitDto, changedFiles: List<String>) -> Unit
     ) {
         if (Config.preferJgit) {
-            val topCommit = this.getRevCommitById(latestSha1)
-            val bottomCommit = this.getRevCommitById(prevProcessedSha1)
+            val topCommit = this.getCommitById(latestSha1)
+            val bottomCommit = this.getCommitById(prevProcessedSha1)
             val walk = this.getWalkBetweenCommitInReverseOrder(topCommit, bottomCommit, false)
             var prev = walk.next()
             while (prev != null) {
-                if (bottomCommit == prev) {
+                if (bottomCommit.sha1 == prev.name) {
                     break
                 }
                 prev = walk.next()
