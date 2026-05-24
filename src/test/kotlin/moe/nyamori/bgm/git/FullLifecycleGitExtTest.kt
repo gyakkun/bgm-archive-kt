@@ -9,7 +9,7 @@ import moe.nyamori.bgm.config.setConfigDelegate
 import moe.nyamori.bgm.db.BgmDaoSqlite
 import moe.nyamori.bgm.db.Dao
 import moe.nyamori.bgm.db.IBgmDaoProvider
-import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
+import moe.nyamori.bgm.git.GitHelper.getLastestCommitSha1Str
 import moe.nyamori.bgm.model.SpaceType
 import moe.nyamori.bgm.util.CommitHistoryCacheHelper.buildCache
 import moe.nyamori.bgm.util.FilePathHelper
@@ -168,7 +168,7 @@ class FullLifecycleGitTest {
 
         // Verify cache updated successfully
         val prevCachedSha1 = Dao.bgmDao.getPrevCachedCommitId(htmlRepo)
-        val latestHtmlSha1 = htmlRepo.getLatestCommitSha1StrExt()
+        val latestHtmlSha1 = htmlRepo.getLastestCommitSha1Str()
         assertEquals(latestHtmlSha1, prevCachedSha1, "Cache marker should catch up to the latest commit")
     }
 }

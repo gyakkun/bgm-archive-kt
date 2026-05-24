@@ -12,7 +12,7 @@ import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.getCommitById
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.git.GitHelper.getLastCommitSha1StrExtGit
+import moe.nyamori.bgm.git.GitHelper.getLastestCommitSha1Str
 import moe.nyamori.bgm.git.GitHelper.simpleName
 import moe.nyamori.bgm.model.Space
 import moe.nyamori.bgm.model.SpaceType
@@ -362,7 +362,7 @@ object SpotChecker {
         LOGGER.info("New bitset size: ${newBs.size()}. Cardinality: ${newBs.cardinality()}. Zero count: ${newBs.size() - newBs.cardinality()}")
         val hiddenTopicMaskFileContent =
             archiveRepo.getFileContentAsStringInACommit(
-                archiveRepo.getLastCommitSha1StrExtGit(),
+                archiveRepo.getLastestCommitSha1Str(),
                 "${spaceType.name.lowercase()}/$HIDDEN_TOPIC_MASK_FILE_NAME"
             )
         if (hiddenTopicMaskFileContent.isNotBlank()) {
@@ -484,7 +484,7 @@ object SpotChecker {
             allJsonRepoListSingleton
         } else jsonRepoList).toMutableList().apply {
             sortBy {
-                val lastCommitSha1 = it.getLastCommitSha1StrExtGit()
+                val lastCommitSha1 = it.getLastestCommitSha1Str()
                 val revCommit = it.getCommitById(lastCommitSha1)
                 revCommit.authorTimeEpochMs
             }
@@ -500,7 +500,7 @@ object SpotChecker {
                 LOGGER.debug("skipping static repo {}", jsonRepo.simpleName())
                 return@outer
             }
-            val headSha1 = jsonRepo.getLastCommitSha1StrExtGit()
+            val headSha1 = jsonRepo.getLastestCommitSha1Str()
             LOGGER.info("Last commit sha1 of repo: $headSha1, msg: ${jsonRepo.getCommitById(headSha1).shortMessage}")
             val gitLsTree = ProcessBuilder()
                 .command("git", "ls-tree", "-r", "--name-only", "HEAD")

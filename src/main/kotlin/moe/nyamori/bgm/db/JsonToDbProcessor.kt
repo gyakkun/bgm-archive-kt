@@ -6,7 +6,7 @@ import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.allJsonRepoListSingleton
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
+import moe.nyamori.bgm.git.GitHelper.getLastestCommitSha1Str
 import moe.nyamori.bgm.git.GitHelper.getPrevPersistedJsonCommitSha1Str
 import moe.nyamori.bgm.git.GitHelper.hasCouplingArchiveRepo
 import moe.nyamori.bgm.git.GitHelper.processHistory
@@ -68,7 +68,7 @@ object JsonToDbProcessor {
 
         reposToProcess.forEach { jsonRepo ->
 
-            val latestSha1 = jsonRepo.getLatestCommitSha1StrExt()
+            val latestSha1 = jsonRepo.getLastestCommitSha1Str()
             val prevPersistedSha1 = getPrevPersistedJsonCommitSha1Str(jsonRepo)
             
             val sidNameMappingSet = mutableSetOf<SpaceNameMappingData>()

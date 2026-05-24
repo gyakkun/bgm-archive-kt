@@ -66,7 +66,7 @@ object GitHelper {
 
     val allRepoInDisplayOrder by lazy {
         allArchiveRepoListSingleton
-            .sortedBy { -1L * it.getCommitById(it.getLastCommitSha1StrExtGit()).timestampHint() }
+            .sortedBy { -1L * it.getCommitById(it.getLastestCommitSha1Str()).timestampHint() }
             .filter { it.hasCouplingJsonRepo() }
             .map { listOf(it, it.couplingJsonRepo()!!) }
             .flatten()
@@ -131,21 +131,21 @@ object GitHelper {
     }
 
     fun Repository.getFirstCommitIdStr(useJgit: Boolean = Config.preferJgit): String {
-        if (!useJgit) return getFirstCommitIdStrExt()
-        this.let { repo ->
-            val headObj = this.resolve(HEAD)
-            val headCommit = repo.parseCommit(headObj)
-            val tmpWalk = RevWalk(repo)
-            tmpWalk.markStart(headCommit)
-            return JGitCommitAdapter(tmpWalk.last()).sha1
+        if (useJgit) {
+            this.let { repo ->
+                val headObj = this.resolve(HEAD)
+                val headCommit = repo.parseCommit(headObj)
+                val tmpWalk = RevWalk(repo)
+                tmpWalk.markStart(headCommit)
+                return JGitCommitAdapter(tmpWalk.last()).sha1
+            }
         }
-    }
-
-    fun Repository.getFirstCommitIdStrExt(): String {
         val cmd = "git rev-list --max-parents=0 HEAD"
         val gitProcess = Runtime.getRuntime().exec(cmd, null, File(this.absolutePathWithoutDotGit()))
-        val msgList = gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = true, printAtStdErr = false, logCmd = false)
-        return msgList.lastOrNull { it.isNotBlank() }?.trim() ?: throw IllegalStateException("Cannot find first commit id")
+        val msgList =
+            gitProcess.blockAndPrintProcessResults(cmd = cmd, toLines = true, printAtStdErr = false, logCmd = false)
+        return msgList.lastOrNull { it.isNotBlank() }?.trim()
+            ?: throw IllegalStateException("Cannot find first commit id")
     }
 
     fun Repository.getGivenCommitByIdStrOrFirstCommit(commitIdStr: String, useJgit: Boolean = Config.preferJgit): IGitCommit {
@@ -157,19 +157,8 @@ object GitHelper {
         }.getOrDefault(this.getCommitById(this.getFirstCommitIdStr(useJgit), useJgit))
     }
 
-    fun Repository.getGivenCommitIdStrOrFirstCommit(commitIdStr: String, useJgit: Boolean = Config.preferJgit): String {
-        if (commitIdStr.isBlank()) return this.getFirstCommitIdStr(useJgit)
-        // If native git, we just return the str (assuming it's valid). We could validate it with `git cat-file -t` but we trust the DB mostly.
-        if (!useJgit) return commitIdStr
-        return this.getGivenCommitByIdStrOrFirstCommit(commitIdStr, useJgit).sha1
-    }
-
-    fun getPrevPersistedJsonCommit(jsonRepo: Repository, useJgit: Boolean = Config.preferJgit): IGitCommit {
-        return jsonRepo.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo), useJgit)
-    }
-
     fun getPrevPersistedJsonCommitSha1Str(jsonRepo: Repository, useJgit: Boolean = Config.preferJgit): String {
-        return jsonRepo.getGivenCommitIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo), useJgit)
+        return jsonRepo.getGivenCommitByIdStrOrFirstCommit(Dao.bgmDao.getPrevPersistedCommitId(jsonRepo), useJgit).sha1
     }
 
     fun Repository.getPrevProcessedArchiveCommit(useJgit: Boolean = Config.preferJgit): IGitCommit {
@@ -181,35 +170,26 @@ object GitHelper {
     }
 
     fun Repository.getPrevProcessedArchiveCommitSha1Str(useJgit: Boolean = Config.preferJgit): String {
-        require(this.hasCouplingJsonRepo())
-        return getGivenCommitIdStrOrFirstCommit(
-            getPrevProcessedArchiveCommitRevIdStr(couplingJsonRepo()!!),
-            useJgit
-        )
+        return getPrevProcessedArchiveCommit(useJgit).sha1
     }
 
     fun Repository.getLatestCommit(useJgit: Boolean = Config.preferJgit): IGitCommit {
-        this.let { repo ->
-            val latestHeadCommitRevId = repo.resolve(HEAD).name
-            return repo.getCommitById(latestHeadCommitRevId, useJgit)
-        }
+        return this.getCommitById(this.getLastestCommitSha1Str(useJgit), useJgit)
     }
 
-    fun Repository.getLatestCommitSha1StrExt(): String {
-        return this.getLastCommitSha1StrExtGit()
-    }
-
-    fun getPrevProcessedArchiveCommitRevIdStr(jsonRepo: Repository): String {
+    private fun getPrevProcessedArchiveCommitRevIdStr(jsonRepo: Repository, useJgit: Boolean = Config.preferJgit): String {
         if (jsonRepo.isBare) {
             return jsonRepo.getFileContentAsStringInACommit(
                 jsonRepo.getLatestCommit().sha1,
-                prevProcessedCommitRevIdFileName
+                prevProcessedCommitRevIdFileName,
+                useJgit
             ).trim()
         } else {
             return runCatching {
                 jsonRepo.getFileContentAsStringInACommit(
-                    jsonRepo.getLastCommitSha1StrExtGit(),
-                    prevProcessedCommitRevIdFileName
+                    jsonRepo.getLastestCommitSha1Str(),
+                    prevProcessedCommitRevIdFileName,
+                    useJgit
                 ).trim()
             }.onFailure {
                 log.error("Failed to get last commit sha1 str using ext git: ", it)
@@ -333,7 +313,10 @@ object GitHelper {
             }
     }
 
-    fun Repository.getLastCommitSha1StrExtGit(): String {
+    fun Repository.getLastestCommitSha1Str(useJgit: Boolean = Config.preferJgit): String {
+        if (useJgit) {
+            return this.resolve(HEAD).name
+        }
         val cmd = "git rev-parse HEAD"
         val gitProcess = Runtime.getRuntime()
             .exec(cmd, null, File(this.absolutePathWithoutDotGit()))
@@ -363,7 +346,7 @@ object GitHelper {
     }
 
 
-    fun Repository.findChangedFilePaths(prevCommit: RevCommit, currentCommit: RevCommit): List<String> {
+    fun Repository.findChangedFilePathsJgit(prevCommit: RevCommit, currentCommit: RevCommit): List<String> {
         val prevTree = prevCommit.tree
         val curTree = currentCommit.tree
         val result = mutableListOf<String>()
@@ -409,7 +392,7 @@ object GitHelper {
                     log.warn("Commit ${JGitCommitAdapter(cur).sha1} has been iterated twice! Repo: ${this.simpleName()}")
                     return@forEach
                 }
-                val files = this.findChangedFilePaths(prev, cur)
+                val files = this.findChangedFilePathsJgit(prev, cur)
                 action(JGitCommitAdapter(cur), files)
                 prev = cur
             }

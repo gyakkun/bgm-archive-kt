@@ -8,7 +8,7 @@ import moe.nyamori.bgm.config.toRepoDtoOrThrow
 import moe.nyamori.bgm.git.GitHelper.absolutePathWithoutDotGit
 import moe.nyamori.bgm.git.GitHelper.couplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.getFileContentAsStringInACommit
-import moe.nyamori.bgm.git.GitHelper.getLatestCommitSha1StrExt
+import moe.nyamori.bgm.git.GitHelper.getLastestCommitSha1Str
 import moe.nyamori.bgm.git.GitHelper.getPrevProcessedArchiveCommitSha1Str
 import moe.nyamori.bgm.git.GitHelper.hasCouplingJsonRepo
 import moe.nyamori.bgm.git.GitHelper.processHistory
@@ -70,7 +70,7 @@ object CommitToJsonProcessor {
             repoCounter++
             val jsonRepo = archiveRepo.couplingJsonRepo()!!
             val prevProcessedSha1 = archiveRepo.getPrevProcessedArchiveCommitSha1Str()
-            val latestSha1 = archiveRepo.getLatestCommitSha1StrExt()
+            val latestSha1 = archiveRepo.getLastestCommitSha1Str()
 
             jsonRepo.toRepoDtoOrThrow().withLock {
                 walkAndWriteJsonAndCommitToJsonRepo(
