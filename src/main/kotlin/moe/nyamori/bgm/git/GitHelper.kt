@@ -75,37 +75,22 @@ object GitHelper {
             }
     }
 
-    fun Repository.getWalkBetweenPrevProcessedArchiveCommitAndLatestArchiveCommitInReverseOrder(): RevWalk {
-        require(hasCouplingJsonRepo()) {
-            "It should be an archive repo with coupling json repo!"
-        }
-        val prevProcessedCommit = getPrevProcessedArchiveCommit()
-        val latestArchiveCommit = getLatestCommit()
-        return this.getWalkBetweenCommitInReverseOrder(
-            latestArchiveCommit,
-            prevProcessedCommit,
-            stepInAdvance = false
-        )
-    }
-
     /**
-     * @param stepInAdvance Walk from top to bottom are inclusive
+     * It's a [top, bottom] range, both ends included
      */
     fun Repository.getWalkBetweenCommitInReverseOrder(
         topCommit: IGitCommit,
         bottomCommit: IGitCommit,
-        stepInAdvance: Boolean = true
     ): RevWalk {
-        this.let {
-            val walk = RevWalk(it)
-            walk.markStart(it.parseCommit(org.eclipse.jgit.lib.ObjectId.fromString(topCommit.sha1)))
-            walk.markUninteresting(it.parseCommit(org.eclipse.jgit.lib.ObjectId.fromString(bottomCommit.sha1)))
-            walk.sort(RevSort.REVERSE, true) // // from bottom to top
-            // the walk will include (bottom-1) commit
-            // step next in advance
-            if (stepInAdvance) walk.next()
-            return walk
-        }
+        val repo = this
+        val walk = RevWalk(repo)
+        // Note: Caveat on using walk.parseCommit(), it will add the start commit to a "visited"
+        //  collection that it will be excluded from the walk
+        //  So we use repo.parseCommit here to avoid this subtle issue
+        walk.markStart(repo.parseCommit(ObjectId.fromString(topCommit.sha1)))
+        walk.markUninteresting(repo.parseCommit(ObjectId.fromString(bottomCommit.sha1)))
+        walk.sort(RevSort.REVERSE, true) // from bottom to top
+        return walk
     }
 
     fun Repository.getCommitById(id: String, useJgit: Boolean = Config.preferJgit): IGitCommit {
@@ -362,7 +347,7 @@ object GitHelper {
                     .setShowNameOnly(true)
                     .call()
                     .forEach {
-                        if (it.newPath == DEV_NULL) return@forEach
+                        if (it.newPath == DEV_NULL /* means deleted */ ) return@forEach
                         result.add(it.newPath)
                     }
             }
@@ -379,10 +364,10 @@ object GitHelper {
         if (useJgit) {
             val topCommit = this.getCommitById(latestSha1, true)
             val bottomCommit = this.getCommitById(prevProcessedSha1, true)
-            val walk = this.getWalkBetweenCommitInReverseOrder(topCommit, bottomCommit, false)
+            val walk = this.getWalkBetweenCommitInReverseOrder(topCommit, bottomCommit)
             var prev = walk.next()
             while (prev != null) {
-                if (bottomCommit.sha1 == prev.name) {
+                if (prevProcessedSha1 == JGitCommitAdapter(prev).sha1) {
                     break
                 }
                 prev = walk.next()

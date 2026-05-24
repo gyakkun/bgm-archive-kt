@@ -63,8 +63,8 @@ object CommitToJsonProcessor {
             log.warn("no repo to process: isAll = {} , html repo id = {}", isAll, htmlRepoId)
         }
 
-        var shouldSpotCheck = true
-        var firstCommitSpaceType: SpaceType? = null
+        val shouldSpotCheck = true
+        val firstCommitSpaceType: SpaceType? = null
         var repoCounter = 0
         reposToProcess.forEach { archiveRepo ->
             repoCounter++
