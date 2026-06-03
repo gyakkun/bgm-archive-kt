@@ -19,6 +19,7 @@ import moe.nyamori.bgm.util.HttpHelper
 import moe.nyamori.bgm.util.ParserHelper.getStyleRevNumberFromHtmlString
 import moe.nyamori.bgm.util.SealedTypeAdapterFactory
 import org.slf4j.LoggerFactory
+import java.net.URI
 import java.time.Instant
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -87,7 +88,7 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                         timestamp
                     )
                     fillMetaHeader(ctx, cp)
-                    html = htmlModifier(html)
+                    html = htmlModifier(html, ctx.req().getHeaders("Referer").toList().firstOrNull())
                     ctx.html(html)
                 } else {
                     val (cp, jsonStr) = FileHistoryLookup.getJsonFileHashMsgContentAsStringTimestamp(
@@ -116,13 +117,36 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
         header("x-bak-jcm", cp.json.fullMessage)
     }
 
-    private fun htmlModifier(html: String): String {
+    private fun htmlModifier(html: String, referer: String?): String {
         var result = html
         val rev = getStyleRevNumberFromHtmlString(html)
         result = result
-            .replace("chii.in", "bgm.tv")
-            .replace("bangumi.tv", "bgm.tv")
+            .let {
+                var refererUri: URI? = null
+                if (referer != null && runCatching { URI.create(referer) }.getOrNull()
+                        ?.also { uriCreated -> refererUri = uriCreated } != null
+                ) {
+                    val host = refererUri!!.host
+                    it.replace("chii.in", host)
+                        .replace("bangumi.tv", host)
+                        .replace("bgm.tv", host)
+                } else {
+                    it.replace("chii.in", "bgm.tv")
+                        .replace("bangumi.tv", "bgm.tv")
+                }
+            }
             .replace("data-theme=\"light\"", "data-theme=\"dark\"")
+            .let {
+                var pivot = 0
+                if(html.indexOf("__cf_email__", pivot).also { pivot=it } >=0
+                    && html.indexOf("data-cfemail", pivot).also { pivot=it } >=0
+                    && html.indexOf("email-protection",pivot) >=0) {
+                    it.replace("</body>", """
+                        <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+                        </body>
+                    """.trimIndent())
+                } else it
+            }
             .replace(
             "</body>",
             """
@@ -130,8 +154,7 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                 <script src="https://bgm.tv/min/g=mobile?r$rev" type="text/javascript"></script>
                 <script type="text/javascript">chiiLib.topic_history.init();chiiLib.likes.init();</script>
                 </body>
-            """.trimIndent()
-        )
+            """.trimIndent())
         return result
     }
 }
