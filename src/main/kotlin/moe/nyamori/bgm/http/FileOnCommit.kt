@@ -88,7 +88,7 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                         timestamp
                     )
                     fillMetaHeader(ctx, cp)
-                    html = htmlModifier(html, ctx.req().getHeaders("Referer").toList().firstOrNull())
+                    html = htmlModifier(html)
                     ctx.html(html)
                 } else {
                     val (cp, jsonStr) = FileHistoryLookup.getJsonFileHashMsgContentAsStringTimestamp(
@@ -117,24 +117,12 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
         header("x-bak-jcm", cp.json.fullMessage)
     }
 
-    private fun htmlModifier(html: String, referer: String?): String {
+    private fun htmlModifier(html: String): String {
         var result = html
         val rev = getStyleRevNumberFromHtmlString(html)
         result = result
-            .let {
-                var refererUri: URI? = null
-                if (referer != null && runCatching { URI.create(referer) }.getOrNull()
-                        ?.also { uriCreated -> refererUri = uriCreated } != null
-                ) {
-                    val host = refererUri!!.host
-                    it.replace("chii.in", host)
-                        .replace("bangumi.tv", host)
-                        .replace("bgm.tv", host)
-                } else {
-                    it.replace("chii.in", "bgm.tv")
-                        .replace("bangumi.tv", "bgm.tv")
-                }
-            }
+            .replace("chii.in", "bgm.tv")
+            .replace("bangumi.tv", "bgm.tv")
             .replace("data-theme=\"light\"", "data-theme=\"dark\"")
             .let {
                 var pivot = 0
