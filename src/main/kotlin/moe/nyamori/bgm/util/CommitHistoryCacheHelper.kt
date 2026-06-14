@@ -22,8 +22,8 @@ object CommitHistoryCacheHelper {
         val prevCachedSha1 =
             Dao.bgmDao.getPrevCachedCommitId(this) ?: run { isFreshCacheBuild = true; this.getFirstCommitIdStr(useJgit = jgitToggle) }
         val latestSha1 = this.getLatestCommit(useJgit = jgitToggle).sha1
-        val firstCommitSha1 = this.getFirstCommitIdStr(useJgit = jgitToggle)
-        
+        val firstCommitSha1Getter = { this.getFirstCommitIdStr(useJgit = jgitToggle) }
+
         var prevCachedMsg = ""
         var latestMsg = ""
         runCatching {
@@ -39,8 +39,8 @@ object CommitHistoryCacheHelper {
                 counter++
                 val curCommitId = cur.sha1
                 val curCommitFullMsg = cur.fullMessage
-                
-                if (curCommitFullMsg.startsWith("META", ignoreCase = true) && curCommitId == firstCommitSha1) {
+
+                if (curCommitFullMsg.startsWith("META", ignoreCase = true) && curCommitId == firstCommitSha1Getter()) {
                     Dao.bgmDao.updatePrevCachedCommitId(repo, curCommitId)
                     return@processHistory
                 }
