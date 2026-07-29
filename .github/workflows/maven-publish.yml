@@ -25,9 +25,13 @@ jobs:
     - run: git config --global user.email "test@example.com"
     - run: git config --global user.name "Github Action"
     - run: echo "M2_HOME=$(dirname $(dirname `which mvn`))" >> $GITHUB_ENV
-    - run: mkdir ~/.m2
+    - run: mkdir -p ~/.m2
     - run: mv $GITHUB_WORKSPACE/settings.xml ~/.m2
     - run: mv $GITHUB_WORKSPACE/toolchains.xml ~/.m2
+    - name: Download dependencies and unsign JGit JAR
+      run: |
+        mvn --batch-mode dependency:go-offline || true
+        find ~/.m2/repository -name "org.eclipse.jgit-*.jar" -exec zip -d {} "META-INF/*.SF" "META-INF/*.RSA" "META-INF/*.DSA" "META-INF/ECLIPSE_.*" \; || true
     - name: Verify package
       run: mvn --batch-mode verify
     - name: Git clean up dry run
