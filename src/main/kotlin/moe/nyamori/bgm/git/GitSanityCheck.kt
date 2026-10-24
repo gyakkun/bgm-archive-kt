@@ -18,6 +18,7 @@ object GitSanityCheck {
     fun initEmptyRepo(dir: File) {
         dir.mkdirs()
         runGitCommand(dir, "git", "init")
+        runGitCommand(dir, "git", "config", "core.autocrlf", "false")
         runGitCommand(dir, "git", "config", "user.name", "test")
         runGitCommand(dir, "git", "config", "user.email", "test@test.com")
         runGitCommand(dir, "git", "config", "commit.gpgsign", "false")
@@ -215,13 +216,14 @@ object GitSanityCheck {
         // System.err.println("command to run ${command.contentToString()}")
         val pb = ProcessBuilder(*command)
             .directory(dir)
-            .start()
+            .redirectErrorStream(true)
         // System.err.println("command started ${command.contentToString()}")
-        val exitCode = pb.waitFor()
+        val p = pb.start()
+        val output = p.inputStream.bufferedReader().readText()
+        val exitCode = p.waitFor()
         // System.err.println("wait for done ${command.contentToString()}")
         if (exitCode != 0) {
-            val errorStream = pb.errorStream.bufferedReader().readText()
-            throw IllegalStateException("Command ${command.joinToString(" ")} failed with exit code $exitCode: $errorStream")
+            throw IllegalStateException("Command ${command.joinToString(" ")} failed with exit code $exitCode: $output")
         }
         // System.err.println("end of command")
     }
