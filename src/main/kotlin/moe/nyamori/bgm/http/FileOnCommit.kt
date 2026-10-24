@@ -70,11 +70,12 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                     if (floorTimestamp == null) {
                         floorTimestamp = treeSet.first()
                     }
+                    val query = ctx.queryString()?.let { "?$it" } ?: ""
                     ctx.redirect(
                         if (isHtml) {
-                            ctx.path().replace(Regex("/${timestampPathParam}/html"), "/${floorTimestamp}/html")
+                            ctx.path().replace(Regex("/${timestampPathParam}/html"), "/${floorTimestamp}/html") + query
                         } else {
-                            ctx.path().replace(Regex("/${timestampPathParam}/*\$"), "/${floorTimestamp}")
+                            ctx.path().replace(Regex("/${timestampPathParam}/*\$"), "/${floorTimestamp}") + query
                         }
                     )
                     return
@@ -88,7 +89,9 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                         timestamp
                     )
                     fillMetaHeader(ctx, cp)
-                    html = htmlModifier(html)
+                    val domainParam = ctx.queryParam("domain")?.lowercase()
+                    val targetDomain = if (domainParam in LEGAL_DOMAINS) domainParam!! else DEFAULT_DOMAIN
+                    html = htmlModifier(html, targetDomain)
                     ctx.html(html)
                 } else {
                     val (cp, jsonStr) = FileHistoryLookup.getJsonFileHashMsgContentAsStringTimestamp(
@@ -117,33 +120,42 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
         header("x-bak-jcm", cp.json.fullMessage)
     }
 
-    private fun htmlModifier(html: String): String {
-        var result = html
-        val rev = getStyleRevNumberFromHtmlString(html)
-        result = result
-            .replace("chii.in", "bgm.tv")
-            .replace("bangumi.tv", "bgm.tv")
-            .replace("data-theme=\"light\"", "data-theme=\"dark\"")
-            .let {
-                var pivot = 0
-                if(html.indexOf("__cf_email__", pivot).also { pivot=it } >=0
-                    && html.indexOf("data-cfemail", pivot).also { pivot=it } >=0
-                    && html.indexOf("email-protection",pivot) >=0) {
-                    it.replace("</body>", """
-                        <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
-                        </body>
-                    """.trimIndent())
-                } else it
-            }
-            .replace(
-            "</body>",
-            """
-                <script src="https://bgm.tv/min/g=ui?r$rev" type="text/javascript"></script>
-                <script src="https://bgm.tv/min/g=mobile?r$rev" type="text/javascript"></script>
-                <script type="text/javascript">chiiLib.topic_history.init();chiiLib.likes.init();</script>
-                </body>
-            """.trimIndent())
-        return result
+    companion object {
+        val LEGAL_DOMAINS = setOf("bgm.tv", "bangumi.tv", "chii.in")
+        const val DEFAULT_DOMAIN = "bgm.tv"
+        private val DOMAIN_REGEX = Regex("(?<![a-zA-Z0-9.-])(bgm\\.tv|bangumi\\.tv|chii\\.in)(?![a-zA-Z0-9.-])")
+
+        internal fun htmlModifier(html: String, targetDomain: String = DEFAULT_DOMAIN): String {
+            var result = html
+            val rev = getStyleRevNumberFromHtmlString(html)
+            val validDomain = if (targetDomain.lowercase() in LEGAL_DOMAINS) targetDomain.lowercase() else DEFAULT_DOMAIN
+            result = DOMAIN_REGEX.replace(result, validDomain)
+                .replace("data-theme=\"light\"", "data-theme=\"dark\"")
+                .let {
+                    var pivot = 0
+                    if (html.indexOf("__cf_email__", pivot).also { pivot = it } >= 0
+                        && html.indexOf("data-cfemail", pivot).also { pivot = it } >= 0
+                        && html.indexOf("email-protection", pivot) >= 0
+                    ) {
+                        it.replace(
+                            "</body>", """
+                            <script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script>
+                            </body>
+                        """.trimIndent()
+                        )
+                    } else it
+                }
+                .replace(
+                    "</body>",
+                    """
+                    <script src="https://$validDomain/min/g=ui?r$rev" type="text/javascript"></script>
+                    <script src="https://$validDomain/min/g=mobile?r$rev" type="text/javascript"></script>
+                    <script type="text/javascript">chiiLib.topic_history.init();chiiLib.likes.init();</script>
+                    </body>
+                """.trimIndent()
+                )
+            return result
+        }
     }
 }
 

@@ -35,7 +35,22 @@ object LinkHandler : Handler {
         return timelineList
     }
 
+    const getReferrerDomain = () => {
+        try {
+            if (!document.referrer) return null
+            let host = new URL(document.referrer).hostname.toLowerCase()
+            if (host === "bgm.tv" || host === "bangumi.tv" || host === "chii.in") {
+                return host
+            }
+        } catch (e) {
+            console.error("Ex: ", e)
+        }
+        return null
+    }
+
     const go = async () => {
+        let domain = getReferrerDomain()
+        let domainQuery = domain ? ("?domain=" + domain) : ""
         let timelineJsonArr = await getTimeline()
         if (timelineJsonArr.length === 0) {
             onNoContent()
@@ -52,7 +67,7 @@ object LinkHandler : Handler {
             let li = document.createElement("li")
             let a = document.createElement("a")
             a.innerHTML = new Date(ts).toLocaleString()
-            a.setAttribute("href", document.location.pathname.replace("/link", "/") + ts + "/html")
+            a.setAttribute("href", document.location.pathname.replace("/link", "/") + ts + "/html" + domainQuery)
             li.appendChild(a)
             if (idx > 0 && new Date(ts).toLocaleDateString() !== new Date(timelineJsonArr[idx-1]).toLocaleDateString()) {
                 let hrzn = document.createElement("div")
