@@ -40,10 +40,11 @@ open class CssHandler(
     }
 
     private fun redirectToOrigin(ctx: Context) {
+        val targetDomain = FileOnCommit.extractBgmDomain(ctx)
+        val cleanedQs = FileOnCommit.cleanQueryString(ctx.queryString())
         ctx.redirect(
-            "https://bgm.tv" + (
-                    ctx.queryString()
-                        ?.let { qs -> "${ctx.path()}?$qs" }
+            "https://$targetDomain" + (
+                    cleanedQs?.let { qs -> "${ctx.path()}?$qs" }
                         ?: ctx.path()
                     )
         )

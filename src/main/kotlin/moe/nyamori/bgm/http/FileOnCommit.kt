@@ -89,8 +89,7 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
                         timestamp
                     )
                     fillMetaHeader(ctx, cp)
-                    val domainParam = ctx.queryParam("domain")?.lowercase()
-                    val targetDomain = if (domainParam in LEGAL_DOMAINS) domainParam!! else DEFAULT_DOMAIN
+                    val targetDomain = extractBgmDomain(ctx)
                     html = htmlModifier(html, targetDomain)
                     ctx.html(html)
                 } else {
@@ -123,13 +122,50 @@ class FileOnCommit(private val spaceType: SpaceType, private val isHtml: Boolean
     companion object {
         val LEGAL_DOMAINS = setOf("bgm.tv", "bangumi.tv", "chii.in")
         const val DEFAULT_DOMAIN = "bgm.tv"
+        const val BGM_DOMAIN_PARAM = "bgm-domain"
         private val DOMAIN_REGEX = Regex("(?<![a-zA-Z0-9.-])(bgm\\.tv|bangumi\\.tv|chii\\.in)(?![a-zA-Z0-9.-])")
+        private val RELATIVE_HREF_REGEX = Regex("""\bhref=(["'])(/(?!/)[^"']*)\1""")
+
+        fun extractBgmDomain(ctx: Context): String {
+            val domainParam = ctx.queryParam(BGM_DOMAIN_PARAM)?.lowercase()
+            return if (domainParam in LEGAL_DOMAINS) domainParam!! else DEFAULT_DOMAIN
+        }
+
+        fun cleanQueryString(qs: String?): String? {
+            if (qs == null) return null
+            val cleaned = qs
+                .replace(Regex("(^|&)$BGM_DOMAIN_PARAM=[^&]*"), "")
+                .removePrefix("&")
+            return cleaned.ifEmpty { null }
+        }
+
+        internal fun injectBgmDomainToRelativeUrl(url: String, targetDomain: String): String {
+            if (!url.startsWith("/") || url.startsWith("//") || url.contains("$BGM_DOMAIN_PARAM=")) {
+                return url
+            }
+            val hashIndex = url.indexOf('#')
+            val base = if (hashIndex >= 0) url.substring(0, hashIndex) else url
+            val fragment = if (hashIndex >= 0) url.substring(hashIndex) else ""
+            val separator = if (base.contains('?')) {
+                if (base.contains("&amp;")) "&amp;" else "&"
+            } else {
+                "?"
+            }
+            val newBase = "$base$separator$BGM_DOMAIN_PARAM=$targetDomain"
+            return newBase + fragment
+        }
 
         internal fun htmlModifier(html: String, targetDomain: String = DEFAULT_DOMAIN): String {
             var result = html
             val rev = getStyleRevNumberFromHtmlString(html)
             val validDomain = if (targetDomain.lowercase() in LEGAL_DOMAINS) targetDomain.lowercase() else DEFAULT_DOMAIN
             result = DOMAIN_REGEX.replace(result, validDomain)
+            result = RELATIVE_HREF_REGEX.replace(result) { matchResult ->
+                val quote = matchResult.groupValues[1]
+                val originalUrl = matchResult.groupValues[2]
+                val newUrl = injectBgmDomainToRelativeUrl(originalUrl, validDomain)
+                "href=$quote$newUrl$quote"
+            }
                 .replace("data-theme=\"light\"", "data-theme=\"dark\"")
                 .let {
                     var pivot = 0

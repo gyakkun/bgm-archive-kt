@@ -49,6 +49,7 @@ import moe.nyamori.bgm.http.DbSetPersistIdHandler
 import moe.nyamori.bgm.http.DbStatusHandler
 import moe.nyamori.bgm.http.FehDeletedPostHandler
 import moe.nyamori.bgm.http.FileHistoryWrapper
+import moe.nyamori.bgm.http.FileOnCommit
 import moe.nyamori.bgm.http.FileOnCommitWrapper
 import moe.nyamori.bgm.http.ForumEnhanceHandler
 import moe.nyamori.bgm.http.GitRepoStatusHandler
@@ -263,10 +264,11 @@ object HttpServer {
                 get(CssMobileHandler.path, CssMobileHandler)
                 get(CssDistBangumiMinHandler.path, CssDistBangumiMinHandler)
                 get("/*") { // redirect all
+                    val targetDomain = FileOnCommit.extractBgmDomain(it)
+                    val cleanedQs = FileOnCommit.cleanQueryString(it.queryString())
                     it.redirect(
-                        "https://bgm.tv" + (
-                                it.queryString()
-                                    ?.let { qs -> "${it.path()}?$qs" }
+                        "https://$targetDomain" + (
+                                cleanedQs?.let { qs -> "${it.path()}?$qs" }
                                     ?: it.path()
                                 )
                     )

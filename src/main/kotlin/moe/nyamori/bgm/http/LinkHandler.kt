@@ -50,7 +50,7 @@ object LinkHandler : Handler {
 
     const go = async () => {
         let domain = getReferrerDomain()
-        let domainQuery = domain ? ("?domain=" + domain) : ""
+        let domainQuery = domain ? ("?bgm-domain=" + domain) : ""
         let timelineJsonArr = await getTimeline()
         if (timelineJsonArr.length === 0) {
             onNoContent()
